@@ -1,0 +1,40 @@
+name: styio-audit
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      STYIO_PYTHON_VERSION: "3.13.5"
+
+    steps:
+      - name: Checkout styio-platform
+        uses: actions/checkout@v5
+        with:
+          path: styio-platform
+
+      - name: Checkout latest styio-audit policy
+        uses: actions/checkout@v5
+        with:
+          repository: eBioRing/styio-audit
+          ref: ai-dev
+          path: styio-audit
+
+      - name: Set up standardized Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.STYIO_PYTHON_VERSION }}
+
+      - name: Run latest styio-audit gate
+        working-directory: styio-platform
+        run: |
+          git -C ../styio-audit rev-parse HEAD
+          python3 ../styio-audit/bin/styio-audit gate --repo . --project styio-platform
