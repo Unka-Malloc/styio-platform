@@ -28,15 +28,19 @@ Keep documentation governance aligned with the Styio ecosystem while making
 ## Daily Workflow
 
 Refresh indexes after docs-tree changes, validate runbook shape, keep
-`DOC-STATS.md` synchronized with runbook content, and keep GPL license,
-derivative-source policy, and dependency usage-boundary evidence aligned with
-`styio-audit`.
+`DOC-STATS.md` synchronized with runbook content, and keep Apache-2.0 license,
+source-distribution policy, and dependency usage-boundary evidence aligned with
+`styio-audit`. Keep `docs/specs/TECHNOLOGY-COMPONENT-INVENTORY.md` aligned
+with `styio-audit` whenever the technology stack, internal components,
+open-source components, dependency manifests, Apache-2.0 evidence, or commercial-risk
+boundaries change.
 
 ## Change Classes
 
 Docs delivery changes include collection structure, generated indexes,
 runbooks, gate scripts, post-push workflow specs, native JSON contract
-governance docs, regional-node docs, and mirror sync docs.
+governance docs, technology/component inventory docs, regional-node docs, and
+mirror sync docs.
 
 ## Required Gates
 

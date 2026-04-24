@@ -4,7 +4,7 @@
 
 **Last updated:** 2026-04-24
 
-`styio-platform` is a GPL-3.0 C++/Python source project. Its current build and test dependency boundary is:
+`styio-platform` is an Apache-2.0 C++/Python source project. Its current build and test dependency boundary is:
 
 - CMake `FetchContent` downloads `tomlplusplus` for TOML parsing, `nlohmann_json` for JSON serialization, and `googletest` for native test execution.
 - Repository Python scripts and tests use the Python standard library only.

@@ -8,3 +8,5 @@
 
 Specs here apply to the platform repository itself. Shared ecosystem workflow
 changes must stay aligned with upstream specs in `styio` and `styio-spio`.
+
+Technology-stack, internal-component, open-source-component, and dependency-manifest inventory maintenance rules live in [TECHNOLOGY-COMPONENT-INVENTORY.md](./TECHNOLOGY-COMPONENT-INVENTORY.md).
