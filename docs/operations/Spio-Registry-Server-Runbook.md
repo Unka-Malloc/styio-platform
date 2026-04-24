@@ -24,6 +24,8 @@ platform mirror before they can be used locally.
 - native `spio` binary is buildable locally
 - target registry root already exposes the canonical shared layout
 - if publish and fetch roots are split, replication or synchronization is already configured between them
+- Linux VM deployments use Python 3, OpenSSL, and systemd
+- manifest-based publish requests on the server need a local `spio` binary path; archive-based publish requests can run without one
 
 Recommended local build entry:
 
@@ -31,7 +33,67 @@ Recommended local build entry:
 ./scripts/native-check.sh
 ```
 
-## 3. Single-Origin Validation
+## 3. VM One-Command Deployment Bundle
+
+Build the VM bundle from a clean `styio-platform` checkout:
+
+```text
+./scripts/package-registry-server.sh
+```
+
+Copy the generated tarball to the VM and run the installer:
+
+```text
+tar -xzf styio-platform-registry-server-<version>.tar.gz
+cd styio-platform-registry-server-<version>
+sudo ./install.sh
+```
+
+The default install creates:
+
+- `/opt/styio-platform-registry` runtime scripts and Python modules
+- `/var/lib/styio-platform/registry/v2` initialized registry static root
+- `/var/lib/styio-platform/registry/v2-keys` server-side registry role keys
+- `/etc/styio-platform/styio-registry.env` deployment environment file
+- `styio-registry-control.service` for `/api/spio-registry-control/v1/status|publish|verify`
+- `styio-registry-read.service` for read-only static package distribution
+
+Safe default binds:
+
+- control plane: `127.0.0.1:8787`
+- read plane: `0.0.0.0:8788`
+
+Use these flags when the VM has a non-default `spio` binary or a different
+network policy:
+
+```text
+sudo ./install.sh --spio-bin /opt/spio/bin/spio --control-bind 127.0.0.1 --read-bind 0.0.0.0
+```
+
+The installer initializes an empty but valid registry root before starting the
+services and runs:
+
+```text
+/opt/styio-platform-registry/scripts/registry-v2-vm-smoke.py \
+  --control-url http://127.0.0.1:8787 \
+  --read-url http://127.0.0.1:8788 \
+  --json
+```
+
+Post-install operator checks:
+
+```text
+systemctl status styio-registry-control.service
+systemctl status styio-registry-read.service
+curl -fsS http://127.0.0.1:8787/api/spio-registry-control/v1/status
+curl -fsS http://127.0.0.1:8788/config.json
+```
+
+The control plane stays bound to localhost by default because publish is a write
+operation. Put it behind a VM-local gateway, tunnel, or private network policy
+before exposing it outside the host.
+
+## 4. Single-Origin Validation
 
 Use this when one origin handles both publish and fetch:
 
@@ -64,7 +126,7 @@ If the deployment links a private security module and already provisions a named
 spio publish --manifest-path path/to/spio.toml --registry https://registry-upload.example.internal --registry-profile write-dev
 ```
 
-## 4. Split Publish and Fetch Origins
+## 5. Split Publish and Fetch Origins
 
 Use this when write traffic goes to an upload origin and read traffic goes to a download origin or CDN:
 
@@ -78,7 +140,7 @@ Notes:
 - keep it at `0` when the read root should be immediately consistent
 - raise it only when the read root is populated by asynchronous replication or CDN propagation
 
-## 5. Promotion Workflow for Split Origins
+## 6. Promotion Workflow for Split Origins
 
 Use this when the write root and read root are backed by different local serving roots or mounted storage views:
 
@@ -99,7 +161,7 @@ What it proves:
 - `config/`, `trust/`, `index/`, `artifacts/`, and `log/` objects are copied consistently
 - repeated promotion is idempotent
 
-## 6. Local Split-Origin Smoke Test
+## 7. Local Split-Origin Smoke Test
 
 The repository black-box gate for the recommended upload/download split is:
 
@@ -109,7 +171,7 @@ bash ./tests/interop/registry-split-origin-promotion.sh ./build-codex/bin/spio
 
 This validates `publish -> promote -> fetch`.
 
-## 7. Remote-Shape Split-Origin Smoke Test
+## 8. Remote-Shape Split-Origin Smoke Test
 
 The repository also ships a closer deployment-shape smoke test:
 
@@ -126,7 +188,7 @@ This validates:
 
 Use this when you want to rehearse the recommended "internal upload origin plus read-only download origin" topology end-to-end.
 
-## 8. Local HTTP Smoke Test
+## 9. Local HTTP Smoke Test
 
 The repository black-box gate uses the local immutable test server:
 
@@ -138,9 +200,11 @@ Use this before touching a real shared registry.
 
 Auth-bearing write-origin smoke tests are intentionally not shipped in the tracked public tree. If a private security module is linked, keep those validations under `tests-private/` and `docs-private/` instead of restoring them to `tests/interop/`.
 
-## 9. Production Checklist
+## 10. Production Checklist
 
 - use `https` for remote publish and fetch roots
+- keep the VM installer smoke gate green before advertising the read endpoint
+- keep write/control-plane exposure private unless a deployment-owned gateway enforces authorization
 - preserve immutable object semantics for artifacts and log leaves
 - reject overwrite attempts with `409 Conflict`
 - retain audit logs for publication attempts
@@ -151,8 +215,12 @@ Auth-bearing write-origin smoke tests are intentionally not shipped in the track
 - if a policy file is used for write-origin headers, keep it outside the source tree and rotate its contents through deployment config rather than project manifests
 - if a named profile is used, provision it through the private security module under deployment-owned state rather than from project state
 
-## 10. Failure Triage
+## 11. Failure Triage
 
+- VM smoke fails on `config.json`:
+  check `styio-registry-read.service`, read bind/port policy, and registry root permissions
+- VM smoke fails on `verify`:
+  check `styio-registry-control.service`, key-dir permissions, and partial root initialization
 - publish fails immediately:
   check `PUT` support, write permissions, proxy limits, and immutable-path handling
 - publish fails only at a gated write origin:

@@ -27,6 +27,11 @@ add_test(
 )
 
 add_test(
+  NAME styio_platform_registry_vm_deploy_unit
+  COMMAND python3 "${CMAKE_SOURCE_DIR}/tests/unit/test_registry_vm_deploy.py"
+)
+
+add_test(
   NAME styio_platform_registry_v2_contract
   COMMAND python3 "${CMAKE_SOURCE_DIR}/tests/interop/registry-v2-contract-gate.py"
 )

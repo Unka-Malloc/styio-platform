@@ -25,6 +25,7 @@ Technology stack:
 - Native JSON contract packages and canonical examples.
 - Python contract, registry, docs, hygiene, and stress gates.
 - Bash delivery and docs scripts.
+- Systemd-managed Linux VM deployment packaging for registry server nodes.
 - JSON and YAML control-plane artifacts.
 - TypeScript and web fixture surfaces present in the repository.
 - GitHub Actions workflow automation.
@@ -33,6 +34,7 @@ Internal components:
 
 - `PlatformService` route dispatch, daemon self-test, identity, object-store, and job lifecycle code.
 - Registry control-plane and registry v2 contract packages.
+- VM registry deployment package, installer, static read server, and smoke gate.
 - Native contract governance, example packs, and source gates.
 - Registry mirror distribution and regional node runbooks.
 - Docs ownership, team runbook, repo hygiene, and delivery gate automation.
@@ -46,6 +48,8 @@ Open-source and external components:
 - `googletest`.
 - Python standard library tooling.
 - Bash shell tooling.
+- OpenSSL command-line tooling for registry role-key generation.
+- systemd-compatible Linux service management for VM deployment.
 - GitHub Actions.
 
 Dependency manifest surfaces:

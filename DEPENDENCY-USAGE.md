@@ -9,7 +9,7 @@
 - CMake `FetchContent` downloads `tomlplusplus` for TOML parsing, `nlohmann_json` for JSON serialization, and `googletest` for native test execution.
 - Repository Python scripts and tests use the Python standard library only.
 - The current service kernel records planned integration boundaries for Boost.Beast/Asio, PostgreSQL, object storage, and regional mirrors as platform capabilities; those integrations must remain explicit service-side dependencies when implemented.
-- Runtime registry, control-plane, and transport checks may invoke system tools such as `curl`, `git`, `tar`, `cmake`, and the configured `styio` compiler binary through explicit process boundaries.
+- Runtime registry, control-plane, VM deployment, and transport checks may invoke system tools such as `curl`, `git`, `tar`, `cmake`, `openssl`, `systemctl`, and the configured `styio` compiler binary through explicit process boundaries.
 
 Dependency policy:
 

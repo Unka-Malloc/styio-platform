@@ -607,3 +607,27 @@ def publish_to_registry_v2(
         "namespaces": metadata_versions["namespaces"],
         "candidate": candidate_payload,
     }
+
+
+def initialize_registry_v2_root(
+    dest_root_value: str,
+    key_dir_value: str,
+    *,
+    registry_name: str = "spio-registry-v2",
+) -> dict[str, Any]:
+    from .keygen import generate_key_directory
+
+    dest_root = normalize_local_root(dest_root_value)
+    key_dir = normalize_local_root(key_dir_value)
+    if not (key_dir / "keys.json").exists():
+        generate_key_directory(key_dir)
+    role_keys = load_role_keys(key_dir)
+    registry_time = utc_now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_root = _initialize_registry_root(dest_root, role_keys, registry_name=registry_name, registry_time=registry_time)
+    return {
+        "ok": True,
+        "registry_root": str(dest_root),
+        "key_dir": str(key_dir),
+        "registry_name": registry_name,
+        "created_root": created_root,
+    }
