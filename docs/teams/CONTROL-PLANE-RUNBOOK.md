@@ -32,6 +32,9 @@ mirror synchronization.
 Update native JSON contracts and examples first, run contract gates, and
 refresh service runbooks in the same change. Regional node and mirror-sync
 changes must describe authority, lag, replay, and failure isolation explicitly.
+Registry-management changes must keep hosted publish, verify, mirror
+freshness/replay, service cache, offline-client fallback, and security policy
+coverage visible in the affected docs or gates.
 
 ## Change Classes
 
@@ -50,6 +53,9 @@ multi-region promotion.
 Run Python unit tests, native JSON contract gate tests, example smoke checks
 for touched contract packages, and mirror/regional-node validation once those
 executable gates exist.
+For registry-control-plane changes, include
+`python3 tests/interop/registry-control-plane-contract-gate.py` and
+`python3 tests/interop/native-contract-source-gate.py`.
 
 ## Cross-Team Dependencies
 

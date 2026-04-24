@@ -2,7 +2,7 @@
 
 **Purpose:** Provide the executable validation and deployment procedure for a shared `spio` registry `v2` origin without mixing it with client cache behavior or hosted publish-service policy.
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-24
 
 ## 1. Scope
 
@@ -11,8 +11,13 @@ This runbook owns:
 - server-side smoke validation commands
 - publish/read origin validation flow
 - deployment checklist for the current registry `v2` static root and publish-control-plane boundary
+- hosted registry and mirror service validation in `styio-platform`
 
 Server policy lives in [../registry/Spio-Registry-Control-Plane-Contract.md](../registry/Spio-Registry-Control-Plane-Contract.md) and [../registry/Spio-Registry-V2-Publish-Control-Plane.md](../registry/Spio-Registry-V2-Publish-Control-Plane.md). Deployment baseline still lives in [../registry/Spio-Registry-Deployment-Baseline.md](../registry/Spio-Registry-Deployment-Baseline.md).
+
+`styio-spio` remains the offline-capable local package manager. This runbook
+must not require client cache, vendored, or imported packages to contact a
+platform mirror before they can be used locally.
 
 ## 2. Preconditions
 
@@ -39,6 +44,7 @@ What it proves:
 - publish commits a valid registry `v2` release
 - duplicate publish is rejected
 - the new package is immediately fetchable from the same static root
+- verify confirms the static root after the publish path changes it
 
 If the write origin sits behind an upload gateway that expects fixed headers, pass them explicitly:
 
@@ -116,6 +122,7 @@ This validates:
 - HTTP publish to a write origin
 - promotion from the write backing root into the read backing root
 - HTTP fetch from a separate read origin
+- mirror-style lag and replay assumptions before a read endpoint is advertised
 
 Use this when you want to rehearse the recommended "internal upload origin plus read-only download origin" topology end-to-end.
 

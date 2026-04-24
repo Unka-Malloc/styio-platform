@@ -15,3 +15,7 @@ from `styio-spio`.
 Contract packages are maintained as repo-native JSON contracts and examples.
 Markdown describes ownership and stability rules; executable gates validate the
 JSON packages directly.
+
+`styio-platform` owns the hosted registry and mirror service side. `styio-spio`
+owns the local package-manager client, offline cache behavior, and import/export
+semantics that consume these packages.

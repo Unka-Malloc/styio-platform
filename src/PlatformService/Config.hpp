@@ -24,6 +24,15 @@ struct ObjectStoreConfig
   std::string region = "local-dev";
 };
 
+struct RegistryControlConfig
+{
+  std::string root = ".styio-platform/registry-v2";
+  std::string key_dir = ".styio-platform/registry-v2-keys";
+  std::string registry_name = "spio-registry-v2";
+  std::string mirror_id = "mirror-local";
+  std::string mirror_origin = "registry-primary";
+};
+
 struct PlatformConfig
 {
   std::string bind_host = "127.0.0.1";
@@ -33,6 +42,7 @@ struct PlatformConfig
   std::vector<std::string> roles = {"control-plane", "worker", "registry-writer", "mirror"};
   std::string postgres_dsn;
   ObjectStoreConfig object_store;
+  RegistryControlConfig registry;
   MtlsConfig mtls;
 };
 

@@ -33,14 +33,16 @@ source-distribution policy, and dependency usage-boundary evidence aligned with
 `styio-audit`. Keep `docs/specs/TECHNOLOGY-COMPONENT-INVENTORY.md` aligned
 with `styio-audit` whenever the technology stack, internal components,
 open-source components, dependency manifests, Apache-2.0 evidence, or commercial-risk
-boundaries change.
+boundaries change. Registry-management docs must explicitly cover publish,
+verify, mirror freshness/replay, offline client fallback, service/client cache
+separation, and security boundaries before docs/audit closure is claimed.
 
 ## Change Classes
 
 Docs delivery changes include collection structure, generated indexes,
 runbooks, gate scripts, post-push workflow specs, native JSON contract
 governance docs, technology/component inventory docs, regional-node docs, and
-mirror sync docs.
+mirror sync docs, including minimum registry-management audit coverage.
 
 ## Required Gates
 
