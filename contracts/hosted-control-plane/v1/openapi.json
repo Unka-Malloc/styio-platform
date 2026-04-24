@@ -1,0 +1,3128 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
+  "info": {
+    "title": "spio hosted control-plane API",
+    "version": "1.0.0",
+    "summary": "Versioned hosted workspace API for styio-view and repo-hosted control-console clients.",
+    "description": "Design-first OpenAPI package for the hosted workspace API. The path family is frozen at `/api/styio-hosted/v1`; clients and backend services may vary base hostnames by deployment, but must preserve operation ids, request envelopes, response envelopes, and example payloads."
+  },
+  "servers": [
+    {
+      "url": "{scheme}://{host}/api/styio-hosted/v1",
+      "description": "Deployment-neutral hosted control-plane base URL.",
+      "variables": {
+        "scheme": {
+          "default": "https",
+          "enum": [
+            "http",
+            "https"
+          ]
+        },
+        "host": {
+          "default": "localhost:3000"
+        }
+      }
+    }
+  ],
+  "externalDocs": {
+    "description": "Normative governance note for this API package.",
+    "url": "https://github.com/eBioRing/styio-spio/blob/main/docs/governance/Spio-Hosted-Control-Plane-Contract.md"
+  },
+  "tags": [
+    {
+      "name": "workspaces",
+      "description": "Bootstrap and refresh hosted workspace state for frontend clients."
+    },
+    {
+      "name": "toolchain",
+      "description": "Install, select, pin, and clear managed compiler state."
+    },
+    {
+      "name": "dependencies",
+      "description": "Materialize and vendor dependency sources for a hosted workspace."
+    },
+    {
+      "name": "execution",
+      "description": "Run, build, and test the active workspace document through the hosted toolchain."
+    },
+    {
+      "name": "deployment",
+      "description": "Pack, preflight, and publish project artifacts from a hosted workspace."
+    }
+  ],
+  "paths": {
+    "/workspaces/open": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Open or resume a hosted workspace",
+        "description": "Create or resume a hosted workspace session and return the initial project graph snapshot plus the hosted workspace record.",
+        "operationId": "openWorkspace",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/HostedProjectGraphEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/openWorkspace_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/openWorkspace_failure"
+                  }
+                }
+              }
+            },
+            "links": {
+              "refreshProjectGraph": {
+                "$ref": "#/components/links/RefreshProjectGraph"
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "description": "Workspace bootstrap request consumed by frontend and control-console clients.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenWorkspaceRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/openWorkspace_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/project-graph": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Refresh the hosted project graph",
+        "description": "Return the latest hosted project graph and workspace record for an existing hosted workspace.",
+        "operationId": "projectGraph",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/HostedProjectGraphEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/projectGraph_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/projectGraph_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/tool/install": {
+      "post": {
+        "tags": [
+          "toolchain"
+        ],
+        "summary": "Install a managed compiler",
+        "description": "Install a managed Styio compiler into the hosted workspace toolchain surface.",
+        "operationId": "toolInstall",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ToolCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/toolInstall_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/toolInstall_failure"
+                  }
+                }
+              }
+            },
+            "links": {
+              "activateInstalledCompiler": {
+                "$ref": "#/components/links/ActivateInstalledCompiler"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Managed compiler installation request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInstallRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/toolInstall_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/tool/use": {
+      "post": {
+        "tags": [
+          "toolchain"
+        ],
+        "summary": "Select the active managed compiler",
+        "description": "Switch the hosted workspace to a specific managed compiler version and optional channel.",
+        "operationId": "toolUse",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ToolCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/toolUse_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/toolUse_failure"
+                  }
+                }
+              }
+            },
+            "links": {
+              "pinActivatedCompiler": {
+                "$ref": "#/components/links/PinActivatedCompiler"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Managed compiler selection request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolVersionRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/toolUse_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/tool/pin": {
+      "post": {
+        "tags": [
+          "toolchain"
+        ],
+        "summary": "Pin the project compiler version",
+        "description": "Persist a project-local compiler pin for the hosted workspace manifest.",
+        "operationId": "toolPin",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ToolCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/toolPin_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/toolPin_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Project toolchain pin request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolVersionRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/toolPin_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/tool/clear-pin": {
+      "post": {
+        "tags": [
+          "toolchain"
+        ],
+        "summary": "Clear the project compiler pin",
+        "description": "Remove the project-local compiler pin for the hosted workspace manifest.",
+        "operationId": "toolClearPin",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ToolCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/toolClearPin_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/toolClearPin_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Empty object request used to clear an existing project toolchain pin.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/toolClearPin_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/dependencies/fetch": {
+      "post": {
+        "tags": [
+          "dependencies"
+        ],
+        "summary": "Fetch dependency sources",
+        "description": "Resolve and materialize dependency sources into the hosted workspace cache.",
+        "operationId": "fetchDependencies",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DependencyCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/fetchDependencies_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/fetchDependencies_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Dependency fetch request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DependencyFetchRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/fetchDependencies_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/dependencies/vendor": {
+      "post": {
+        "tags": [
+          "dependencies"
+        ],
+        "summary": "Vendor dependency sources",
+        "description": "Copy dependency sources into a vendor output path inside the hosted workspace.",
+        "operationId": "vendorDependencies",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DependencyCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/vendorDependencies_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/vendorDependencies_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Dependency vendor request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DependencyVendorRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/vendorDependencies_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/execution/run": {
+      "post": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Run the active document workflow",
+        "description": "Execute the active hosted document as a run workflow and return structured diagnostics and runtime events.",
+        "operationId": "runWorkflow",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionCommandEnvelope"
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/runWorkflow_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/runWorkflow_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Hosted run-workflow request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionWorkflowRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/runWorkflow_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/execution/build": {
+      "post": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Build the active document workflow",
+        "description": "Execute the active hosted document as a build workflow and return structured diagnostics and runtime events.",
+        "operationId": "buildWorkflow",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionCommandEnvelope"
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/buildWorkflow_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/buildWorkflow_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Hosted build-workflow request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionWorkflowRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/buildWorkflow_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/execution/test": {
+      "post": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Test the active document workflow",
+        "description": "Execute the active hosted document as a test workflow and return structured diagnostics and runtime events.",
+        "operationId": "testWorkflow",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionCommandEnvelope"
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/testWorkflow_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/testWorkflow_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Hosted test-workflow request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionWorkflowRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/testWorkflow_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/deployment/pack": {
+      "post": {
+        "tags": [
+          "deployment"
+        ],
+        "summary": "Pack the hosted project",
+        "description": "Build a source package archive for the selected hosted package or workspace project.",
+        "operationId": "packProject",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DeploymentCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/packProject_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/packProject_failure"
+                  }
+                }
+              }
+            },
+            "links": {
+              "preparePackedProjectForPublish": {
+                "$ref": "#/components/links/PreparePackedProjectForPublish"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Deployment pack request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/packProject_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/deployment/preflight": {
+      "post": {
+        "tags": [
+          "deployment"
+        ],
+        "summary": "Prepare publish preflight",
+        "description": "Produce the publish-preflight result for a hosted package and preserve artifact paths for frontend flows.",
+        "operationId": "preparePublish",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DeploymentCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/preparePublish_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/preparePublish_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Deployment preflight request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/preparePublish_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/deployment/publish": {
+      "post": {
+        "tags": [
+          "deployment"
+        ],
+        "summary": "Publish to a registry",
+        "description": "Publish a hosted package artifact to the selected registry root.",
+        "operationId": "publishToRegistry",
+        "responses": {
+          "200": {
+            "description": "HTTP 200 returns either the success envelope or the documented domain-level failure envelope. Clients must inspect `returncode` and the payload family instead of guessing from frontend route context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DeploymentCommandEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostedCommandFailureEnvelope"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "$ref": "#/components/examples/publishToRegistry_success"
+                  },
+                  "failure": {
+                    "$ref": "#/components/examples/publishToRegistry_failure"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workspace_id"
+          }
+        ],
+        "requestBody": {
+          "description": "Registry publish request.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentPublishRequest"
+              },
+              "examples": {
+                "request": {
+                  "$ref": "#/components/examples/publishToRegistry_request"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "workspace_id": {
+        "name": "workspace_id",
+        "in": "path",
+        "required": true,
+        "description": "Hosted workspace identifier returned by `openWorkspace`.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "schemas": {
+      "EmptyObject": {
+        "type": "object",
+        "title": "EmptyObject",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "OpenWorkspaceRequest": {
+        "type": "object",
+        "title": "OpenWorkspaceRequest",
+        "additionalProperties": false,
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "web",
+              "android"
+            ]
+          },
+          "manifest_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "workspace_root",
+          "platform"
+        ]
+      },
+      "ToolInstallRequest": {
+        "type": "object",
+        "title": "ToolInstallRequest",
+        "additionalProperties": false,
+        "properties": {
+          "styio_binary_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "styio_binary_path"
+        ]
+      },
+      "ToolVersionRequest": {
+        "type": "object",
+        "title": "ToolVersionRequest",
+        "additionalProperties": false,
+        "properties": {
+          "compiler_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "compiler_version"
+        ]
+      },
+      "DependencyFetchRequest": {
+        "type": "object",
+        "title": "DependencyFetchRequest",
+        "additionalProperties": false,
+        "properties": {
+          "locked": {
+            "type": "boolean"
+          },
+          "offline": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DependencyVendorRequest": {
+        "type": "object",
+        "title": "DependencyVendorRequest",
+        "additionalProperties": false,
+        "properties": {
+          "output_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "offline": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExecutionWorkflowRequest": {
+        "type": "object",
+        "title": "ExecutionWorkflowRequest",
+        "additionalProperties": false,
+        "properties": {
+          "active_file_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "document_text": {
+            "type": "string"
+          },
+          "package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "lib",
+              "bin",
+              "test"
+            ]
+          }
+        },
+        "required": [
+          "active_file_path",
+          "document_text"
+        ]
+      },
+      "DeploymentRequest": {
+        "type": "object",
+        "title": "DeploymentRequest",
+        "additionalProperties": false,
+        "properties": {
+          "package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "output_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "DeploymentPublishRequest": {
+        "type": "object",
+        "title": "DeploymentPublishRequest",
+        "additionalProperties": false,
+        "properties": {
+          "registry_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "output_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "registry_root"
+        ]
+      },
+      "HostedProjectGraphEnvelope": {
+        "type": "object",
+        "title": "HostedProjectGraphEnvelope",
+        "additionalProperties": false,
+        "properties": {
+          "returncode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectGraphPayload"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/HostedWorkspaceRecord"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "returncode",
+          "message",
+          "payload",
+          "workspace"
+        ]
+      },
+      "HostedCommandFailureEnvelope": {
+        "type": "object",
+        "title": "HostedCommandFailureEnvelope",
+        "additionalProperties": false,
+        "properties": {
+          "returncode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "error_payload": {
+            "$ref": "#/components/schemas/ErrorPayload"
+          },
+          "payload": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "returncode",
+          "message",
+          "stdout",
+          "stderr",
+          "error_payload"
+        ]
+      },
+      "ToolCommandEnvelope": {
+        "type": "object",
+        "title": "ToolCommandEnvelope",
+        "additionalProperties": false,
+        "properties": {
+          "returncode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ToolCommandPayload"
+          },
+          "error_payload": {
+            "$ref": "#/components/schemas/ErrorPayload"
+          }
+        },
+        "required": [
+          "returncode",
+          "message",
+          "stdout",
+          "stderr",
+          "payload"
+        ]
+      },
+      "DependencyCommandEnvelope": {
+        "type": "object",
+        "title": "DependencyCommandEnvelope",
+        "additionalProperties": false,
+        "properties": {
+          "returncode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DependencyCommandPayload"
+          },
+          "error_payload": {
+            "$ref": "#/components/schemas/ErrorPayload"
+          }
+        },
+        "required": [
+          "returncode",
+          "message",
+          "stdout",
+          "stderr",
+          "payload"
+        ]
+      },
+      "ExecutionCommandEnvelope": {
+        "type": "object",
+        "title": "ExecutionCommandEnvelope",
+        "additionalProperties": false,
+        "properties": {
+          "returncode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ExecutionCommandPayload"
+          },
+          "error_payload": {
+            "$ref": "#/components/schemas/ExecutionCommandPayload"
+          }
+        },
+        "required": [
+          "returncode",
+          "message",
+          "stdout",
+          "stderr"
+        ]
+      },
+      "DeploymentCommandEnvelope": {
+        "type": "object",
+        "title": "DeploymentCommandEnvelope",
+        "additionalProperties": false,
+        "properties": {
+          "returncode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DeploymentCommandPayload"
+          },
+          "error_payload": {
+            "$ref": "#/components/schemas/ErrorPayload"
+          }
+        },
+        "required": [
+          "returncode",
+          "message",
+          "stdout",
+          "stderr",
+          "payload"
+        ]
+      },
+      "ErrorPayload": {
+        "type": "object",
+        "title": "ErrorPayload",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "reason"
+        ]
+      },
+      "HostedWorkspaceRecord": {
+        "type": "object",
+        "title": "HostedWorkspaceRecord",
+        "additionalProperties": false,
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schemaVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ownerRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "provisioning",
+              "active",
+              "closing",
+              "pending_deletion",
+              "deleted"
+            ]
+          },
+          "entryUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retentionDays": {
+            "type": "integer"
+          },
+          "exportState": {
+            "type": "string",
+            "enum": [
+              "not_requested",
+              "preparing",
+              "ready",
+              "expired"
+            ]
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retentionDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coreFileExportUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coreFileExportExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "schemaVersion",
+          "ownerRef",
+          "status",
+          "entryUrl",
+          "createdAt",
+          "lastActiveAt",
+          "retentionDays",
+          "exportState"
+        ]
+      },
+      "ProjectGraphPayload": {
+        "type": "object",
+        "title": "ProjectGraphPayload",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hosted"
+            ]
+          },
+          "workspace_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workspace_members": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "manifest_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectPackage"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectDependency"
+            }
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectTarget"
+            }
+          },
+          "editor_files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toolchain": {
+            "$ref": "#/components/schemas/ToolchainStatus"
+          },
+          "lock_state": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing",
+              "unknown"
+            ]
+          },
+          "vendor_state": {
+            "type": "string",
+            "enum": [
+              "present",
+              "missing",
+              "unknown"
+            ]
+          },
+          "lockfile_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "toolchain_pin_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "styio_config_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "vendor_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "build_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "active_compiler": {
+            "$ref": "#/components/schemas/CompilerHandshake"
+          },
+          "managed_toolchains": {
+            "$ref": "#/components/schemas/ManagedToolchainState"
+          },
+          "package_distribution": {
+            "$ref": "#/components/schemas/PackageDistributionSnapshot"
+          },
+          "source_state": {
+            "$ref": "#/components/schemas/ProjectSourceState"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "workspace_root",
+          "workspace_members",
+          "manifest_path",
+          "packages",
+          "dependencies",
+          "targets",
+          "editor_files",
+          "toolchain",
+          "lock_state",
+          "vendor_state"
+        ]
+      },
+      "ProjectPackage": {
+        "type": "object",
+        "title": "ProjectPackage",
+        "additionalProperties": false,
+        "properties": {
+          "package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "root_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "manifest_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectTarget"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectDependency"
+            }
+          },
+          "is_workspace_member": {
+            "type": "boolean"
+          },
+          "publish_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "package_name",
+          "version",
+          "root_path",
+          "manifest_path",
+          "targets",
+          "dependencies",
+          "is_workspace_member",
+          "publish_enabled"
+        ]
+      },
+      "ProjectDependency": {
+        "type": "object",
+        "title": "ProjectDependency",
+        "additionalProperties": false,
+        "properties": {
+          "source_package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dependency_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "runtime",
+              "dev"
+            ]
+          },
+          "requirement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "path",
+              "git",
+              "registry",
+              "unknown"
+            ]
+          },
+          "publish_blocking": {
+            "type": "boolean"
+          },
+          "is_workspace_reference": {
+            "type": "boolean"
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "git": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rev": {
+            "type": "string",
+            "minLength": 1
+          },
+          "registry": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "source_package_name",
+          "dependency_name",
+          "kind",
+          "requirement",
+          "source_kind",
+          "publish_blocking"
+        ]
+      },
+      "ProjectTarget": {
+        "type": "object",
+        "title": "ProjectTarget",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "lib",
+              "bin",
+              "test"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "package_name",
+          "kind",
+          "name",
+          "file_path"
+        ]
+      },
+      "ToolchainStatus": {
+        "type": "object",
+        "title": "ToolchainStatus",
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "project-pin",
+              "managed-current",
+              "environment",
+              "unavailable",
+              "unknown"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pin_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "source",
+          "detail"
+        ]
+      },
+      "ManagedToolchainInstall": {
+        "type": "object",
+        "title": "ManagedToolchainInstall",
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "compiler_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "install_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "install_binary_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "install_metadata_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "channel",
+          "compiler_version",
+          "install_root",
+          "install_binary_path"
+        ]
+      },
+      "ManagedToolchainState": {
+        "type": "object",
+        "title": "ManagedToolchainState",
+        "additionalProperties": false,
+        "properties": {
+          "installed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedToolchainInstall"
+            }
+          },
+          "spio_home": {
+            "type": "string",
+            "minLength": 1
+          },
+          "current_binary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "current_metadata_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "installed"
+        ]
+      },
+      "CompilerHandshake": {
+        "type": "object",
+        "title": "CompilerHandshake",
+        "additionalProperties": false,
+        "properties": {
+          "binary_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tool": {
+            "type": "string",
+            "minLength": 1
+          },
+          "compiler_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "variant": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supported_contract_versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "integration_phase": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supported_adapter_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "feature_flags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          }
+        },
+        "required": [
+          "binary_path",
+          "tool",
+          "compiler_version",
+          "channel",
+          "variant",
+          "capabilities",
+          "supported_contract_versions",
+          "integration_phase",
+          "supported_adapter_modes",
+          "feature_flags"
+        ]
+      },
+      "RegistrySource": {
+        "type": "object",
+        "title": "RegistrySource",
+        "additionalProperties": false,
+        "properties": {
+          "registry_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transport": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dependency_refs": {
+            "type": "integer"
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "registry_root",
+          "transport",
+          "dependency_refs",
+          "packages"
+        ]
+      },
+      "PackageDistributionPackage": {
+        "type": "object",
+        "title": "PackageDistributionPackage",
+        "additionalProperties": false,
+        "properties": {
+          "package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "manifest_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "publish_enabled": {
+            "type": "boolean"
+          },
+          "publish_ready": {
+            "type": "boolean"
+          },
+          "blocking_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runtime_registry_dependencies": {
+            "type": "integer"
+          },
+          "runtime_path_dependencies": {
+            "type": "integer"
+          },
+          "runtime_git_dependencies": {
+            "type": "integer"
+          },
+          "dev_registry_dependencies": {
+            "type": "integer"
+          },
+          "dev_path_dependencies": {
+            "type": "integer"
+          },
+          "dev_git_dependencies": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "package_name",
+          "manifest_path",
+          "publish_enabled",
+          "publish_ready",
+          "blocking_reasons",
+          "runtime_registry_dependencies",
+          "runtime_path_dependencies",
+          "runtime_git_dependencies",
+          "dev_registry_dependencies",
+          "dev_path_dependencies",
+          "dev_git_dependencies"
+        ]
+      },
+      "PackageDistributionSnapshot": {
+        "type": "object",
+        "title": "PackageDistributionSnapshot",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "type": "integer"
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackageDistributionPackage"
+            }
+          },
+          "registry_sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistrySource"
+            }
+          },
+          "publishable_packages": {
+            "type": "integer"
+          },
+          "blocked_packages": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "packages",
+          "registry_sources",
+          "publishable_packages",
+          "blocked_packages"
+        ]
+      },
+      "GitCacheState": {
+        "type": "object",
+        "title": "GitCacheState",
+        "additionalProperties": false,
+        "properties": {
+          "repos_present": {
+            "type": "boolean"
+          },
+          "checkouts_present": {
+            "type": "boolean"
+          },
+          "repos_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checkouts_root": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "repos_present",
+          "checkouts_present"
+        ]
+      },
+      "RegistryCacheState": {
+        "type": "object",
+        "title": "RegistryCacheState",
+        "additionalProperties": false,
+        "properties": {
+          "index_present": {
+            "type": "boolean"
+          },
+          "blobs_present": {
+            "type": "boolean"
+          },
+          "checkouts_present": {
+            "type": "boolean"
+          },
+          "cache_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "index_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blob_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checkout_root": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "index_present",
+          "blobs_present",
+          "checkouts_present"
+        ]
+      },
+      "VendorSourceState": {
+        "type": "object",
+        "title": "VendorSourceState",
+        "additionalProperties": false,
+        "properties": {
+          "vendor_present": {
+            "type": "boolean"
+          },
+          "metadata_present": {
+            "type": "boolean"
+          },
+          "git_snapshots": {
+            "type": "integer"
+          },
+          "vendor_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metadata_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "vendor_present",
+          "metadata_present",
+          "git_snapshots"
+        ]
+      },
+      "ProjectSourceState": {
+        "type": "object",
+        "title": "ProjectSourceState",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "type": "integer"
+          },
+          "declared_git_dependencies": {
+            "type": "integer"
+          },
+          "declared_registry_dependencies": {
+            "type": "integer"
+          },
+          "git_cache": {
+            "$ref": "#/components/schemas/GitCacheState"
+          },
+          "registry_cache": {
+            "$ref": "#/components/schemas/RegistryCacheState"
+          },
+          "vendor": {
+            "$ref": "#/components/schemas/VendorSourceState"
+          },
+          "spio_home": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "schema_version",
+          "declared_git_dependencies",
+          "declared_registry_dependencies",
+          "git_cache",
+          "registry_cache",
+          "vendor"
+        ]
+      },
+      "ToolCommandPayload": {
+        "type": "object",
+        "title": "ToolCommandPayload",
+        "additionalProperties": false,
+        "properties": {
+          "installed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedToolchainInstall"
+            }
+          },
+          "compiler_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "spio_home": {
+            "type": "string",
+            "minLength": 1
+          },
+          "current_binary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "current_metadata_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "installed"
+        ]
+      },
+      "DependencyCommandPayload": {
+        "type": "object",
+        "title": "DependencyCommandPayload",
+        "additionalProperties": false,
+        "properties": {
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "vendor_root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metadata_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_state": {
+            "$ref": "#/components/schemas/ProjectSourceState"
+          }
+        },
+        "required": [
+          "packages"
+        ]
+      },
+      "DiagnosticRecord": {
+        "type": "object",
+        "title": "DiagnosticRecord",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "range": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "RuntimeEvent": {
+        "type": "object",
+        "title": "RuntimeEvent",
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "type": "integer"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eventKind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 1
+          },
+          "payload": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "eventKind",
+          "origin",
+          "payload"
+        ]
+      },
+      "ExecutionCommandPayload": {
+        "type": "object",
+        "title": "ExecutionCommandPayload",
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticRecord"
+            }
+          },
+          "runtime_events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeEvent"
+            }
+          }
+        },
+        "required": [
+          "session_id",
+          "stdout",
+          "stderr",
+          "diagnostics",
+          "runtime_events"
+        ]
+      },
+      "DeploymentCommandPayload": {
+        "type": "object",
+        "title": "DeploymentCommandPayload",
+        "additionalProperties": false,
+        "properties": {
+          "package": {
+            "type": "string",
+            "minLength": 1
+          },
+          "archive_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "registry_root": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "package",
+          "archive_path"
+        ]
+      }
+    },
+    "examples": {
+      "openWorkspace_request": {
+        "summary": "openWorkspace request",
+        "value": {
+          "workspace_root": "/workspace/demo",
+          "manifest_path": "/workspace/demo/spio.toml",
+          "platform": "ios"
+        }
+      },
+      "openWorkspace_success": {
+        "summary": "openWorkspace success",
+        "value": {
+          "returncode": 0,
+          "message": "opened hosted workspace",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "id": "/workspace/demo/spio.toml",
+            "title": "demo/app",
+            "kind": "hosted",
+            "workspace_root": "/workspace/demo",
+            "workspace_members": [],
+            "manifest_path": "/workspace/demo/spio.toml",
+            "lockfile_path": "/workspace/demo/spio.lock",
+            "toolchain_pin_path": "/workspace/demo/spio-toolchain.toml",
+            "styio_config_path": "/workspace/demo/styio.toml",
+            "vendor_root": "/workspace/demo/.spio/vendor",
+            "build_root": "/workspace/demo/.spio/build",
+            "packages": [
+              {
+                "package_name": "demo/app",
+                "version": "0.1.0",
+                "root_path": "/workspace/demo",
+                "manifest_path": "/workspace/demo/spio.toml",
+                "targets": [
+                  {
+                    "id": "demo/app:bin:demo",
+                    "package_name": "demo/app",
+                    "kind": "bin",
+                    "name": "demo",
+                    "file_path": "/workspace/demo/src/main.styio"
+                  }
+                ],
+                "dependencies": [
+                  {
+                    "source_package_name": "demo/app",
+                    "dependency_name": "palette",
+                    "kind": "runtime",
+                    "requirement": "registry:https://packages.example.test@1.0.0",
+                    "source_kind": "registry",
+                    "registry": "https://packages.example.test",
+                    "package": "palette",
+                    "version": "1.0.0",
+                    "publish_blocking": false
+                  }
+                ],
+                "is_workspace_member": false,
+                "publish_enabled": true
+              }
+            ],
+            "dependencies": [
+              {
+                "source_package_name": "demo/app",
+                "dependency_name": "palette",
+                "kind": "runtime",
+                "requirement": "registry:https://packages.example.test@1.0.0",
+                "source_kind": "registry",
+                "registry": "https://packages.example.test",
+                "package": "palette",
+                "version": "1.0.0",
+                "publish_blocking": false
+              }
+            ],
+            "targets": [
+              {
+                "id": "demo/app:bin:demo",
+                "package_name": "demo/app",
+                "kind": "bin",
+                "name": "demo",
+                "file_path": "/workspace/demo/src/main.styio"
+              }
+            ],
+            "editor_files": [
+              "/workspace/demo/src/main.styio"
+            ],
+            "toolchain": {
+              "source": "project-pin",
+              "detail": "Pinned compiler is active.",
+              "pin_path": "/workspace/demo/spio-toolchain.toml",
+              "channel": "stable",
+              "version": "0.0.1"
+            },
+            "lock_state": "fresh",
+            "vendor_state": "present",
+            "active_compiler": {
+              "binary_path": "/workspace/demo/.spio/tools/styio/current/bin/styio",
+              "tool": "styio",
+              "compiler_version": "0.0.1",
+              "channel": "stable",
+              "variant": "full",
+              "capabilities": [
+                "machine_info_json",
+                "compile_plan"
+              ],
+              "supported_contract_versions": {
+                "compile_plan": [
+                  1
+                ],
+                "runtime_events": [
+                  1
+                ]
+              },
+              "integration_phase": "hosted-product",
+              "supported_adapter_modes": [
+                "cloud",
+                "cli"
+              ],
+              "feature_flags": {
+                "runtime_events": true
+              }
+            },
+            "managed_toolchains": {
+              "spio_home": "/workspace/demo/.spio",
+              "current_binary": "/workspace/demo/.spio/tools/styio/current/bin/styio",
+              "current_metadata_path": "/workspace/demo/.spio/tools/styio/current/metadata.json",
+              "installed": [
+                {
+                  "channel": "stable",
+                  "compiler_version": "0.0.1",
+                  "install_root": "/workspace/demo/.spio/tools/styio/0.0.1",
+                  "install_binary_path": "/workspace/demo/.spio/tools/styio/0.0.1/bin/styio",
+                  "install_metadata_path": "/workspace/demo/.spio/tools/styio/0.0.1/metadata.json"
+                }
+              ]
+            },
+            "package_distribution": {
+              "schema_version": 1,
+              "packages": [
+                {
+                  "package_name": "demo/app",
+                  "manifest_path": "/workspace/demo/spio.toml",
+                  "publish_enabled": true,
+                  "publish_ready": true,
+                  "blocking_reasons": [],
+                  "runtime_registry_dependencies": 1,
+                  "runtime_path_dependencies": 0,
+                  "runtime_git_dependencies": 0,
+                  "dev_registry_dependencies": 0,
+                  "dev_path_dependencies": 0,
+                  "dev_git_dependencies": 0
+                }
+              ],
+              "registry_sources": [
+                {
+                  "registry_root": "https://packages.example.test",
+                  "transport": "https",
+                  "dependency_refs": 1,
+                  "packages": [
+                    "palette"
+                  ]
+                }
+              ],
+              "publishable_packages": 1,
+              "blocked_packages": 0
+            },
+            "source_state": {
+              "schema_version": 1,
+              "spio_home": "/workspace/demo/.spio",
+              "declared_git_dependencies": 0,
+              "declared_registry_dependencies": 1,
+              "git_cache": {
+                "repos_root": "/workspace/demo/.spio/git/repos",
+                "checkouts_root": "/workspace/demo/.spio/git/checkouts",
+                "repos_present": true,
+                "checkouts_present": true
+              },
+              "registry_cache": {
+                "cache_root": "/workspace/demo/.spio/registry",
+                "index_root": "/workspace/demo/.spio/registry/index",
+                "blob_root": "/workspace/demo/.spio/registry/blobs",
+                "checkout_root": "/workspace/demo/.spio/registry/checkouts",
+                "index_present": true,
+                "blobs_present": true,
+                "checkouts_present": true
+              },
+              "vendor": {
+                "vendor_root": "/workspace/demo/.spio/vendor",
+                "metadata_path": "/workspace/demo/.spio/vendor/vendor.json",
+                "vendor_present": true,
+                "metadata_present": true,
+                "git_snapshots": 0
+              }
+            },
+            "notes": [
+              "Hosted project graph ready."
+            ]
+          },
+          "workspace": {
+            "workspaceId": "demo-workspace",
+            "schemaVersion": "1",
+            "ownerRef": "styio-view",
+            "status": "active",
+            "entryUrl": "https://hosted.example.test/workspaces/demo-workspace",
+            "createdAt": "2026-04-21T00:00:00Z",
+            "lastActiveAt": "2026-04-21T00:00:10Z",
+            "retentionDays": 7,
+            "exportState": "not_requested"
+          }
+        }
+      },
+      "openWorkspace_failure": {
+        "summary": "openWorkspace failure",
+        "value": {
+          "returncode": 1,
+          "message": "workspace root was rejected",
+          "stdout": "",
+          "stderr": "workspace root was rejected",
+          "error_payload": {
+            "code": "workspace.invalid_root",
+            "reason": "Workspace root does not exist.",
+            "retryable": false,
+            "details": {
+              "workspace_root": "/workspace/missing"
+            }
+          }
+        }
+      },
+      "projectGraph_success": {
+        "summary": "projectGraph success",
+        "value": {
+          "returncode": 0,
+          "message": "refreshed hosted project graph",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "id": "/workspace/demo/spio.toml",
+            "title": "demo/app",
+            "kind": "hosted",
+            "workspace_root": "/workspace/demo",
+            "workspace_members": [],
+            "manifest_path": "/workspace/demo/spio.toml",
+            "packages": [
+              {
+                "package_name": "demo/app",
+                "version": "0.1.0",
+                "root_path": "/workspace/demo",
+                "manifest_path": "/workspace/demo/spio.toml",
+                "targets": [
+                  {
+                    "id": "demo/app:bin:demo",
+                    "package_name": "demo/app",
+                    "kind": "bin",
+                    "name": "demo",
+                    "file_path": "/workspace/demo/src/main.styio"
+                  }
+                ],
+                "dependencies": [],
+                "is_workspace_member": false,
+                "publish_enabled": true
+              }
+            ],
+            "dependencies": [],
+            "targets": [
+              {
+                "id": "demo/app:bin:demo",
+                "package_name": "demo/app",
+                "kind": "bin",
+                "name": "demo",
+                "file_path": "/workspace/demo/src/main.styio"
+              }
+            ],
+            "editor_files": [
+              "/workspace/demo/src/main.styio"
+            ],
+            "toolchain": {
+              "source": "project-pin",
+              "detail": "Pinned compiler is active."
+            },
+            "lock_state": "fresh",
+            "vendor_state": "present",
+            "notes": [
+              "Hosted project graph refreshed."
+            ]
+          },
+          "workspace": {
+            "workspaceId": "demo-workspace",
+            "schemaVersion": "1",
+            "ownerRef": "styio-view",
+            "status": "active",
+            "entryUrl": "https://hosted.example.test/workspaces/demo-workspace",
+            "createdAt": "2026-04-21T00:00:00Z",
+            "lastActiveAt": "2026-04-21T00:00:10Z",
+            "retentionDays": 7,
+            "exportState": "not_requested"
+          }
+        }
+      },
+      "projectGraph_failure": {
+        "summary": "projectGraph failure",
+        "value": {
+          "returncode": 1,
+          "message": "workspace could not be loaded",
+          "stdout": "",
+          "stderr": "workspace could not be loaded",
+          "error_payload": {
+            "code": "workspace.not_found",
+            "reason": "The hosted workspace no longer exists.",
+            "retryable": false
+          }
+        }
+      },
+      "toolInstall_request": {
+        "summary": "toolInstall request",
+        "value": {
+          "styio_binary_path": "/opt/styio/bin/styio"
+        }
+      },
+      "toolInstall_success": {
+        "summary": "toolInstall success",
+        "value": {
+          "returncode": 0,
+          "message": "installed managed compiler",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "compiler_version": "0.0.1",
+            "channel": "stable",
+            "spio_home": "/workspace/demo/.spio",
+            "current_binary": "/workspace/demo/.spio/tools/styio/current/bin/styio",
+            "current_metadata_path": "/workspace/demo/.spio/tools/styio/current/metadata.json",
+            "installed": [
+              {
+                "channel": "stable",
+                "compiler_version": "0.0.1",
+                "install_root": "/workspace/demo/.spio/tools/styio/0.0.1",
+                "install_binary_path": "/workspace/demo/.spio/tools/styio/0.0.1/bin/styio",
+                "install_metadata_path": "/workspace/demo/.spio/tools/styio/0.0.1/metadata.json"
+              }
+            ]
+          }
+        }
+      },
+      "toolInstall_failure": {
+        "summary": "toolInstall failure",
+        "value": {
+          "returncode": 1,
+          "message": "styio binary failed validation",
+          "stdout": "",
+          "stderr": "styio binary failed validation",
+          "error_payload": {
+            "code": "tool.install.invalid_binary",
+            "reason": "The provided styio binary does not advertise the required contracts.",
+            "retryable": false
+          }
+        }
+      },
+      "toolUse_request": {
+        "summary": "toolUse request",
+        "value": {
+          "compiler_version": "0.0.1",
+          "channel": "stable"
+        }
+      },
+      "toolUse_success": {
+        "summary": "toolUse success",
+        "value": {
+          "returncode": 0,
+          "message": "activated managed compiler",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "compiler_version": "0.0.1",
+            "channel": "stable",
+            "current_binary": "/workspace/demo/.spio/tools/styio/current/bin/styio",
+            "installed": [
+              {
+                "channel": "stable",
+                "compiler_version": "0.0.1",
+                "install_root": "/workspace/demo/.spio/tools/styio/0.0.1",
+                "install_binary_path": "/workspace/demo/.spio/tools/styio/0.0.1/bin/styio"
+              }
+            ]
+          }
+        }
+      },
+      "toolUse_failure": {
+        "summary": "toolUse failure",
+        "value": {
+          "returncode": 1,
+          "message": "requested compiler is not installed",
+          "stdout": "",
+          "stderr": "requested compiler is not installed",
+          "error_payload": {
+            "code": "tool.use.missing_install",
+            "reason": "The requested managed compiler version is not installed.",
+            "retryable": false
+          }
+        }
+      },
+      "toolPin_request": {
+        "summary": "toolPin request",
+        "value": {
+          "compiler_version": "0.0.1",
+          "channel": "stable"
+        }
+      },
+      "toolPin_success": {
+        "summary": "toolPin success",
+        "value": {
+          "returncode": 0,
+          "message": "pinned managed compiler",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "compiler_version": "0.0.1",
+            "channel": "stable",
+            "current_binary": "/workspace/demo/.spio/tools/styio/current/bin/styio",
+            "installed": [
+              {
+                "channel": "stable",
+                "compiler_version": "0.0.1",
+                "install_root": "/workspace/demo/.spio/tools/styio/0.0.1",
+                "install_binary_path": "/workspace/demo/.spio/tools/styio/0.0.1/bin/styio"
+              }
+            ]
+          }
+        }
+      },
+      "toolPin_failure": {
+        "summary": "toolPin failure",
+        "value": {
+          "returncode": 1,
+          "message": "project pin could not be written",
+          "stdout": "",
+          "stderr": "project pin could not be written",
+          "error_payload": {
+            "code": "tool.pin.write_failed",
+            "reason": "The hosted workspace rejected the pin write.",
+            "retryable": true
+          }
+        }
+      },
+      "toolClearPin_request": {
+        "summary": "toolClearPin request",
+        "value": {}
+      },
+      "toolClearPin_success": {
+        "summary": "toolClearPin success",
+        "value": {
+          "returncode": 0,
+          "message": "cleared pinned compiler",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "installed": [
+              {
+                "channel": "stable",
+                "compiler_version": "0.0.1",
+                "install_root": "/workspace/demo/.spio/tools/styio/0.0.1",
+                "install_binary_path": "/workspace/demo/.spio/tools/styio/0.0.1/bin/styio"
+              }
+            ]
+          }
+        }
+      },
+      "toolClearPin_failure": {
+        "summary": "toolClearPin failure",
+        "value": {
+          "returncode": 1,
+          "message": "project pin was already absent",
+          "stdout": "",
+          "stderr": "project pin was already absent",
+          "error_payload": {
+            "code": "tool.pin.missing",
+            "reason": "No hosted project pin was present to clear.",
+            "retryable": false
+          }
+        }
+      },
+      "fetchDependencies_request": {
+        "summary": "fetchDependencies request",
+        "value": {
+          "locked": true,
+          "offline": false
+        }
+      },
+      "fetchDependencies_success": {
+        "summary": "fetchDependencies success",
+        "value": {
+          "returncode": 0,
+          "message": "fetched hosted dependencies",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "packages": [
+              "demo/app"
+            ],
+            "vendor_root": "/workspace/demo/.spio/vendor",
+            "metadata_path": "/workspace/demo/.spio/vendor/vendor.json"
+          }
+        }
+      },
+      "fetchDependencies_failure": {
+        "summary": "fetchDependencies failure",
+        "value": {
+          "returncode": 1,
+          "message": "dependency fetch failed",
+          "stdout": "",
+          "stderr": "dependency fetch failed",
+          "error_payload": {
+            "code": "dependencies.fetch.failed",
+            "reason": "The registry source could not satisfy the requested version.",
+            "retryable": true
+          }
+        }
+      },
+      "vendorDependencies_request": {
+        "summary": "vendorDependencies request",
+        "value": {
+          "output_path": "/workspace/demo/vendor-cache",
+          "locked": true,
+          "offline": false
+        }
+      },
+      "vendorDependencies_success": {
+        "summary": "vendorDependencies success",
+        "value": {
+          "returncode": 0,
+          "message": "vendored hosted dependencies",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "packages": [
+              "demo/app"
+            ],
+            "vendor_root": "/workspace/demo/vendor-cache",
+            "metadata_path": "/workspace/demo/vendor-cache/vendor.json"
+          }
+        }
+      },
+      "vendorDependencies_failure": {
+        "summary": "vendorDependencies failure",
+        "value": {
+          "returncode": 1,
+          "message": "dependency vendoring failed",
+          "stdout": "",
+          "stderr": "dependency vendoring failed",
+          "error_payload": {
+            "code": "dependencies.vendor.failed",
+            "reason": "The vendor output path could not be created.",
+            "retryable": true
+          }
+        }
+      },
+      "runWorkflow_request": {
+        "summary": "runWorkflow request",
+        "value": {
+          "active_file_path": "/workspace/demo/src/main.styio",
+          "document_text": ">_(1 + 1)\n",
+          "package_name": "demo/app",
+          "target_name": "demo",
+          "target_kind": "bin"
+        }
+      },
+      "runWorkflow_success": {
+        "summary": "runWorkflow success",
+        "value": {
+          "returncode": 0,
+          "message": "run completed",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "session_id": "hosted-run-session",
+            "stdout": "2\n",
+            "stderr": "",
+            "diagnostics": [],
+            "runtime_events": [
+              {
+                "schemaVersion": 1,
+                "sessionId": "hosted-run-session",
+                "sequence": 1,
+                "timestamp": "2026-04-21T00:01:00Z",
+                "eventKind": "runtime.completed",
+                "origin": "styio.hosted",
+                "payload": {
+                  "target": "demo",
+                  "status": "succeeded"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "runWorkflow_failure": {
+        "summary": "runWorkflow failure",
+        "value": {
+          "returncode": 1,
+          "message": "run failed",
+          "stdout": "",
+          "stderr": "",
+          "error_payload": {
+            "session_id": "hosted-run-session",
+            "stdout": "",
+            "stderr": "",
+            "diagnostics": [
+              {
+                "message": "unexpected end of file",
+                "severity": "error",
+                "category": "parse",
+                "code": "parse:eof",
+                "file": "/workspace/demo/src/main.styio"
+              }
+            ],
+            "runtime_events": []
+          }
+        }
+      },
+      "buildWorkflow_request": {
+        "summary": "buildWorkflow request",
+        "value": {
+          "active_file_path": "/workspace/demo/src/main.styio",
+          "document_text": ">_(1 + 1)\n",
+          "package_name": "demo/app",
+          "target_name": "demo",
+          "target_kind": "bin"
+        }
+      },
+      "buildWorkflow_success": {
+        "summary": "buildWorkflow success",
+        "value": {
+          "returncode": 0,
+          "message": "build completed",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "session_id": "hosted-build-session",
+            "stdout": "artifact ready\n",
+            "stderr": "",
+            "diagnostics": [],
+            "runtime_events": [
+              {
+                "schemaVersion": 1,
+                "sessionId": "hosted-build-session",
+                "sequence": 1,
+                "timestamp": "2026-04-21T00:01:10Z",
+                "eventKind": "runtime.completed",
+                "origin": "styio.hosted",
+                "payload": {
+                  "target": "demo",
+                  "status": "succeeded"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "buildWorkflow_failure": {
+        "summary": "buildWorkflow failure",
+        "value": {
+          "returncode": 1,
+          "message": "build failed",
+          "stdout": "",
+          "stderr": "",
+          "error_payload": {
+            "session_id": "hosted-build-session",
+            "stdout": "",
+            "stderr": "",
+            "diagnostics": [
+              {
+                "message": "build target is blocked",
+                "severity": "error",
+                "category": "compile",
+                "code": "compile:blocked",
+                "file": "/workspace/demo/src/main.styio"
+              }
+            ],
+            "runtime_events": []
+          }
+        }
+      },
+      "testWorkflow_request": {
+        "summary": "testWorkflow request",
+        "value": {
+          "active_file_path": "/workspace/demo/tests/demo_test.styio",
+          "document_text": ">_(1 + 1)\n",
+          "package_name": "demo/app",
+          "target_name": "demo_test",
+          "target_kind": "test"
+        }
+      },
+      "testWorkflow_success": {
+        "summary": "testWorkflow success",
+        "value": {
+          "returncode": 0,
+          "message": "test completed",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "session_id": "hosted-test-session",
+            "stdout": "1 test passed\n",
+            "stderr": "",
+            "diagnostics": [],
+            "runtime_events": [
+              {
+                "schemaVersion": 1,
+                "sessionId": "hosted-test-session",
+                "sequence": 1,
+                "timestamp": "2026-04-21T00:01:20Z",
+                "eventKind": "runtime.completed",
+                "origin": "styio.hosted",
+                "payload": {
+                  "target": "demo_test",
+                  "status": "succeeded"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "testWorkflow_failure": {
+        "summary": "testWorkflow failure",
+        "value": {
+          "returncode": 1,
+          "message": "test failed",
+          "stdout": "",
+          "stderr": "",
+          "error_payload": {
+            "session_id": "hosted-test-session",
+            "stdout": "",
+            "stderr": "",
+            "diagnostics": [
+              {
+                "message": "assertion failed",
+                "severity": "error",
+                "category": "runtime",
+                "code": "runtime:assert",
+                "file": "/workspace/demo/tests/demo_test.styio"
+              }
+            ],
+            "runtime_events": []
+          }
+        }
+      },
+      "packProject_request": {
+        "summary": "packProject request",
+        "value": {
+          "package_name": "demo/app",
+          "output_path": "/workspace/demo/dist"
+        }
+      },
+      "packProject_success": {
+        "summary": "packProject success",
+        "value": {
+          "returncode": 0,
+          "message": "pack completed",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "package": "demo/app",
+            "archive_path": "/workspace/demo/dist/demo-app-0.1.0.tar"
+          }
+        }
+      },
+      "packProject_failure": {
+        "summary": "packProject failure",
+        "value": {
+          "returncode": 1,
+          "message": "pack failed",
+          "stdout": "",
+          "stderr": "",
+          "error_payload": {
+            "code": "deployment.pack.failed",
+            "reason": "The package could not be materialized.",
+            "retryable": true
+          }
+        }
+      },
+      "preparePublish_request": {
+        "summary": "preparePublish request",
+        "value": {
+          "package_name": "demo/app",
+          "output_path": "/workspace/demo/dist"
+        }
+      },
+      "preparePublish_success": {
+        "summary": "preparePublish success",
+        "value": {
+          "returncode": 0,
+          "message": "publish preflight completed",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "package": "demo/app",
+            "archive_path": "/workspace/demo/dist/demo-app-0.1.0.tar"
+          }
+        }
+      },
+      "preparePublish_failure": {
+        "summary": "preparePublish failure",
+        "value": {
+          "returncode": 1,
+          "message": "publish preflight failed",
+          "stdout": "",
+          "stderr": "",
+          "error_payload": {
+            "code": "deployment.preflight.failed",
+            "reason": "The package is not publish-ready.",
+            "retryable": false
+          }
+        }
+      },
+      "publishToRegistry_request": {
+        "summary": "publishToRegistry request",
+        "value": {
+          "registry_root": "https://packages.example.test",
+          "package_name": "demo/app",
+          "output_path": "/workspace/demo/dist"
+        }
+      },
+      "publishToRegistry_success": {
+        "summary": "publishToRegistry success",
+        "value": {
+          "returncode": 0,
+          "message": "publish completed",
+          "stdout": "",
+          "stderr": "",
+          "payload": {
+            "package": "demo/app",
+            "archive_path": "/workspace/demo/dist/demo-app-0.1.0.tar",
+            "registry_root": "https://packages.example.test"
+          }
+        }
+      },
+      "publishToRegistry_failure": {
+        "summary": "publishToRegistry failure",
+        "value": {
+          "returncode": 1,
+          "message": "publish failed",
+          "stdout": "",
+          "stderr": "",
+          "error_payload": {
+            "code": "deployment.publish.failed",
+            "reason": "The registry rejected the publish attempt.",
+            "retryable": true
+          }
+        }
+      }
+    },
+    "links": {
+      "RefreshProjectGraph": {
+        "operationId": "projectGraph",
+        "parameters": {
+          "workspace_id": "$response.body#/workspace/workspaceId"
+        },
+        "description": "Refresh the project graph using the hosted workspace id returned by the bootstrap call."
+      },
+      "ActivateInstalledCompiler": {
+        "operationId": "toolUse",
+        "parameters": {
+          "workspace_id": "$request.path.workspace_id"
+        },
+        "requestBody": {
+          "compiler_version": "$response.body#/payload/compiler_version",
+          "channel": "$response.body#/payload/channel"
+        },
+        "description": "Activate the managed compiler that was just installed for the same hosted workspace."
+      },
+      "PinActivatedCompiler": {
+        "operationId": "toolPin",
+        "parameters": {
+          "workspace_id": "$request.path.workspace_id"
+        },
+        "requestBody": {
+          "compiler_version": "$response.body#/payload/compiler_version",
+          "channel": "$response.body#/payload/channel"
+        },
+        "description": "Persist the compiler version that was activated for the hosted workspace."
+      },
+      "PreparePackedProjectForPublish": {
+        "operationId": "preparePublish",
+        "parameters": {
+          "workspace_id": "$request.path.workspace_id"
+        },
+        "requestBody": "$request.body",
+        "description": "Run publish preflight with the same package and output path used for pack."
+      }
+    }
+  }
+}

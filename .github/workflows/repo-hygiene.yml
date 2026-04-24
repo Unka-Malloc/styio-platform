@@ -1,0 +1,45 @@
+name: repo-hygiene
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      STYIO_PYTHON_VERSION: "3.13.5"
+
+    steps:
+      - name: Checkout styio-platform
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          path: styio-platform
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.STYIO_PYTHON_VERSION }}
+
+      - name: Check tracked tree
+        working-directory: styio-platform
+        run: python3 scripts/repo-hygiene-gate.py --mode tracked
+
+      - name: Check incoming history range
+        shell: bash
+        working-directory: styio-platform
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+            RANGE="HEAD"
+          else
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          fi
+          python3 scripts/repo-hygiene-gate.py --mode push --range "$RANGE"

@@ -1,0 +1,10 @@
+# Specs
+
+**Purpose:** Keep cross-cutting platform delivery specs, audit rules, and post-push workflow requirements.
+
+**Last updated:** 2026-04-24
+
+## Scope
+
+Specs here apply to the platform repository itself. Shared ecosystem workflow
+changes must stay aligned with upstream specs in `styio` and `styio-spio`.

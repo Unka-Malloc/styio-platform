@@ -1,0 +1,406 @@
+{
+  "arazzo": "1.0.1",
+  "info": {
+    "title": "spio hosted control-plane workflows",
+    "version": "1.0.0",
+    "summary": "Frontend/backend workflow descriptions built on top of the hosted control-plane OpenAPI package.",
+    "description": "These workflows show how frontend and backend teams coordinate across the frozen OpenAPI operation set without depending on private source layout."
+  },
+  "sourceDescriptions": [
+    {
+      "name": "hostedControlPlane",
+      "url": "./openapi.json",
+      "type": "openapi"
+    }
+  ],
+  "workflows": [
+    {
+      "workflowId": "bootstrapWorkspaceAndProjectGraph",
+      "summary": "Open a hosted workspace and load the initial project graph.",
+      "description": "Bootstrap flow used by user-facing frontend shells and repo-hosted control-console pages.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "manifest_path": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "platform"
+        ]
+      },
+      "steps": [
+        {
+          "stepId": "openWorkspace",
+          "description": "Create or resume a hosted workspace session.",
+          "operationId": "openWorkspace",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "workspace_root": "$inputs.workspace_root",
+              "manifest_path": "$inputs.manifest_path",
+              "platform": "$inputs.platform"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ],
+          "outputs": {
+            "workspaceId": "$response.body#/workspace/workspaceId"
+          }
+        },
+        {
+          "stepId": "projectGraph",
+          "description": "Refresh the project graph with the workspace id returned by the bootstrap step.",
+          "operationId": "projectGraph",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$steps.openWorkspace.outputs.workspaceId"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        }
+      ],
+      "outputs": {
+        "workspace_id": "$steps.openWorkspace.outputs.workspaceId"
+      }
+    },
+    {
+      "workflowId": "installUseAndPinManagedCompiler",
+      "summary": "Install, activate, and pin a managed compiler for a hosted workspace.",
+      "description": "Toolchain-management flow used by frontend environment panels and control-console tooling.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          },
+          "styio_binary_path": {
+            "type": "string"
+          },
+          "compiler_version": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "styio_binary_path",
+          "compiler_version"
+        ]
+      },
+      "steps": [
+        {
+          "stepId": "toolInstall",
+          "description": "Install the managed compiler into the hosted workspace toolchain surface.",
+          "operationId": "toolInstall",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "styio_binary_path": "$inputs.styio_binary_path"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        },
+        {
+          "stepId": "toolUse",
+          "description": "Switch the active compiler version for the hosted workspace.",
+          "operationId": "toolUse",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "compiler_version": "$inputs.compiler_version",
+              "channel": "$inputs.channel"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        },
+        {
+          "stepId": "toolPin",
+          "description": "Persist the project-level compiler pin after selection succeeds.",
+          "operationId": "toolPin",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "compiler_version": "$inputs.compiler_version",
+              "channel": "$inputs.channel"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflowId": "dependencyExecutionAndPackagingLoop",
+      "summary": "Fetch dependencies, run the active document, and pack an artifact.",
+      "description": "End-to-end user-facing workflow that spans dependency materialization, execution, and deployment-prep surfaces.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          },
+          "active_file_path": {
+            "type": "string"
+          },
+          "document_text": {
+            "type": "string"
+          },
+          "package_name": {
+            "type": "string"
+          },
+          "target_name": {
+            "type": "string"
+          },
+          "target_kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "active_file_path",
+          "document_text"
+        ]
+      },
+      "steps": [
+        {
+          "stepId": "fetchDependencies",
+          "description": "Refresh dependency sources before execution or packaging.",
+          "operationId": "fetchDependencies",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "locked": true,
+              "offline": false
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        },
+        {
+          "stepId": "runWorkflow",
+          "description": "Run the active document and capture structured runtime events.",
+          "operationId": "runWorkflow",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "active_file_path": "$inputs.active_file_path",
+              "document_text": "$inputs.document_text",
+              "package_name": "$inputs.package_name",
+              "target_name": "$inputs.target_name",
+              "target_kind": "$inputs.target_kind"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        },
+        {
+          "stepId": "packProject",
+          "description": "Produce a distributable source package artifact.",
+          "operationId": "packProject",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "package_name": "$inputs.package_name"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ],
+          "outputs": {
+            "archive_path": "$response.body#/payload/archive_path"
+          }
+        }
+      ],
+      "outputs": {
+        "archive_path": "$steps.packProject.outputs.archive_path"
+      }
+    },
+    {
+      "workflowId": "preflightAndPublishArtifact",
+      "summary": "Prepare a publish candidate and publish it to a registry.",
+      "description": "Deployment workflow for frontend release surfaces and control-console publish actions.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          },
+          "registry_root": {
+            "type": "string"
+          },
+          "package_name": {
+            "type": "string"
+          },
+          "output_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "registry_root"
+        ]
+      },
+      "steps": [
+        {
+          "stepId": "preparePublish",
+          "description": "Run publish preflight and preserve the generated artifact path.",
+          "operationId": "preparePublish",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "package_name": "$inputs.package_name",
+              "output_path": "$inputs.output_path"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        },
+        {
+          "stepId": "publishToRegistry",
+          "description": "Publish the preflighted artifact to the selected registry root.",
+          "operationId": "publishToRegistry",
+          "parameters": [
+            {
+              "name": "workspace_id",
+              "in": "path",
+              "value": "$inputs.workspace_id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "registry_root": "$inputs.registry_root",
+              "package_name": "$inputs.package_name",
+              "output_path": "$inputs.output_path"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            },
+            {
+              "condition": "$response.body.returncode == 0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
