@@ -1,0 +1,700 @@
+{
+  "schema_version": 1,
+  "contract_name": "styio platform control plane",
+  "contract_version": "v1",
+  "base_path": "/api/styio-platform/v1",
+  "internal_base_path": "/internal/styio-platform/v1",
+  "identity_model": {
+    "scheme": "mtls",
+    "uri_san_fields": [
+      "role",
+      "tenant",
+      "node"
+    ]
+  },
+  "operations": [
+    {
+      "id": "health",
+      "method": "GET",
+      "path": "/health",
+      "request_shape": "NoRequestBody",
+      "success_shape": "HealthEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "nodeSelf",
+      "method": "GET",
+      "path": "/nodes/self",
+      "request_shape": "NoRequestBody",
+      "success_shape": "NodeEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "submitJob",
+      "method": "POST",
+      "path": "/jobs",
+      "request_shape": "SubmitJobRequest",
+      "success_shape": "JobEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "getJob",
+      "method": "GET",
+      "path": "/jobs/{job_id}",
+      "request_shape": "NoRequestBody",
+      "success_shape": "JobEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "getJobEvents",
+      "method": "GET",
+      "path": "/jobs/{job_id}/events",
+      "request_shape": "NoRequestBody",
+      "success_shape": "JobEventsEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "cancelJob",
+      "method": "POST",
+      "path": "/jobs/{job_id}/cancel",
+      "request_shape": "CancelJobRequest",
+      "success_shape": "JobEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "registerWorker",
+      "method": "POST",
+      "path": "/workers/register",
+      "internal": true,
+      "request_shape": "WorkerRegisterRequest",
+      "success_shape": "WorkerEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "claimJob",
+      "method": "POST",
+      "path": "/jobs/claim",
+      "internal": true,
+      "request_shape": "ClaimJobRequest",
+      "success_shape": "ClaimJobEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "heartbeatJob",
+      "method": "POST",
+      "path": "/jobs/{job_id}/heartbeat",
+      "internal": true,
+      "request_shape": "HeartbeatJobRequest",
+      "success_shape": "JobEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "completeJob",
+      "method": "POST",
+      "path": "/jobs/{job_id}/complete",
+      "internal": true,
+      "request_shape": "CompleteJobRequest",
+      "success_shape": "JobEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "mirrorStatus",
+      "method": "GET",
+      "path": "/mirrors/{mirror_id}/status",
+      "request_shape": "NoRequestBody",
+      "success_shape": "MirrorEnvelope",
+      "failure_shape": "FailureEnvelope"
+    }
+  ],
+  "shapes": {
+    "NoRequestBody": {
+      "kind": "none"
+    },
+    "FailurePayload": {
+      "kind": "object",
+      "required": {
+        "category": {
+          "type": "string",
+          "min_length": 1
+        },
+        "detail": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {
+        "operation_id": {
+          "type": "string",
+          "min_length": 1
+        }
+      }
+    },
+    "FailureEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "error_payload": {
+          "ref": "FailurePayload"
+        }
+      },
+      "optional": {}
+    },
+    "HealthPayload": {
+      "kind": "object",
+      "required": {
+        "service": {
+          "type": "string",
+          "min_length": 1
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "ready",
+            "degraded"
+          ]
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "node_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "contract_version": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        }
+      }
+    },
+    "HealthEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "HealthPayload"
+        }
+      },
+      "optional": {}
+    },
+    "NodePayload": {
+      "kind": "object",
+      "required": {
+        "node_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        },
+        "postgres_configured": {
+          "type": "boolean"
+        },
+        "object_store_provider": {
+          "type": "enum",
+          "values": [
+            "s3",
+            "gcs",
+            "azure",
+            "filesystem",
+            "memory"
+          ]
+        },
+        "mtls_required": {
+          "type": "boolean"
+        }
+      },
+      "optional": {}
+    },
+    "NodeEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "NodePayload"
+        }
+      },
+      "optional": {}
+    },
+    "SubmitJobRequest": {
+      "kind": "object",
+      "required": {
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "workspace_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "action": {
+          "type": "enum",
+          "values": [
+            "build",
+            "run",
+            "test"
+          ]
+        },
+        "job_request": {
+          "type": "object"
+        }
+      },
+      "optional": {
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "preferred_worker_pool": {
+          "type": "string",
+          "min_length": 1
+        }
+      }
+    },
+    "CancelJobRequest": {
+      "kind": "object",
+      "required": {
+        "reason": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {}
+    },
+    "ArtifactRecord": {
+      "kind": "object",
+      "required": {
+        "artifact_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "object_key": {
+          "type": "string",
+          "min_length": 1
+        },
+        "kind": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {}
+    },
+    "JobPayload": {
+      "kind": "object",
+      "required": {
+        "job_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "workspace_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "action": {
+          "type": "enum",
+          "values": [
+            "build",
+            "run",
+            "test"
+          ]
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "worker_pool_key": {
+          "type": "string",
+          "min_length": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "optional": {
+        "worker_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "ref": "ArtifactRecord"
+          }
+        }
+      }
+    },
+    "JobEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "JobPayload"
+        }
+      },
+      "optional": {}
+    },
+    "JobEvent": {
+      "kind": "object",
+      "required": {
+        "event_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "job_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "status": {
+          "type": "string",
+          "min_length": 1
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "optional": {}
+    },
+    "JobEventsPayload": {
+      "kind": "object",
+      "required": {
+        "job_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "ref": "JobEvent"
+          }
+        }
+      },
+      "optional": {}
+    },
+    "JobEventsEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "JobEventsPayload"
+        }
+      },
+      "optional": {}
+    },
+    "WorkerRegisterRequest": {
+      "kind": "object",
+      "required": {
+        "worker_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "worker_pool_key": {
+          "type": "string",
+          "min_length": 1
+        },
+        "capacity": {
+          "type": "integer"
+        }
+      },
+      "optional": {}
+    },
+    "WorkerPayload": {
+      "kind": "object",
+      "required": {
+        "worker_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "worker_pool_key": {
+          "type": "string",
+          "min_length": 1
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "registered",
+            "draining"
+          ]
+        }
+      },
+      "optional": {}
+    },
+    "WorkerEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "WorkerPayload"
+        }
+      },
+      "optional": {}
+    },
+    "ClaimJobRequest": {
+      "kind": "object",
+      "required": {
+        "worker_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "worker_pool_key": {
+          "type": "string",
+          "min_length": 1
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {}
+    },
+    "ClaimJobPayload": {
+      "kind": "object",
+      "required": {
+        "claimed": {
+          "type": "boolean"
+        }
+      },
+      "optional": {
+        "job": {
+          "ref": "JobPayload"
+        }
+      }
+    },
+    "ClaimJobEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "ClaimJobPayload"
+        }
+      },
+      "optional": {}
+    },
+    "HeartbeatJobRequest": {
+      "kind": "object",
+      "required": {
+        "worker_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {}
+    },
+    "CompleteJobRequest": {
+      "kind": "object",
+      "required": {
+        "worker_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "ref": "ArtifactRecord"
+          }
+        }
+      }
+    },
+    "MirrorPayload": {
+      "kind": "object",
+      "required": {
+        "mirror_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "origin": {
+          "type": "string",
+          "min_length": 1
+        },
+        "freshness": {
+          "type": "enum",
+          "values": [
+            "fresh",
+            "lagging",
+            "unknown"
+          ]
+        },
+        "replay_cursor": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {}
+    },
+    "MirrorEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "MirrorPayload"
+        }
+      },
+      "optional": {}
+    }
+  }
+}

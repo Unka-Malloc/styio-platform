@@ -73,7 +73,7 @@ private:
       const CloudExecutionPolicy &cloud_policy);
 
   int schema_version_ = 1;
-  std::string api_path_ = "/v1/build-jobs";
+  std::string api_path_ = "/api/styio-platform/v1/jobs";
   std::string action_;
   std::filesystem::path manifest_path_;
   std::string toolchain_mode_;

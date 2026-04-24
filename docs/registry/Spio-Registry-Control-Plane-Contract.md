@@ -2,17 +2,14 @@
 
 **Purpose:** Freeze the HTTP control-plane contract used by backend services and automation to operate a `spio` registry `v2` root independently of the static read-plane contract.
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-24
 
 ## Source Of Truth
 
 The authoritative machine contract lives under:
 
-- [`../../contracts/registry-control-plane/v1/openapi.json`](../../contracts/registry-control-plane/v1/openapi.json)
-- [`../../contracts/registry-control-plane/v1/workflows.arazzo.json`](../../contracts/registry-control-plane/v1/workflows.arazzo.json)
 - [`../../contracts/registry-control-plane/v1/registry-control-plane.contract.json`](../../contracts/registry-control-plane/v1/registry-control-plane.contract.json)
 - [`../../contracts/registry-control-plane/v1/registry-control-plane.examples.json`](../../contracts/registry-control-plane/v1/registry-control-plane.examples.json)
-- [`../../contracts/registry-control-plane/v1/redocly.yaml`](../../contracts/registry-control-plane/v1/redocly.yaml)
 
 Human-readable docs explain those files. They do not replace them.
 
@@ -54,3 +51,10 @@ That server binds:
 - one `spio` binary for dry-run publish preparation
 
 It is the current executable reference for the contract package. It does not yet represent the final hosted multi-tenant service shape.
+
+## Gate Rule
+
+Registry control-plane compatibility is validated from the native JSON contract
+and example package. Any route or envelope change must update both JSON files,
+this governance page, and the owning runbook before claiming the service
+boundary is stable.

@@ -10,8 +10,8 @@
 
 | Path | Entry | Summary |
 |------|-------|---------|
-| `CONTROL-PLANE-RUNBOOK.md` | [Control Plane Runbook](./CONTROL-PLANE-RUNBOOK.md) | Own global hosted workspace, regional node, registry distribution, mirror sync, server-script, and cloud stress surfaces. |
+| `CONTROL-PLANE-RUNBOOK.md` | [Control Plane Runbook](./CONTROL-PLANE-RUNBOOK.md) | Own global hosted workspace, native JSON platform control-plane, regional node, registry distribution, mirror sync, server-script, and cloud stress surfaces. |
 | `COORDINATION-RUNBOOK.md` | [Coordination Runbook](./COORDINATION-RUNBOOK.md) | Coordinate cross-team ownership for platform kernel, global control-plane, package distribution, and docs delivery changes. |
 | `DOC-STATS.md` | [Doc Stats](./DOC-STATS.md) | Track platform team runbook sizes so ownership updates are visible in review. |
 | `DOCS-DELIVERY-RUNBOOK.md` | [Docs Delivery Runbook](./DOCS-DELIVERY-RUNBOOK.md) | Own platform documentation structure, generated indexes, and docs gate automation. |
-| `PLATFORM-KERNEL-RUNBOOK.md` | [Platform Kernel Runbook](./PLATFORM-KERNEL-RUNBOOK.md) | Own the migrated compile-plan, mixed Styio/C++ compile model, and cloud job request kernel. |
+| `PLATFORM-KERNEL-RUNBOOK.md` | [Platform Kernel Runbook](./PLATFORM-KERNEL-RUNBOOK.md) | Own the migrated compile-plan, mixed Styio/C++ compile model, cloud job request kernel, and C++ service-kernel integration boundary. |

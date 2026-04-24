@@ -5,8 +5,15 @@
 #include "SpioCloud/Job.hpp"
 #include "SpioCore/Errors.hpp"
 #include "SpioPlan/CompilePlan.hpp"
+#include "PlatformService/Http.hpp"
+#include "PlatformService/Identity.hpp"
+#include "PlatformService/ObjectStore.hpp"
+#include "PlatformService/PostgresStore.hpp"
+#include "PlatformService/Router.hpp"
 
 #include <nlohmann/json.hpp>
+
+#include <string>
 
 using json = nlohmann::json;
 
@@ -130,7 +137,7 @@ TEST(PlatformCloudJobTests, EmitsControlPlaneBuildJobRequest)
   const spio::CloudBuildJobRequest job = spio::BuildCloudBuildJobRequest("build", request, state, options, policy);
   const json payload = spio::BuildCloudBuildJobRequestPayload(job);
 
-  EXPECT_EQ(payload.at("api_path").get<std::string>(), "/v1/build-jobs");
+  EXPECT_EQ(payload.at("api_path").get<std::string>(), "/api/styio-platform/v1/jobs");
   EXPECT_EQ(payload.at("action").get<std::string>(), "build");
   EXPECT_EQ(payload.at("toolchain").at("mode").get<std::string>(), "build");
   EXPECT_EQ(payload.at("toolchain").at("build_mode").get<std::string>(), "minimal");
@@ -169,4 +176,206 @@ TEST(PlatformCloudJobTests, RejectsSourceBuildOverridesWhenProjectUsesBinaryMode
   {
     EXPECT_EQ(std::string(error.what()), "source-build options require 'spio use build'");
   }
+}
+
+namespace
+{
+
+spio::platform::MtlsIdentity WorkerIdentity()
+{
+  return {
+      .role = "worker",
+      .tenant_id = "tenant-acme",
+      .node_id = "worker-01",
+  };
+}
+
+nlohmann::json MinimalJobRequest()
+{
+  return {
+      {"tenant_id", "tenant-acme"},
+      {"workspace_id", "workspace-main"},
+      {"action", "build"},
+      {"region", "local-dev"},
+      {"preferred_worker_pool", "linux/x86_64/build/nightly/minimal"},
+      {"job_request", {
+                          {"manifest_path", "spio.toml"},
+                          {"profile", "dev"},
+                      }},
+  };
+}
+
+spio::platform::HttpRequest Request(
+    spio::platform::HttpMethod method,
+    std::string path,
+    nlohmann::json body = nlohmann::json::object())
+{
+  return {
+      .method = method,
+      .path = std::move(path),
+      .body = std::move(body),
+      .identity = WorkerIdentity(),
+  };
+}
+
+}  // namespace
+
+TEST(PlatformServiceIdentityTests, ParsesMtlsUriSanIntoRoleTenantAndNode)
+{
+  const std::optional<spio::platform::MtlsIdentity> identity =
+      spio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/tenant-acme/role/worker/node/worker-01");
+
+  ASSERT_TRUE(identity.has_value());
+  EXPECT_EQ(identity->role, "worker");
+  EXPECT_EQ(identity->tenant_id, "tenant-acme");
+  EXPECT_EQ(identity->node_id, "worker-01");
+  EXPECT_TRUE(spio::platform::IsPlatformServiceRole(identity->role));
+
+  const json serialized = spio::platform::SerializeMtlsIdentity(*identity);
+  EXPECT_EQ(serialized.at("role").get<std::string>(), "worker");
+  EXPECT_EQ(serialized.at("tenant_id").get<std::string>(), "tenant-acme");
+  EXPECT_EQ(serialized.at("node_id").get<std::string>(), "worker-01");
+}
+
+TEST(PlatformServiceIdentityTests, RejectsUnknownMtlsUriSanRoleOrMissingNode)
+{
+  EXPECT_FALSE(spio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/acme/role/browser/node/client").has_value());
+  EXPECT_FALSE(spio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/acme/role/worker").has_value());
+  EXPECT_FALSE(spio::platform::ParseMtlsUriSan("https://styio-platform/tenant/acme/role/worker/node/worker-01").has_value());
+}
+
+TEST(PlatformServiceRouterTests, MatchesRouteParametersForJobsAndMirrors)
+{
+  const std::vector<spio::platform::RouteSpec> routes = spio::platform::BuildPlatformControlPlaneRoutes();
+
+  const std::optional<spio::platform::RouteMatch> job =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/jobs/job-abc/events");
+  ASSERT_TRUE(job.has_value());
+  EXPECT_EQ(job->route.operation_id, "getJobEvents");
+  EXPECT_EQ(job->parameters.at("job_id"), "job-abc");
+
+  const std::optional<spio::platform::RouteMatch> mirror =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/mirrors/registry-primary/status");
+  ASSERT_TRUE(mirror.has_value());
+  EXPECT_EQ(mirror->route.operation_id, "mirrorStatus");
+  EXPECT_EQ(mirror->parameters.at("mirror_id"), "registry-primary");
+
+  EXPECT_FALSE(spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/jobs/job-abc/events").has_value());
+}
+
+TEST(PlatformServiceObjectStoreTests, SanitizesArtifactObjectKeyParts)
+{
+  const std::string key = spio::platform::BuildArtifactObjectKey(
+      "tenant/acme",
+      "workspace main",
+      "job:42",
+      "../out.tar.gz");
+
+  EXPECT_EQ(key, "tenants/tenant_acme/workspaces/workspace_main/jobs/job_42/artifacts/.._out.tar.gz");
+  EXPECT_EQ(key.find("tenant/acme"), std::string::npos);
+  EXPECT_EQ(key.find("workspace main"), std::string::npos);
+  EXPECT_EQ(key.find("job:42"), std::string::npos);
+  EXPECT_EQ(key.find("../out"), std::string::npos);
+}
+
+TEST(PlatformServicePostgresTests, DefinesCloudKernelMigrationAndClaimSql)
+{
+  const std::vector<spio::platform::SqlMigration> migrations = spio::platform::CloudKernelMigrations();
+
+  ASSERT_FALSE(migrations.empty());
+  EXPECT_EQ(migrations.front().id, "001_cloud_kernel");
+  EXPECT_NE(migrations.front().sql.find("CREATE TABLE IF NOT EXISTS platform_jobs"), std::string::npos);
+  EXPECT_NE(migrations.front().sql.find("CREATE TABLE IF NOT EXISTS platform_job_events"), std::string::npos);
+  EXPECT_NE(migrations.front().sql.find("CREATE TABLE IF NOT EXISTS platform_artifacts"), std::string::npos);
+
+  const std::string claim_sql = spio::platform::ClaimJobSql();
+  EXPECT_NE(claim_sql.find("FOR UPDATE SKIP LOCKED"), std::string::npos);
+  EXPECT_NE(claim_sql.find("worker_pool_key = $2"), std::string::npos);
+  EXPECT_NE(claim_sql.find("RETURNING *"), std::string::npos);
+
+  const std::string complete_sql = spio::platform::CompleteJobSql();
+  EXPECT_NE(complete_sql.find("status = 'running'"), std::string::npos);
+  EXPECT_NE(complete_sql.find("worker_id = $4"), std::string::npos);
+}
+
+TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelopes)
+{
+  spio::platform::PlatformConfig config;
+  config.region = "local-dev";
+  config.node_id = "node-test";
+  config.postgres_dsn = "postgres://platform@localhost/styio";
+  config.object_store.provider = "memory";
+  config.mtls.required = true;
+
+  spio::platform::PlatformRouter router(config);
+
+  const spio::platform::HttpResponse submit =
+      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  ASSERT_EQ(submit.status_code, 200);
+  ASSERT_EQ(submit.body.at("returncode").get<int>(), 0);
+  EXPECT_EQ(submit.body.at("message").get<std::string>(), "queued platform job");
+  const json queued = submit.body.at("payload");
+  const std::string job_id = queued.at("job_id").get<std::string>();
+  EXPECT_EQ(queued.at("status").get<std::string>(), "queued");
+  EXPECT_EQ(queued.at("worker_pool_key").get<std::string>(), "linux/x86_64/build/nightly/minimal");
+
+  const spio::platform::HttpResponse register_worker =
+      router.Dispatch(Request(
+          spio::platform::HttpMethod::Post,
+          "/workers/register",
+          {
+              {"worker_id", "worker-01"},
+              {"region", "local-dev"},
+              {"worker_pool_key", "linux/x86_64/build/nightly/minimal"},
+              {"capacity", 1},
+          }));
+  ASSERT_EQ(register_worker.status_code, 200);
+  EXPECT_EQ(register_worker.body.at("payload").at("status").get<std::string>(), "registered");
+
+  const spio::platform::HttpResponse claim =
+      router.Dispatch(Request(
+          spio::platform::HttpMethod::Post,
+          "/jobs/claim",
+          {
+              {"worker_id", "worker-01"},
+              {"region", "local-dev"},
+              {"worker_pool_key", "linux/x86_64/build/nightly/minimal"},
+          }));
+  ASSERT_EQ(claim.status_code, 200);
+  ASSERT_TRUE(claim.body.at("payload").at("claimed").get<bool>());
+  EXPECT_EQ(claim.body.at("payload").at("job").at("job_id").get<std::string>(), job_id);
+  EXPECT_EQ(claim.body.at("payload").at("job").at("status").get<std::string>(), "running");
+  EXPECT_EQ(claim.body.at("payload").at("job").at("worker_id").get<std::string>(), "worker-01");
+
+  const std::string artifact_key = spio::platform::BuildArtifactObjectKey("tenant-acme", "workspace-main", job_id, "stdout.log");
+  const spio::platform::HttpResponse complete =
+      router.Dispatch(Request(
+          spio::platform::HttpMethod::Post,
+          "/jobs/" + job_id + "/complete",
+          {
+              {"worker_id", "worker-01"},
+              {"status", "succeeded"},
+              {"message", "build completed"},
+              {"artifacts", json::array({
+                                {
+                                    {"artifact_id", "stdout"},
+                                    {"object_key", artifact_key},
+                                    {"kind", "log"},
+                                },
+                            })},
+          }));
+  ASSERT_EQ(complete.status_code, 200);
+  ASSERT_EQ(complete.body.at("returncode").get<int>(), 0);
+  EXPECT_EQ(complete.body.at("message").get<std::string>(), "completed platform job");
+  EXPECT_EQ(complete.body.at("payload").at("status").get<std::string>(), "succeeded");
+  EXPECT_EQ(complete.body.at("payload").at("artifacts").at(0).at("object_key").get<std::string>(), artifact_key);
+
+  const spio::platform::HttpResponse events =
+      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/" + job_id + "/events"));
+  ASSERT_EQ(events.status_code, 200);
+  const json event_list = events.body.at("payload").at("events");
+  ASSERT_EQ(event_list.size(), 3U);
+  EXPECT_EQ(event_list.at(0).at("status").get<std::string>(), "queued");
+  EXPECT_EQ(event_list.at(1).at("status").get<std::string>(), "running");
+  EXPECT_EQ(event_list.at(2).at("status").get<std::string>(), "succeeded");
 }

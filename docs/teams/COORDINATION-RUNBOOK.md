@@ -14,10 +14,10 @@ distribution foundation for `styio-spio`.
 
 - `src/SpioPlan/` and `src/SpioCloud/` provide the migrated platform kernel.
 - `docs/governance/Platform-Workspace-Compile-Model.md` owns the Styio default target, C++/LLVM workspace, and mixed compile rule.
-- `contracts/` publishes compile-plan, hosted control-plane, registry control-plane, and registry v2 packages.
+- `contracts/` publishes compile-plan, hosted control-plane, platform control-plane, registry control-plane, and registry v2 packages.
 - `docs/registry/` owns package distribution and mirror synchronization rules.
 - `docs/operations/` owns regional node deployment and recovery rules.
-- `scripts/` owns server tools, generated API artifacts, docs gates, and stress harnesses.
+- `scripts/` owns server tools, docs gates, and stress harnesses.
 - `docs/` owns service governance and migration history.
 
 ## Ownership Table
@@ -32,8 +32,14 @@ distribution foundation for `styio-spio`.
 
 Platform kernel changes need native tests and must preserve the Styio-default,
 C++/LLVM-capable workspace model. Control-plane changes need contract or script
-gates. Regional node and mirror changes need explicit authority, freshness, and
-recovery rules. Docs changes need docs audit and runbook ownership updates.
+gates over native JSON packages. Regional node and mirror changes need explicit
+authority, freshness, and recovery rules. Docs changes need docs audit and
+runbook ownership updates.
+
+The V1 cloud service is coordinated as a single-region runnable C++ kernel:
+Boost.Beast/Asio networking, Postgres durable state, provider-neutral object
+storage with S3 first, and mTLS service traffic. Multi-region expansion must not
+precede executable compatibility gates for that kernel.
 
 ## Escalation Rules
 

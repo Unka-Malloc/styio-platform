@@ -23,6 +23,7 @@ The platform owns:
 - package repository distribution and mirror replication
 - cross-network deployment topology and service health contracts
 - service-side observability, replay, and stress validation
+- native JSON platform-control-plane contracts, examples, and gates
 
 The platform does not own:
 
@@ -40,6 +41,25 @@ registry read replicas, write-forwarding control planes, or all of them.
 Package repository distribution must tolerate mirror lag explicitly. Clients
 must be able to distinguish authoritative write acceptance from eventually
 consistent mirror availability.
+
+The V1 service target is a single-region runnable kernel. It must prove health,
+node introspection, hosted job lifecycle, worker lifecycle, and mirror
+freshness/replay behavior before multi-region routing or provider fan-out is
+treated as production scope.
+
+## Implementation Target
+
+The V1 cloud service implementation target is pure C++:
+
+- Boost.Beast and Boost.Asio for HTTP and async network execution
+- Postgres for control-plane state, hosted job lifecycle, mirror status, and
+  audit records
+- provider-neutral object storage with S3 as the first backend
+- mTLS across operator, regional-node, worker, and internal service traffic
+
+The service contract is maintained as native JSON under
+`contracts/platform-control-plane/v1/`; generated third-party API descriptions
+are not part of the platform governance source of truth.
 
 ## Client Relationship
 

@@ -1,35 +1,26 @@
 # Spio Hosted Control-Plane Contract
 
-**Purpose:** Freeze the frontend/backend HTTP contract used by hosted workspaces so `styio-view`, the future `spio` control console, and backend services can develop independently against a versioned API package.
+**Purpose:** Freeze the frontend/backend HTTP contract used by hosted workspaces so `styio-view`, the future `spio` control console, and backend services can develop independently against a versioned native JSON package.
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-24
 
 ## Source Of Truth
 
 The authoritative machine contract lives under:
 
-- [`contracts/hosted-control-plane/v1/openapi.json`](../../contracts/hosted-control-plane/v1/openapi.json)
-- [`contracts/hosted-control-plane/v1/workflows.arazzo.json`](../../contracts/hosted-control-plane/v1/workflows.arazzo.json)
 - [`contracts/hosted-control-plane/v1/hosted-control-plane.contract.json`](../../contracts/hosted-control-plane/v1/hosted-control-plane.contract.json)
 - [`contracts/hosted-control-plane/v1/hosted-control-plane.examples.json`](../../contracts/hosted-control-plane/v1/hosted-control-plane.examples.json)
-- [`contracts/hosted-control-plane/v1/redocly.yaml`](../../contracts/hosted-control-plane/v1/redocly.yaml)
 
 Human-readable docs must explain and reference those files, not replace them.
 
 ## Engineering Package
 
-`v1` now ships as a full interface package:
+`v1` ships as a native JSON interface package:
 
-1. `openapi.json`
-   Standards-based API description for frontend/backend independent development, including reusable schemas, examples, and cross-operation links.
-2. `workflows.arazzo.json`
-   Workflow descriptions for multi-operation frontend/backend flows.
-3. `hosted-control-plane.contract.json`
-   Local compatibility contract catalog used by shape gates and artifact generation.
-4. `hosted-control-plane.examples.json`
+1. `hosted-control-plane.contract.json`
+   Local compatibility contract catalog used by native JSON shape gates.
+2. `hosted-control-plane.examples.json`
    Canonical request/success/failure examples.
-5. `redocly.yaml`
-   Lint profile that keeps the OpenAPI package at a stable engineering floor.
 
 ## Scope
 
@@ -79,7 +70,7 @@ Those stay in their existing contracts.
 
 ## Workflow Rule
 
-Any frontend or control-console workflow that spans multiple operations must be described in `workflows.arazzo.json` once it becomes part of the expected product path. Route docs alone are not enough for independent frontend/backend development.
+Any frontend or control-console workflow that spans multiple operations must be represented in the native JSON contract/examples package once it becomes part of the expected product path. Route docs alone are not enough for independent frontend/backend development.
 
 ## Testing Rule
 
@@ -93,6 +84,6 @@ Every published operation must keep:
 
 And the package as a whole must keep:
 
-- generated-artifact sync checks for OpenAPI and Arazzo
-- OpenAPI lint
-- workflow-document lint
+- native JSON contract shape gates
+- canonical example smoke gates
+- workflow coverage for multi-operation product paths

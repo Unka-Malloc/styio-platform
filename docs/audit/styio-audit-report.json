@@ -1,0 +1,42 @@
+{
+  "findings": [],
+  "framework": {
+    "name": "styio-audit",
+    "root": "/home/unka/styio-audit",
+    "version": "0.1.0"
+  },
+  "modules": [
+    {
+      "description": "Common auditable-code rules shared by all Styio-family repositories.",
+      "last_updated": "2026-04-22",
+      "module_id": "default",
+      "module_type": "default",
+      "project_ids": [
+        "*"
+      ],
+      "root": "modules/default"
+    },
+    {
+      "description": "Project module for styio-platform cloud service contracts, service kernel, registry distribution, regional nodes, and delivery gates.",
+      "last_updated": "2026-04-24",
+      "module_id": "for-styio-platform",
+      "module_type": "project",
+      "project_ids": [
+        "styio-platform",
+        "platform"
+      ],
+      "root": "for-styio-platform"
+    }
+  ],
+  "report_version": 1,
+  "summary": {
+    "finding_count": 0,
+    "severity_counts": {},
+    "status": "passed"
+  },
+  "target": {
+    "framework_only": false,
+    "project": "styio-platform",
+    "repo_root": "/home/unka/styio-platform"
+  }
+}

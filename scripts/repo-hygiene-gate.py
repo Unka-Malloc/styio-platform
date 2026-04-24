@@ -87,6 +87,12 @@ REQUIRED_DOC_REFERENCES = {
     ],
 }
 
+FORBIDDEN_CONTRACT_TERMS = [
+    "open" + "api",
+    "ara" + "zzo",
+    "redo" + "cly",
+]
+
 
 def run_git(*args: str, check: bool = True) -> str:
     result = subprocess.run(["git", "-C", str(REPO_ROOT), *args], check=check, text=True, capture_output=True)
@@ -124,9 +130,55 @@ def is_binary_file(path: Path) -> bool:
 def path_violations(files: list[str]) -> list[str]:
     problems: list[str] = []
     for rel in files:
+        if not (REPO_ROOT / rel).exists():
+            continue
         pattern = match_forbidden(rel)
         if pattern is not None:
             problems.append(f"{rel}: matches forbidden pattern {pattern}")
+        lowered = rel.lower()
+        for term in FORBIDDEN_CONTRACT_TERMS:
+            if term in lowered:
+                problems.append(f"{rel}: contains forbidden non-native contract term in path")
+    return problems
+
+
+def decode_text(data: bytes) -> str | None:
+    if b"\x00" in data:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def staged_file_text(rel: str) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "show", f":{rel}"],
+        text=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return None
+    return decode_text(result.stdout)
+
+
+def working_file_text(rel: str) -> str | None:
+    path = REPO_ROOT / rel
+    if not path.is_file():
+        return None
+    return decode_text(path.read_bytes())
+
+
+def contract_reference_violations(files: list[str], source: str) -> list[str]:
+    problems: list[str] = []
+    for rel in files:
+        text = staged_file_text(rel) if source == "staged" else working_file_text(rel)
+        if text is None:
+            continue
+        lowered = text.lower()
+        for term in FORBIDDEN_CONTRACT_TERMS:
+            if term in lowered:
+                problems.append(f"{rel}: contains forbidden non-native contract text reference")
     return problems
 
 
@@ -178,22 +230,43 @@ def history_violations(rev_range: str, max_bytes: int) -> list[str]:
         capture_output=True,
     )
     problems: list[str] = []
+    object_ids_by_path: dict[str, str] = {}
     for line in batch.stdout.splitlines():
         parts = line.split(" ", 3)
         if len(parts) != 4:
             continue
-        object_type, _oid, object_size, path = parts
+        object_type, oid, object_size, path = parts
         if object_type != "blob" or not path:
             continue
+        object_ids_by_path[path] = oid
         pattern = match_forbidden(path)
         if pattern is not None:
             problems.append(f"{path}: appears in pushed history range {rev_range} and matches forbidden pattern {pattern}")
+        lowered = path.lower()
+        for term in FORBIDDEN_CONTRACT_TERMS:
+            if term in lowered:
+                problems.append(f"{path}: appears in pushed history range {rev_range} with forbidden non-native contract term in path")
         try:
             size = int(object_size)
         except ValueError:
             continue
         if size > max_bytes:
             problems.append(f"{path}: blob size {size} bytes in pushed history range {rev_range} exceeds soft limit {max_bytes} bytes")
+    for path, oid in object_ids_by_path.items():
+        blob = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "cat-file", "blob", oid],
+            text=False,
+            capture_output=True,
+        )
+        if blob.returncode != 0:
+            continue
+        text = decode_text(blob.stdout)
+        if text is None:
+            continue
+        lowered = text.lower()
+        for term in FORBIDDEN_CONTRACT_TERMS:
+            if term in lowered:
+                problems.append(f"{path}: appears in pushed history range {rev_range} with forbidden non-native contract text reference")
     return sorted(set(problems))
 
 
@@ -262,6 +335,7 @@ def main() -> int:
         return 0
     problems = []
     problems.extend(path_violations(files))
+    problems.extend(contract_reference_violations(files, args.mode))
     problems.extend(size_violations(files, args.max_file_bytes))
     problems.extend(binary_violations(files))
     problems.extend(gitignore_pattern_violations())

@@ -1,0 +1,385 @@
+{
+  "health": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "styio-platform is ready",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "service": "styio-platformd",
+        "status": "ready",
+        "region": "local-dev",
+        "node_id": "node-local",
+        "contract_version": "v1",
+        "roles": [
+          "control-plane",
+          "worker",
+          "registry-writer",
+          "mirror"
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "styio-platform is degraded",
+      "stdout": "",
+      "stderr": "postgres is not configured",
+      "error_payload": {
+        "category": "HealthError",
+        "detail": "postgres is not configured",
+        "operation_id": "health"
+      }
+    }
+  },
+  "nodeSelf": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "resolved current platform node",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "node_id": "node-local",
+        "region": "local-dev",
+        "roles": [
+          "control-plane",
+          "worker",
+          "registry-writer",
+          "mirror"
+        ],
+        "postgres_configured": true,
+        "object_store_provider": "s3",
+        "mtls_required": true
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "node introspection failed",
+      "stdout": "",
+      "stderr": "node id is missing",
+      "error_payload": {
+        "category": "ConfigError",
+        "detail": "node id is missing",
+        "operation_id": "nodeSelf"
+      }
+    }
+  },
+  "submitJob": {
+    "request": {
+      "tenant_id": "tenant-demo",
+      "workspace_id": "workspace-demo",
+      "action": "build",
+      "region": "local-dev",
+      "preferred_worker_pool": "linux/x86_64/build/nightly/minimal",
+      "job_request": {
+        "schema_version": 1,
+        "api_path": "/api/styio-platform/v1/jobs",
+        "action": "build"
+      }
+    },
+    "success": {
+      "returncode": 0,
+      "message": "queued platform job",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "job_id": "job-demo",
+        "tenant_id": "tenant-demo",
+        "workspace_id": "workspace-demo",
+        "action": "build",
+        "status": "queued",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "created_at": "2026-04-24T00:00:00Z"
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "job submission rejected",
+      "stdout": "",
+      "stderr": "action must be build, run, or test",
+      "error_payload": {
+        "category": "ValidationError",
+        "detail": "action must be build, run, or test",
+        "operation_id": "submitJob"
+      }
+    }
+  },
+  "getJob": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded platform job",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "job_id": "job-demo",
+        "tenant_id": "tenant-demo",
+        "workspace_id": "workspace-demo",
+        "action": "build",
+        "status": "running",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "created_at": "2026-04-24T00:00:00Z",
+        "worker_id": "worker-local"
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "job lookup failed",
+      "stdout": "",
+      "stderr": "job not found",
+      "error_payload": {
+        "category": "NotFound",
+        "detail": "job not found",
+        "operation_id": "getJob"
+      }
+    }
+  },
+  "getJobEvents": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded platform job events",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "job_id": "job-demo",
+        "events": [
+          {
+            "event_id": "event-1",
+            "job_id": "job-demo",
+            "status": "queued",
+            "message": "job queued",
+            "created_at": "2026-04-24T00:00:00Z"
+          }
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "job event lookup failed",
+      "stdout": "",
+      "stderr": "job not found",
+      "error_payload": {
+        "category": "NotFound",
+        "detail": "job not found",
+        "operation_id": "getJobEvents"
+      }
+    }
+  },
+  "cancelJob": {
+    "request": {
+      "reason": "user requested cancellation"
+    },
+    "success": {
+      "returncode": 0,
+      "message": "cancelled platform job",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "job_id": "job-demo",
+        "tenant_id": "tenant-demo",
+        "workspace_id": "workspace-demo",
+        "action": "build",
+        "status": "cancelled",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "created_at": "2026-04-24T00:00:00Z",
+        "finished_at": "2026-04-24T00:01:00Z"
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "job cancellation failed",
+      "stdout": "",
+      "stderr": "job is already completed",
+      "error_payload": {
+        "category": "StateError",
+        "detail": "job is already completed",
+        "operation_id": "cancelJob"
+      }
+    }
+  },
+  "registerWorker": {
+    "request": {
+      "worker_id": "worker-local",
+      "region": "local-dev",
+      "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+      "capacity": 2
+    },
+    "success": {
+      "returncode": 0,
+      "message": "registered platform worker",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "worker_id": "worker-local",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "status": "registered"
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "worker registration rejected",
+      "stdout": "",
+      "stderr": "capacity must be positive",
+      "error_payload": {
+        "category": "ValidationError",
+        "detail": "capacity must be positive",
+        "operation_id": "registerWorker"
+      }
+    }
+  },
+  "claimJob": {
+    "request": {
+      "worker_id": "worker-local",
+      "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+      "region": "local-dev"
+    },
+    "success": {
+      "returncode": 0,
+      "message": "claimed platform job",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "claimed": true,
+        "job": {
+          "job_id": "job-demo",
+          "tenant_id": "tenant-demo",
+          "workspace_id": "workspace-demo",
+          "action": "build",
+          "status": "running",
+          "region": "local-dev",
+          "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+          "created_at": "2026-04-24T00:00:00Z",
+          "worker_id": "worker-local"
+        }
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "job claim failed",
+      "stdout": "",
+      "stderr": "worker is not registered",
+      "error_payload": {
+        "category": "WorkerError",
+        "detail": "worker is not registered",
+        "operation_id": "claimJob"
+      }
+    }
+  },
+  "heartbeatJob": {
+    "request": {
+      "worker_id": "worker-local",
+      "message": "compile-plan generated"
+    },
+    "success": {
+      "returncode": 0,
+      "message": "recorded platform job heartbeat",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "job_id": "job-demo",
+        "tenant_id": "tenant-demo",
+        "workspace_id": "workspace-demo",
+        "action": "build",
+        "status": "running",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "created_at": "2026-04-24T00:00:00Z",
+        "worker_id": "worker-local"
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "job heartbeat failed",
+      "stdout": "",
+      "stderr": "worker does not own job",
+      "error_payload": {
+        "category": "WorkerError",
+        "detail": "worker does not own job",
+        "operation_id": "heartbeatJob"
+      }
+    }
+  },
+  "completeJob": {
+    "request": {
+      "worker_id": "worker-local",
+      "status": "succeeded",
+      "message": "build completed",
+      "artifacts": [
+        {
+          "artifact_id": "artifact-1",
+          "object_key": "tenants/tenant-demo/workspaces/workspace-demo/jobs/job-demo/artifacts/build-log.jsonl",
+          "kind": "build-log"
+        }
+      ]
+    },
+    "success": {
+      "returncode": 0,
+      "message": "completed platform job",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "job_id": "job-demo",
+        "tenant_id": "tenant-demo",
+        "workspace_id": "workspace-demo",
+        "action": "build",
+        "status": "succeeded",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "created_at": "2026-04-24T00:00:00Z",
+        "worker_id": "worker-local",
+        "finished_at": "2026-04-24T00:02:00Z",
+        "artifacts": [
+          {
+            "artifact_id": "artifact-1",
+            "object_key": "tenants/tenant-demo/workspaces/workspace-demo/jobs/job-demo/artifacts/build-log.jsonl",
+            "kind": "build-log"
+          }
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "job completion failed",
+      "stdout": "",
+      "stderr": "worker does not own job",
+      "error_payload": {
+        "category": "WorkerError",
+        "detail": "worker does not own job",
+        "operation_id": "completeJob"
+      }
+    }
+  },
+  "mirrorStatus": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded mirror freshness",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "mirror_id": "mirror-local",
+        "region": "local-dev",
+        "origin": "registry-primary",
+        "freshness": "fresh",
+        "replay_cursor": "checkpoint-0001"
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "mirror freshness unavailable",
+      "stdout": "",
+      "stderr": "mirror cursor not found",
+      "error_payload": {
+        "category": "MirrorError",
+        "detail": "mirror cursor not found",
+        "operation_id": "mirrorStatus"
+      }
+    }
+  }
+}

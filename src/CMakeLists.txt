@@ -40,6 +40,17 @@ set(STYIO_PLATFORM_CLOUD_SOURCES
     SpioCloud/Job.cpp
 )
 
+set(STYIO_PLATFORM_SERVICE_SOURCES
+    PlatformService/BeastServer.cpp
+    PlatformService/Config.cpp
+    PlatformService/Http.cpp
+    PlatformService/Identity.cpp
+    PlatformService/JobQueue.cpp
+    PlatformService/ObjectStore.cpp
+    PlatformService/PostgresStore.cpp
+    PlatformService/Router.cpp
+)
+
 styio_platform_add_static_library(styio_platform_foundation ${STYIO_PLATFORM_FOUNDATION_SOURCES})
 
 styio_platform_add_static_library(styio_platform_manifest ${STYIO_PLATFORM_MANIFEST_SOURCES})
@@ -54,6 +65,9 @@ target_link_libraries(styio_platform_compile PUBLIC styio_platform_foundation st
 styio_platform_add_static_library(styio_platform_cloud ${STYIO_PLATFORM_CLOUD_SOURCES})
 target_link_libraries(styio_platform_cloud PUBLIC styio_platform_compile)
 
+styio_platform_add_static_library(styio_platform_service ${STYIO_PLATFORM_SERVICE_SOURCES})
+target_link_libraries(styio_platform_service PUBLIC styio_platform_cloud)
+
 add_library(styio_platform_kernel INTERFACE)
 target_link_libraries(styio_platform_kernel INTERFACE
   styio_platform_foundation
@@ -61,4 +75,8 @@ target_link_libraries(styio_platform_kernel INTERFACE
   styio_platform_resolution
   styio_platform_compile
   styio_platform_cloud
+  styio_platform_service
 )
+
+add_executable(styio-platformd PlatformService/Daemon.cpp)
+target_link_libraries(styio-platformd PRIVATE styio_platform_service)

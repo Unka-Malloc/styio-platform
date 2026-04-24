@@ -17,6 +17,17 @@ Regional nodes may provide:
 Node roles must be explicit in deployment metadata so clients and operators know
 whether a node is authoritative, read-only, write-forwarding, or compile-only.
 
+## V1 Runnable Kernel
+
+The first regional node must run as a single-region C++ service before any
+multi-region deployment is promoted. Its target stack is Boost.Beast and
+Boost.Asio for HTTP/network execution, Postgres for durable control-plane
+state, provider-neutral object storage with S3 as the first backend, and mTLS
+for operator, node, worker, and internal service traffic.
+
+The node must expose only the native JSON platform-control-plane V1 route
+families until matching gates exist for a broader topology.
+
 ## Cross-Network Deployment
 
 Cross-network deployments must avoid assuming a single low-latency control
@@ -28,6 +39,7 @@ and retry/replay behavior instead of hiding topology behind one opaque endpoint.
 Before a node role is promoted, validate:
 
 - contract compatibility for hosted and registry APIs
+- native JSON platform-control-plane contract and example compatibility
 - mirror freshness and replay behavior
 - package read availability from the regional mirror
 - worker-pool health for compile-capable nodes

@@ -26,13 +26,28 @@ Those remain in the existing governance, registry, and `styio` contract document
 
 ## Route Ownership
 
-The route-level HTTP contract for hosted workspace and deployment operations is now owned by:
+The route-level HTTP contract for hosted workspace and deployment operations is now owned by native JSON packages:
 
 - [`./Spio-Hosted-Control-Plane-Contract.md`](./Spio-Hosted-Control-Plane-Contract.md)
-- [`../../contracts/hosted-control-plane/v1/openapi.json`](../../contracts/hosted-control-plane/v1/openapi.json)
-- [`../../contracts/hosted-control-plane/v1/workflows.arazzo.json`](../../contracts/hosted-control-plane/v1/workflows.arazzo.json)
+- [`../../contracts/hosted-control-plane/v1/hosted-control-plane.contract.json`](../../contracts/hosted-control-plane/v1/hosted-control-plane.contract.json)
+- [`../../contracts/hosted-control-plane/v1/hosted-control-plane.examples.json`](../../contracts/hosted-control-plane/v1/hosted-control-plane.examples.json)
+- [`../../contracts/platform-control-plane/v1/platform-control-plane.contract.json`](../../contracts/platform-control-plane/v1/platform-control-plane.contract.json)
+- [`../../contracts/platform-control-plane/v1/platform-control-plane.examples.json`](../../contracts/platform-control-plane/v1/platform-control-plane.examples.json)
 
 This cloud-policy document still owns the execution-lane, risk-class, security-profile, cache-policy, and worker-pool semantics that those route payloads must preserve.
+
+## V1 Cloud Service Target
+
+The first remote service implementation must be a single-region runnable kernel
+before any multi-region topology is promoted. The target stack is pure C++ with
+Boost.Beast and Boost.Asio for HTTP and async networking, Postgres for durable
+control-plane state, provider-neutral object storage with S3 as the first
+backend, and mTLS for service-to-service and operator traffic.
+
+The native JSON platform-control-plane package owns the executable route shape
+for health, node introspection, hosted job lifecycle, worker lifecycle, and
+mirror freshness/replay status. This document owns the cloud execution policy
+semantics those routes expose.
 
 ## Baseline Position
 
@@ -170,7 +185,7 @@ This command must report at least:
 - `command = "cloud plan"`
 - a top-level `job_request`
 - `job_request.schema_version = 1`
-- `job_request.api_path = "/v1/build-jobs"`
+- `job_request.api_path = "/api/styio-platform/v1/jobs"`
 - `job_request.action`
 - `job_request.toolchain`
 - `job_request.workflow`

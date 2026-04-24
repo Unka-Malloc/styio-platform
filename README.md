@@ -21,6 +21,11 @@ should live here first. `styio-spio` should only retain local package-manager
 client code, offline package workflows, local import/export paths, and
 compatibility shims that users need without connecting to the platform.
 
+The V1 cloud service plan is a native platform kernel, not a generated API
+toolchain. Its executable contract source is the repo-native JSON package under
+`contracts/platform-control-plane/v1/`, with examples and gates validating that
+package directly.
+
 ## Product Role
 
 - global hosted compile and execution platform
@@ -32,6 +37,20 @@ compatibility shims that users need without connecting to the platform.
 - multi-region and cross-network deployment node control plane
 - mirror-site synchronization and registry replication
 - extensible cloud service APIs consumed by local and hosted clients
+
+## V1 Service Kernel
+
+The first runnable cloud service kernel targets a pure C++ implementation:
+
+- HTTP service layer built on Boost.Beast and Boost.Asio
+- Postgres for durable control-plane state, job lifecycle, and audit metadata
+- provider-neutral object storage with S3 as the first deployment backend
+- mTLS between operators, regional nodes, workers, and internal service callers
+- single-region runnable deployment before multi-region routing is promoted
+
+V1 must boot as a small regional node that can expose health, node
+introspection, hosted job lifecycle, worker lifecycle, and mirror freshness
+status from the native JSON platform-control-plane contract.
 
 ## Validate
 
