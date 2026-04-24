@@ -33,7 +33,9 @@ source-distribution policy, and dependency usage-boundary evidence aligned with
 `styio-audit`. Keep `docs/specs/TECHNOLOGY-COMPONENT-INVENTORY.md` aligned
 with `styio-audit` whenever the technology stack, internal components,
 open-source components, dependency manifests, Apache-2.0 evidence, or commercial-risk
-boundaries change. Registry-management docs must explicitly cover publish,
+boundaries change. Keep external `styio-audit` execution wired through the
+repository audit gate and dedicated GitHub Actions workflow whenever audit
+policy or cross-repo CI ownership changes. Registry-management docs must explicitly cover publish,
 verify, mirror freshness/replay, offline client fallback, service/client cache
 separation, VM one-command deployment, and security boundaries before
 docs/audit closure is claimed.

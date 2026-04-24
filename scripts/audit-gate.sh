@@ -35,18 +35,23 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$AUDIT_BIN" ]]; then
-  if command -v styio-audit >/dev/null 2>&1; then
-    AUDIT_BIN="$(command -v styio-audit)"
-  elif [[ -x "$ROOT/../styio-audit/bin/styio-audit" ]]; then
+  if [[ -x "$ROOT/../styio-audit/bin/styio-audit" ]]; then
     AUDIT_BIN="$ROOT/../styio-audit/bin/styio-audit"
   elif [[ -x "/home/unka/styio-audit/bin/styio-audit" ]]; then
     AUDIT_BIN="/home/unka/styio-audit/bin/styio-audit"
+  elif command -v styio-audit >/dev/null 2>&1; then
+    AUDIT_BIN="$(command -v styio-audit)"
   fi
 fi
 
 if [[ -z "$AUDIT_BIN" || ! -x "$AUDIT_BIN" ]]; then
   echo "styio-audit executable not found; set STYIO_AUDIT_BIN or pass --audit-bin" >&2
   exit 2
+fi
+
+AUDIT_ROOT="$(cd "$(dirname "$AUDIT_BIN")/.." && pwd)"
+if git -C "$AUDIT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "styio-audit commit: $(git -C "$AUDIT_ROOT" rev-parse HEAD)"
 fi
 
 "$AUDIT_BIN" gate --repo "$ROOT" --project styio-platform
