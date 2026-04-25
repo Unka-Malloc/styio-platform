@@ -1,0 +1,73 @@
+name: styio-platform-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - ai-dev
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      STYIO_LLVM_MAJOR: "18"
+      STYIO_CMAKE_VERSION: "3.31.6"
+      STYIO_PYTHON_VERSION: "3.13.5"
+
+    steps:
+      - name: Checkout styio-platform
+        uses: actions/checkout@v5
+        with:
+          path: styio-platform
+
+      - name: Set up standardized Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.STYIO_PYTHON_VERSION }}
+
+      - name: Install standardized CMake / CTest
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --user "cmake==${STYIO_CMAKE_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            clang-${STYIO_LLVM_MAJOR} \
+            lld-${STYIO_LLVM_MAJOR}
+
+      - name: Verify standardized toolchain
+        run: |
+          python3 --version
+          cmake --version | head -n1
+          ctest --version | head -n1
+          clang-${STYIO_LLVM_MAJOR} --version | head -n1
+
+      - name: Configure
+        working-directory: styio-platform
+        env:
+          CC: clang-${{ env.STYIO_LLVM_MAJOR }}
+          CXX: clang++-${{ env.STYIO_LLVM_MAJOR }}
+        run: cmake -S . -B build-codex -DSTYIO_PLATFORM_BUILD_TESTS=ON
+
+      - name: Build
+        working-directory: styio-platform
+        run: cmake --build build-codex
+
+      - name: Test
+        working-directory: styio-platform
+        run: ctest --test-dir build-codex --output-on-failure
+
+      - name: Docs gate
+        working-directory: styio-platform
+        run: ./scripts/docs-gate.sh
+
+      - name: Repo hygiene
+        working-directory: styio-platform
+        run: python3 scripts/repo-hygiene-gate.py --mode tracked

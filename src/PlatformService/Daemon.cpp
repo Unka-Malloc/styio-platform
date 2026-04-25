@@ -1,0 +1,98 @@
+#include "PlatformService/Config.hpp"
+#include "PlatformService/BeastServer.hpp"
+#include "PlatformService/Http.hpp"
+#include "PlatformService/Identity.hpp"
+#include "PlatformService/PostgresStore.hpp"
+#include "PlatformService/Router.hpp"
+
+#include <iostream>
+#include <string>
+
+namespace
+{
+
+void PrintUsage()
+{
+  std::cout
+      << "Usage: styio-platformd [--check-config|--self-test|--print-routes|--print-migrations]\n";
+}
+
+spio::platform::MtlsIdentity SelfTestIdentity()
+{
+  return {
+      .role = "operator",
+      .tenant_id = "tenant-demo",
+      .node_id = "node-local",
+  };
+}
+
+}  // namespace
+
+int main(int argc, char **argv)
+{
+  const std::string command = argc > 1 ? argv[1] : "--check-config";
+  spio::platform::PlatformConfig config = spio::platform::LoadPlatformConfigFromEnvironment();
+  spio::platform::PlatformRouter router(config);
+
+  if (command == "--help" || command == "-h")
+  {
+    PrintUsage();
+    return 0;
+  }
+  if (command == "--check-config")
+  {
+    nlohmann::json payload = spio::platform::SerializePublicConfig(config);
+    payload["http_adapter"] = spio::platform::DescribeBeastServerCapability();
+    std::cout << payload.dump(2) << "\n";
+    return 0;
+  }
+  if (command == "--print-routes")
+  {
+    nlohmann::json routes = nlohmann::json::array();
+    for (const spio::platform::RouteSpec &route : router.routes())
+    {
+      routes.push_back({
+          {"operation_id", route.operation_id},
+          {"method", spio::platform::ToString(route.method)},
+          {"path", route.path},
+          {"internal", route.internal},
+      });
+    }
+    std::cout << routes.dump(2) << "\n";
+    return 0;
+  }
+  if (command == "--print-migrations")
+  {
+    for (const spio::platform::SqlMigration &migration : spio::platform::CloudKernelMigrations())
+    {
+      std::cout << "-- " << migration.id << "\n" << migration.sql << "\n";
+    }
+    return 0;
+  }
+  if (command == "--self-test")
+  {
+    const spio::platform::HttpResponse health = router.Dispatch({
+        .method = spio::platform::HttpMethod::Get,
+        .path = "/health",
+        .identity = SelfTestIdentity(),
+    });
+    const spio::platform::HttpResponse submit = router.Dispatch({
+        .method = spio::platform::HttpMethod::Post,
+        .path = "/jobs",
+        .body = {
+            {"tenant_id", "tenant-demo"},
+            {"workspace_id", "workspace-demo"},
+            {"action", "build"},
+            {"preferred_worker_pool", "linux/x86_64/build/nightly/minimal"},
+            {"job_request", {{"schema_version", 1}, {"action", "build"}}},
+        },
+        .identity = SelfTestIdentity(),
+    });
+    std::cout << nlohmann::json{{"health", health.body}, {"submit", submit.body}}.dump(2) << "\n";
+    return health.status_code == 200 && submit.status_code == 200 ? 0 : 1;
+  }
+
+  std::cerr << "unsupported command: " << command << "\n";
+  PrintUsage();
+  return 2;
+}
