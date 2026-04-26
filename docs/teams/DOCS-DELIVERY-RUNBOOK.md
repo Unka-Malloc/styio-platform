@@ -2,7 +2,7 @@
 
 **Purpose:** Own platform documentation structure, generated indexes, and docs gate automation.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-26
 
 ## Mission
 
@@ -15,7 +15,9 @@ Keep documentation governance aligned with the Styio ecosystem while making
 - `LICENSE`
 - `LICENSE-POLICY.md`
 - `DEPENDENCY-USAGE.md`
+- `.github/workflows/local-ci-gate.yml`
 - `docs/`
+- `docs/specs/TECHNOLOGY-COMPONENT-INVENTORY.md`
 - `scripts/audit-gate.sh`
 - `scripts/docs-audit.py`
 - `scripts/docs-index.py`
@@ -30,12 +32,15 @@ Keep documentation governance aligned with the Styio ecosystem while making
 Refresh indexes after docs-tree changes, validate runbook shape, keep
 `DOC-STATS.md` synchronized with runbook content, and keep Apache-2.0 license,
 source-distribution policy, and dependency usage-boundary evidence aligned with
-`styio-audit`. Keep `docs/specs/TECHNOLOGY-COMPONENT-INVENTORY.md` aligned
-with `styio-audit` whenever the technology stack, internal components,
-open-source components, dependency manifests, Apache-2.0 evidence, or commercial-risk
-boundaries change. Keep external `styio-audit` execution wired through the
-repository audit gate and dedicated GitHub Actions workflow whenever audit
-policy or cross-repo CI ownership changes. Registry-management docs must explicitly cover publish,
+`styio-audit`. Keep `local-ci-gate` covering the platform repository's own
+delivery floor for pull requests and managed branch pushes; it is not the
+shared upstream `styio-ci-gate` ecosystem resource gate. Keep
+`docs/specs/TECHNOLOGY-COMPONENT-INVENTORY.md` aligned with `styio-audit`
+whenever the technology stack, internal components, open-source components,
+dependency manifests, Apache-2.0 evidence, or commercial-risk boundaries
+change. Keep external `styio-audit` execution wired through the repository
+audit gate and dedicated GitHub Actions workflow whenever audit policy or
+cross-repo CI ownership changes. Registry-management docs must explicitly cover publish,
 verify, mirror freshness/replay, offline client fallback, service/client cache
 separation, VM one-command deployment, and security boundaries before
 docs/audit closure is claimed.
@@ -51,8 +56,8 @@ registry-management audit coverage.
 ## Required Gates
 
 Run `python3 scripts/docs-index.py --write`, `python3 scripts/docs-audit.py`,
-`./scripts/audit-gate.sh`, and `python3 scripts/repo-hygiene-gate.py --mode
-tracked`.
+`./scripts/audit-gate.sh`, `python3 scripts/repo-hygiene-gate.py --mode
+tracked`, and `./scripts/delivery-gate.sh --mode checkpoint --skip-audit`.
 
 ## Cross-Team Dependencies
 
