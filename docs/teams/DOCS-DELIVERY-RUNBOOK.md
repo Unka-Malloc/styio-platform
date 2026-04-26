@@ -2,7 +2,7 @@
 
 **Purpose:** Own platform documentation structure, generated indexes, and docs gate automation.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-26
 
 ## Mission
 
@@ -15,6 +15,7 @@ Keep documentation governance aligned with the Styio ecosystem while making
 - `LICENSE`
 - `LICENSE-POLICY.md`
 - `DEPENDENCY-USAGE.md`
+- `.github/workflows/local-ci-gate.yml`
 - `docs/`
 - `scripts/audit-gate.sh`
 - `scripts/docs-audit.py`
@@ -30,7 +31,10 @@ Keep documentation governance aligned with the Styio ecosystem while making
 Refresh indexes after docs-tree changes, validate runbook shape, keep
 `DOC-STATS.md` synchronized with runbook content, and keep Apache-2.0 license,
 source-distribution policy, dependency usage-boundary evidence, and the local
-`styio-audit` workflow aligned with `styio-audit`.
+`styio-audit` workflow aligned with `styio-audit`, and keep `local-ci-gate`
+covering the platform repository's own delivery floor for pull requests and
+managed branch pushes. `local-ci-gate` is not the shared upstream
+`styio-ci-gate` ecosystem resource gate.
 
 ## Change Classes
 
@@ -41,8 +45,8 @@ governance docs, regional-node docs, and mirror sync docs.
 ## Required Gates
 
 Run `python3 scripts/docs-index.py --write`, `python3 scripts/docs-audit.py`,
-`./scripts/audit-gate.sh`, and `python3 scripts/repo-hygiene-gate.py --mode
-tracked`.
+`./scripts/audit-gate.sh`, `python3 scripts/repo-hygiene-gate.py --mode
+tracked`, and `./scripts/delivery-gate.sh --mode checkpoint --skip-audit`.
 
 ## Cross-Team Dependencies
 
