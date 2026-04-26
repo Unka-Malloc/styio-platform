@@ -25,6 +25,17 @@ MAX_REQUEST_BYTES = 1 * 1024 * 1024
 REQUEST_TIMEOUT_SECONDS = 10.0
 
 
+def registry_error_status(error: RegistryV2Error, *, operation: str) -> int:
+    detail = str(error)
+    if "already published" in detail or "already exists" in detail:
+        return 409
+    if operation == "publish":
+        return 422
+    if operation == "verify":
+        return 422
+    return 500
+
+
 def load_json_request(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
     content_length = handler.headers.get("Content-Length")
     if content_length is None:
@@ -143,7 +154,10 @@ class RegistryControlPlaneHandler(BaseHTTPRequestHandler):
                 publisher_id=request.get("publisher_id") or "control-plane",
             )
         except RegistryV2Error as err:
-            self._send_json(200, failure_envelope("registry publish failed", str(err), category="PublishError"))
+            self._send_json(
+                registry_error_status(err, operation="publish"),
+                failure_envelope("registry publish failed", str(err), category="PublishError"),
+            )
             return
         self._send_json(200, success_envelope("published registry v2 release", payload))
 
@@ -154,12 +168,23 @@ class RegistryControlPlaneHandler(BaseHTTPRequestHandler):
             self._send_json(400, failure_envelope("malformed registry verify request", str(err), category="UsageError", returncode=2))
             return
         if request not in ({},):
-            self._send_json(200, failure_envelope("registry verification failed", "verify request must be an empty JSON object", category="VerifyError"))
+            self._send_json(
+                400,
+                failure_envelope(
+                    "registry verification failed",
+                    "verify request must be an empty JSON object",
+                    category="VerifyError",
+                    returncode=2,
+                ),
+            )
             return
         try:
             payload = verify_registry_root(self.registry_root)
         except RegistryV2Error as err:
-            self._send_json(200, failure_envelope("registry verification failed", str(err), category="VerifyError"))
+            self._send_json(
+                registry_error_status(err, operation="verify"),
+                failure_envelope("registry verification failed", str(err), category="VerifyError"),
+            )
             return
         self._send_json(200, success_envelope("verified registry v2 root", payload))
 

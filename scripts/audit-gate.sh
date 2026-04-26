@@ -35,16 +35,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$AUDIT_BIN" ]]; then
-  for candidate in \
-    "$ROOT/../styio-audit/bin/styio-audit" \
-    "/home/unka/eBioRing/styio-audit/bin/styio-audit" \
-    "/home/unka/styio-audit/bin/styio-audit"; do
-    if [[ -x "$candidate" ]]; then
-      AUDIT_BIN="$candidate"
-      break
-    fi
-  done
-  if [[ -z "$AUDIT_BIN" ]] && command -v styio-audit >/dev/null 2>&1; then
+  if [[ -x "$ROOT/../styio-audit/bin/styio-audit" ]]; then
+    AUDIT_BIN="$ROOT/../styio-audit/bin/styio-audit"
+  elif [[ -x "/home/unka/styio-audit/bin/styio-audit" ]]; then
+    AUDIT_BIN="/home/unka/styio-audit/bin/styio-audit"
+  elif command -v styio-audit >/dev/null 2>&1; then
     AUDIT_BIN="$(command -v styio-audit)"
   fi
 fi
@@ -57,12 +52,6 @@ fi
 AUDIT_ROOT="$(cd "$(dirname "$AUDIT_BIN")/.." && pwd)"
 if git -C "$AUDIT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "styio-audit commit: $(git -C "$AUDIT_ROOT" rev-parse HEAD)"
-fi
-
-if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  for branch in stable nightly ai-dev; do
-    git -C "$ROOT" fetch --no-tags origin "+refs/heads/${branch}:refs/remotes/origin/${branch}" 2>/dev/null || true
-  done
 fi
 
 "$AUDIT_BIN" gate --repo "$ROOT" --project styio-platform

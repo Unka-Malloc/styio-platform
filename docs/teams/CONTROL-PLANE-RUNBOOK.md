@@ -23,7 +23,11 @@ mirror synchronization.
 - `docs/operations/Platform-Regional-Node-Runbook.md`
 - `docs/registry/Platform-Mirror-Synchronization-Contract.md`
 - `scripts/cloud-compile-stress.py`
+- `scripts/deploy-registry-vm.sh`
+- `scripts/package-registry-server.sh`
 - `scripts/registry-v2-control-plane-server.py`
+- `scripts/registry-v2-static-read-server.py`
+- `scripts/registry-v2-vm-smoke.py`
 - `src/spio_cloud_stress/`
 - `tests/interop/` and `tests/unit/`
 
@@ -32,13 +36,19 @@ mirror synchronization.
 Update native JSON contracts and examples first, run contract gates, and
 refresh service runbooks in the same change. Regional node and mirror-sync
 changes must describe authority, lag, replay, and failure isolation explicitly.
+Registry-management changes must keep hosted publish, verify, mirror
+freshness/replay, service cache, offline-client fallback, and security policy
+coverage visible in the affected docs or gates. VM deployment changes must keep
+the package bundle, installer, systemd services, static read plane, and smoke
+check aligned in the same change.
 
 ## Change Classes
 
 Control-plane changes include route shape, native JSON contract/example
 packages, registry server behavior, hosted workspace envelopes, regional node
 behavior, mirror freshness, package distribution, workspace target selection,
-mixed Styio/C++ execution envelopes, and cloud stress scenarios.
+mixed Styio/C++ execution envelopes, VM deployment packaging, and cloud stress
+scenarios.
 
 The V1 cloud-service implementation boundary is pure C++ with Boost.Beast and
 Boost.Asio, Postgres for durable state, provider-neutral object storage with S3
@@ -50,6 +60,10 @@ multi-region promotion.
 Run Python unit tests, native JSON contract gate tests, example smoke checks
 for touched contract packages, and mirror/regional-node validation once those
 executable gates exist.
+For registry-control-plane changes, include
+`python3 tests/interop/registry-control-plane-contract-gate.py` and
+`python3 tests/interop/native-contract-source-gate.py`. For VM registry
+deployment changes, include `python3 tests/unit/test_registry_vm_deploy.py`.
 
 ## Cross-Team Dependencies
 

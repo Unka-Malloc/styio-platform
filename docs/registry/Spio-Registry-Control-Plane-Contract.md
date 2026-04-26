@@ -38,6 +38,15 @@ Those remain in:
 - [`Spio-Registry-V2-Protocol.md`](./Spio-Registry-V2-Protocol.md)
 - [`Spio-Registry-V2-Publish-Control-Plane.md`](./Spio-Registry-V2-Publish-Control-Plane.md)
 
+## Repository Boundary
+
+`styio-platform` owns the hosted registry and mirror service side for this
+contract. `styio-spio` consumes the same native JSON package as a local
+package-manager compatibility boundary. Service implementations must preserve
+the shared status, publish, and verify envelopes while keeping mirror
+freshness/replay in platform mirror docs and offline cache behavior in
+`styio-spio` client docs.
+
 ## Current Implementation Status
 
 The tracked open-source repository now ships a local HTTP implementation:
@@ -57,4 +66,5 @@ It is the current executable reference for the contract package. It does not yet
 Registry control-plane compatibility is validated from the native JSON contract
 and example package. Any route or envelope change must update both JSON files,
 this governance page, and the owning runbook before claiming the service
-boundary is stable.
+boundary is stable. Generated third-party API-description artifacts are not
+accepted as contract source.

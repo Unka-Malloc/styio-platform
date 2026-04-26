@@ -9,6 +9,6 @@
 | Runbook | Lines |
 |---------|-------|
 | `COORDINATION-RUNBOOK.md` | 69 |
-| `PLATFORM-KERNEL-RUNBOOK.md` | 51 |
-| `CONTROL-PLANE-RUNBOOK.md` | 66 |
-| `DOCS-DELIVERY-RUNBOOK.md` | 63 |
+| `PLATFORM-KERNEL-RUNBOOK.md` | 64 |
+| `CONTROL-PLANE-RUNBOOK.md` | 80 |
+| `DOCS-DELIVERY-RUNBOOK.md` | 74 |

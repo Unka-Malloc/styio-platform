@@ -79,6 +79,11 @@ PlatformConfig LoadPlatformConfigFromEnvironment()
   config.object_store.bucket = EnvString("STYIO_PLATFORM_OBJECT_STORE_BUCKET", "");
   config.object_store.endpoint = EnvString("STYIO_PLATFORM_OBJECT_STORE_ENDPOINT", "");
   config.object_store.region = EnvString("STYIO_PLATFORM_OBJECT_STORE_REGION", config.region);
+  config.registry.root = EnvString("STYIO_PLATFORM_REGISTRY_ROOT", config.registry.root);
+  config.registry.key_dir = EnvString("STYIO_PLATFORM_REGISTRY_KEY_DIR", config.registry.key_dir);
+  config.registry.registry_name = EnvString("STYIO_PLATFORM_REGISTRY_NAME", config.registry.registry_name);
+  config.registry.mirror_id = EnvString("STYIO_PLATFORM_REGISTRY_MIRROR_ID", config.registry.mirror_id);
+  config.registry.mirror_origin = EnvString("STYIO_PLATFORM_REGISTRY_MIRROR_ORIGIN", config.registry.mirror_origin);
   config.mtls.required = EnvBool("STYIO_PLATFORM_MTLS_REQUIRED", config.mtls.required);
   config.mtls.ca_path = EnvString("STYIO_PLATFORM_MTLS_CA", "");
   config.mtls.cert_path = EnvString("STYIO_PLATFORM_MTLS_CERT", "");
@@ -98,6 +103,11 @@ nlohmann::json SerializePublicConfig(const PlatformConfig &config)
       {"object_store_provider", config.object_store.provider},
       {"object_store_bucket_configured", !config.object_store.bucket.empty()},
       {"object_store_endpoint_configured", !config.object_store.endpoint.empty()},
+      {"registry_root_configured", !config.registry.root.empty()},
+      {"registry_key_dir_configured", !config.registry.key_dir.empty()},
+      {"registry_name", config.registry.registry_name},
+      {"registry_mirror_id", config.registry.mirror_id},
+      {"registry_mirror_origin", config.registry.mirror_origin},
       {"mtls_required", config.mtls.required},
       {"mtls_ca_configured", !config.mtls.ca_path.empty()},
       {"mtls_cert_configured", !config.mtls.cert_path.empty()},

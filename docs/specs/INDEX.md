@@ -17,3 +17,4 @@
 | Path | Entry | Summary |
 |------|-------|---------|
 | `POST-COMMIT-CI-CHECKS.md` | [Post Commit CI Checks](./POST-COMMIT-CI-CHECKS.md) | Require post-push validation for styio-platform changes before work is reported as closed. |
+| `TECHNOLOGY-COMPONENT-INVENTORY.md` | [Technology And Component Inventory](./TECHNOLOGY-COMPONENT-INVENTORY.md) | Define the required technology-stack, internal-component, open-source-component, and dependency-manifest inventory for styio-platform. |
