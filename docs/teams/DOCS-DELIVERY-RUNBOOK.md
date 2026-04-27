@@ -2,7 +2,7 @@
 
 **Purpose:** Own platform documentation structure, generated indexes, and docs gate automation.
 
-**Last updated:** 2026-04-26
+**Last updated:** 2026-04-28
 
 ## Mission
 
@@ -40,10 +40,14 @@ whenever the technology stack, internal components, open-source components,
 dependency manifests, Apache-2.0 evidence, or commercial-risk boundaries
 change. Keep external `styio-audit` execution wired through the repository
 audit gate and dedicated GitHub Actions workflow whenever audit policy or
-cross-repo CI ownership changes. Registry-management docs must explicitly cover publish,
-verify, mirror freshness/replay, offline client fallback, service/client cache
-separation, VM one-command deployment, and security boundaries before
-docs/audit closure is claimed.
+cross-repo CI ownership changes. Generated indexes for empty documentation
+collections must derive `Last updated` from the collection `README.md` instead
+of the wall clock, so `--check` stays deterministic across days. The local
+audit gate must discover the sibling `styio-audit` checkout used by this
+workspace before falling back to PATH. Registry-management docs must explicitly
+cover publish, verify, mirror freshness/replay, offline client fallback,
+service/client cache separation, VM one-command deployment, and security
+boundaries before docs/audit closure is claimed.
 
 ## Change Classes
 

@@ -450,6 +450,81 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   EXPECT_EQ(event_list.at(2).at("status").get<std::string>(), "succeeded");
 }
 
+TEST(PlatformServiceJobQueueTests, MissingJobMutationsDoNotCreateRecords)
+{
+  spio::platform::PlatformConfig config;
+  config.region = "local-dev";
+  config.postgres_dsn = "postgres://platform@localhost/styio";
+  config.object_store.provider = "memory";
+  config.mtls.required = true;
+
+  spio::platform::PlatformRouter router(config);
+
+  const spio::platform::HttpResponse cancel =
+      router.Dispatch(Request(
+          spio::platform::HttpMethod::Post,
+          "/jobs/job-missing/cancel",
+          {
+              {"reason", "operator requested"},
+          }));
+  ASSERT_EQ(cancel.status_code, 404);
+
+  const spio::platform::HttpResponse heartbeat =
+      router.Dispatch(Request(
+          spio::platform::HttpMethod::Post,
+          "/jobs/job-missing/heartbeat",
+          {
+              {"worker_id", "worker-01"},
+          }));
+  ASSERT_EQ(heartbeat.status_code, 404);
+
+  const spio::platform::HttpResponse complete =
+      router.Dispatch(Request(
+          spio::platform::HttpMethod::Post,
+          "/jobs/job-missing/complete",
+          {
+              {"worker_id", "worker-01"},
+              {"status", "succeeded"},
+          }));
+  ASSERT_EQ(complete.status_code, 404);
+
+  const spio::platform::HttpResponse lookup =
+      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/job-missing"));
+  ASSERT_EQ(lookup.status_code, 404);
+  EXPECT_EQ(lookup.body.at("error_payload").at("category").get<std::string>(), "NotFound");
+}
+
+TEST(PlatformServiceJobQueueTests, RepeatedSubmitsUseDistinctJobIds)
+{
+  spio::platform::PlatformConfig config;
+  config.region = "local-dev";
+  config.postgres_dsn = "postgres://platform@localhost/styio";
+  config.object_store.provider = "memory";
+  config.mtls.required = true;
+
+  spio::platform::PlatformRouter router(config);
+
+  const spio::platform::HttpResponse first =
+      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  const spio::platform::HttpResponse second =
+      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+
+  ASSERT_EQ(first.status_code, 200);
+  ASSERT_EQ(second.status_code, 200);
+  const std::string first_id = first.body.at("payload").at("job_id").get<std::string>();
+  const std::string second_id = second.body.at("payload").at("job_id").get<std::string>();
+  EXPECT_NE(first_id, second_id);
+
+  const spio::platform::HttpResponse first_lookup =
+      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/" + first_id));
+  const spio::platform::HttpResponse second_lookup =
+      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/" + second_id));
+  ASSERT_EQ(first_lookup.status_code, 200);
+  ASSERT_EQ(second_lookup.status_code, 200);
+  EXPECT_EQ(first_lookup.body.at("payload").at("status").get<std::string>(), "queued");
+  EXPECT_EQ(second_lookup.body.at("payload").at("status").get<std::string>(), "queued");
+}
+
 TEST(PlatformRegistryControlPlaneTests, StatusUsesRedactedPathsAndFilesystemReadiness)
 {
   const fs::path root = MakeTempDir("platform-registry-status");

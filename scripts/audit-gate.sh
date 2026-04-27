@@ -35,11 +35,18 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$AUDIT_BIN" ]]; then
-  if [[ -x "$ROOT/../styio-audit/bin/styio-audit" ]]; then
-    AUDIT_BIN="$ROOT/../styio-audit/bin/styio-audit"
-  elif [[ -x "/home/unka/styio-audit/bin/styio-audit" ]]; then
-    AUDIT_BIN="/home/unka/styio-audit/bin/styio-audit"
-  elif command -v styio-audit >/dev/null 2>&1; then
+  for candidate in \
+    "$ROOT/../styio-audit/bin/styio-audit" \
+    "$ROOT/../../eBioRing/styio-audit/bin/styio-audit" \
+    "${HOME:-}/eBioRing/styio-audit/bin/styio-audit" \
+    "${HOME:-}/styio-audit/bin/styio-audit"
+  do
+    if [[ -x "$candidate" ]]; then
+      AUDIT_BIN="$candidate"
+      break
+    fi
+  done
+  if [[ -z "$AUDIT_BIN" ]] && command -v styio-audit >/dev/null 2>&1; then
     AUDIT_BIN="$(command -v styio-audit)"
   fi
 fi

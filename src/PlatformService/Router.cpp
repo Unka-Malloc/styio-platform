@@ -644,7 +644,7 @@ HttpResponse PlatformRouter::HandleSubmitJob(const HttpRequest &request)
   {
     return JsonResponse(400, FailureEnvelope("job submission rejected", *error, "ValidationError", "submitJob", 2));
   }
-  PlatformJobRecord job = BuildQueuedJobRecord(request.body, config_);
+  PlatformJobRecord job = BuildQueuedJobRecord(request.body, config_, next_job_sequence_++);
   jobs_[job.job_id] = job;
   events_[job.job_id].push_back({
       .event_id = "event-queued",
@@ -687,11 +687,12 @@ HttpResponse PlatformRouter::HandleCancelJob(const RouteMatch &match, const Http
   {
     return JsonResponse(400, FailureEnvelope("job cancellation failed", "reason is required", "ValidationError", "cancelJob", 2));
   }
-  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
-  if (job.job_id.empty())
+  const auto job_it = jobs_.find(match.parameters.at("job_id"));
+  if (job_it == jobs_.end())
   {
     return JsonResponse(404, FailureEnvelope("job cancellation failed", "job not found", "NotFound", "cancelJob"));
   }
+  PlatformJobRecord &job = job_it->second;
   job.status = "cancelled";
   job.finished_at = "2026-04-24T00:01:00Z";
   events_[job.job_id].push_back({
@@ -764,11 +765,12 @@ HttpResponse PlatformRouter::HandleClaimJob(const HttpRequest &request)
 
 HttpResponse PlatformRouter::HandleHeartbeatJob(const RouteMatch &match, const HttpRequest &request)
 {
-  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
-  if (job.job_id.empty())
+  const auto job_it = jobs_.find(match.parameters.at("job_id"));
+  if (job_it == jobs_.end())
   {
     return JsonResponse(404, FailureEnvelope("job heartbeat failed", "job not found", "NotFound", "heartbeatJob"));
   }
+  PlatformJobRecord &job = job_it->second;
   if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job heartbeat failed", "worker does not own job", "WorkerError", "heartbeatJob"));
@@ -784,11 +786,12 @@ HttpResponse PlatformRouter::HandleHeartbeatJob(const RouteMatch &match, const H
 
 HttpResponse PlatformRouter::HandleCompleteJob(const RouteMatch &match, const HttpRequest &request)
 {
-  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
-  if (job.job_id.empty())
+  const auto job_it = jobs_.find(match.parameters.at("job_id"));
+  if (job_it == jobs_.end())
   {
     return JsonResponse(404, FailureEnvelope("job completion failed", "job not found", "NotFound", "completeJob"));
   }
+  PlatformJobRecord &job = job_it->second;
   if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job completion failed", "worker does not own job", "WorkerError", "completeJob"));

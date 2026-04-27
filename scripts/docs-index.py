@@ -147,7 +147,9 @@ def render_index(base: Path) -> str:
     rel = base.relative_to(ROOT).as_posix()
     title, purpose = INDEX_META[rel]
     entries = build_entries(base)
-    updated = max((entry.last_updated for entry in entries), default=TODAY)
+    fallback_source = base / "README.md"
+    fallback_updated = extract_last_updated(fallback_source) if fallback_source.exists() else TODAY
+    updated = max((entry.last_updated for entry in entries), default=fallback_updated)
     dir_entries = [entry for entry in entries if entry.is_dir]
     file_entries = [entry for entry in entries if not entry.is_dir]
 

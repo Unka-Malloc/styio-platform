@@ -1,6 +1,6 @@
 #include "PlatformService/JobQueue.hpp"
 
-#include <functional>
+#include <iomanip>
 #include <sstream>
 
 namespace spio::platform
@@ -14,13 +14,10 @@ bool IsAction(std::string_view value)
   return value == "build" || value == "run" || value == "test";
 }
 
-std::string StableJobId(const nlohmann::json &request)
+std::string JobIdForSequence(const size_t sequence)
 {
-  const std::string seed =
-      request.value("tenant_id", "") + "/" + request.value("workspace_id", "") + "/" + request.value("action", "");
-  const size_t hash = std::hash<std::string>{}(seed);
   std::ostringstream stream;
-  stream << "job-" << std::hex << hash;
+  stream << "job-" << std::setw(12) << std::setfill('0') << sequence;
   return stream.str();
 }
 
@@ -71,10 +68,10 @@ std::optional<std::string> ValidateSubmitJobRequest(const nlohmann::json &reques
   return std::nullopt;
 }
 
-PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config)
+PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config, const size_t sequence)
 {
   return {
-      .job_id = StableJobId(request),
+      .job_id = JobIdForSequence(sequence),
       .tenant_id = request["tenant_id"].get<std::string>(),
       .workspace_id = request["workspace_id"].get<std::string>(),
       .action = request["action"].get<std::string>(),

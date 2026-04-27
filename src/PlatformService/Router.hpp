@@ -4,6 +4,7 @@
 #include "PlatformService/Http.hpp"
 #include "PlatformService/JobQueue.hpp"
 
+#include <cstddef>
 #include <map>
 #include <string>
 #include <vector>
@@ -53,6 +54,7 @@ private:
   std::map<std::string, nlohmann::json> workers_;
   std::map<std::string, RegistryMirrorState> mirrors_;
   std::map<std::string, nlohmann::json> published_releases_;
+  size_t next_job_sequence_ = 1;
 };
 
 std::vector<RouteSpec> BuildPlatformControlPlaneRoutes();

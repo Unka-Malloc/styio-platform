@@ -2,7 +2,7 @@
 
 **Purpose:** Own the migrated compile-plan, mixed Styio/C++ compile model, cloud job request kernel, and C++ service-kernel integration boundary.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-28
 
 ## Mission
 
@@ -33,7 +33,10 @@ For registry service work, keep platform as the hosted publish/verify/mirror
 owner while preserving `styio-spio` offline client behavior and the shared
 registry-control-plane v1 route shape. When deployment scripts need a new
 registry helper, keep it covered by Python unit tests and avoid making the
-client-side package manager depend on platform availability.
+client-side package manager depend on platform availability. Job lifecycle
+handlers must not mutate queue state when a referenced job is missing, and
+repeated submissions for the same tenant/workspace/action tuple must receive
+distinct job identifiers instead of overwriting earlier queued jobs.
 
 ## Change Classes
 
@@ -43,6 +46,8 @@ request payload shape, platform service payload shape, or imported
 package-manager dependency changes. Registry kernel changes also include mTLS
 role policy, publish/verify status code semantics, mirror freshness transitions,
 VM initialization helper behavior, and migrated registry v2 helper behavior.
+Job queue changes include identifier allocation, lookup semantics, lifecycle
+event recording, and worker ownership checks.
 
 ## Required Gates
 
