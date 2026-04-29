@@ -98,6 +98,24 @@
       "failure_shape": "FailureEnvelope"
     },
     {
+      "id": "registerWorkgroupCluster",
+      "method": "POST",
+      "path": "/workgroups/{workgroup_id}/clusters/register",
+      "internal": true,
+      "request_shape": "WorkgroupClusterRegisterRequest",
+      "success_shape": "WorkgroupClusterEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listWorkgroupClusters",
+      "method": "GET",
+      "path": "/workgroups/{workgroup_id}/clusters",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "WorkgroupClusterListEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
       "id": "mirrorStatus",
       "method": "GET",
       "path": "/mirrors/{mirror_id}/status",
@@ -386,6 +404,9 @@
           "type": "string",
           "format": "date-time"
         },
+        "job_request": {
+          "type": "object"
+        },
         "artifacts": {
           "type": "array",
           "items": {
@@ -643,6 +664,249 @@
           }
         }
       }
+    },
+    "RegisteredByPayload": {
+      "kind": "object",
+      "required": {
+        "role": {
+          "type": "string",
+          "min_length": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "node_id": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {}
+    },
+    "WorkgroupClusterRegisterRequest": {
+      "kind": "object",
+      "required": {
+        "cluster_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "node_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "control_plane_endpoint": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {
+        "internal_control_plane_endpoint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "registry_endpoint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "mirror_endpoint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        },
+        "trust_domain": {
+          "type": "string",
+          "min_length": 1
+        },
+        "registration_token": {
+          "type": "string",
+          "min_length": 1
+        },
+        "labels": {
+          "type": "object"
+        }
+      }
+    },
+    "WorkgroupClusterPayload": {
+      "kind": "object",
+      "required": {
+        "workgroup_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "cluster_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "region": {
+          "type": "string",
+          "min_length": 1
+        },
+        "node_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "control_plane_endpoint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        },
+        "trust_domain": {
+          "type": "string",
+          "min_length": 1
+        },
+        "registration_policy": {
+          "type": "string",
+          "min_length": 1
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "registered",
+            "draining"
+          ]
+        },
+        "registered_by": {
+          "ref": "RegisteredByPayload"
+        }
+      },
+      "optional": {
+        "internal_control_plane_endpoint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "registry_endpoint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "mirror_endpoint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "labels": {
+          "type": "object"
+        }
+      }
+    },
+    "WorkgroupClusterEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "WorkgroupClusterPayload"
+        }
+      },
+      "optional": {}
+    },
+    "WorkgroupPolicyPayload": {
+      "kind": "object",
+      "required": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "workgroup_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "trust_domain": {
+          "type": "string",
+          "min_length": 1
+        },
+        "registration_policy": {
+          "type": "string",
+          "min_length": 1
+        },
+        "registration_tenant": {
+          "type": "string",
+          "min_length": 1
+        },
+        "registration_token_required": {
+          "type": "boolean"
+        },
+        "allowed_registration_roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        },
+        "allowed_read_roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        }
+      },
+      "optional": {}
+    },
+    "WorkgroupClusterListPayload": {
+      "kind": "object",
+      "required": {
+        "workgroup_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "policy": {
+          "ref": "WorkgroupPolicyPayload"
+        },
+        "clusters": {
+          "type": "array",
+          "items": {
+            "ref": "WorkgroupClusterPayload"
+          }
+        }
+      },
+      "optional": {}
+    },
+    "WorkgroupClusterListEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "ref": "WorkgroupClusterListPayload"
+        }
+      },
+      "optional": {}
     },
     "MirrorPayload": {
       "kind": "object",

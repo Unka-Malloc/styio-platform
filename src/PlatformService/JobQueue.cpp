@@ -1,6 +1,6 @@
 #include "PlatformService/JobQueue.hpp"
 
-#include <iomanip>
+#include <functional>
 #include <sstream>
 
 namespace spio::platform
@@ -14,10 +14,13 @@ bool IsAction(std::string_view value)
   return value == "build" || value == "run" || value == "test";
 }
 
-std::string JobIdForSequence(const size_t sequence)
+std::string StableJobId(const nlohmann::json &request)
 {
+  const std::string seed =
+      request.value("tenant_id", "") + "/" + request.value("workspace_id", "") + "/" + request.value("action", "");
+  const size_t hash = std::hash<std::string>{}(seed);
   std::ostringstream stream;
-  stream << "job-" << std::setw(12) << std::setfill('0') << sequence;
+  stream << "job-" << std::hex << hash;
   return stream.str();
 }
 
@@ -40,6 +43,41 @@ std::string WorkerPoolFromRequest(const nlohmann::json &request)
     }
   }
   return "linux/x86_64/binary/stable/minimal";
+}
+
+std::optional<std::string> ValidateCloudBuildRequest(const nlohmann::json &job_request)
+{
+  if (!job_request.contains("schema_version") || !job_request["schema_version"].is_number_integer())
+  {
+    return "job_request.schema_version is required";
+  }
+  if (!job_request.contains("manifest_path") || !job_request["manifest_path"].is_string() ||
+      job_request["manifest_path"].get<std::string>().empty())
+  {
+    return "job_request.manifest_path is required";
+  }
+  if (!job_request.contains("source") || !job_request["source"].is_object())
+  {
+    return "job_request.source is required";
+  }
+  const nlohmann::json &source = job_request["source"];
+  if (!source.contains("origin") || !source["origin"].is_string() || source["origin"].get<std::string>().empty())
+  {
+    return "job_request.source.origin is required";
+  }
+  if (source.contains("requested_revision") &&
+      (!source["requested_revision"].is_string() || source["requested_revision"].get<std::string>().empty()))
+  {
+    return "job_request.source.requested_revision must be a non-empty string when present";
+  }
+  for (const std::string field : {"toolchain", "workflow", "target", "cloud"})
+  {
+    if (job_request.contains(field) && !job_request[field].is_object())
+    {
+      return "job_request." + field + " must be an object when present";
+    }
+  }
+  return std::nullopt;
 }
 
 }  // namespace
@@ -65,19 +103,24 @@ std::optional<std::string> ValidateSubmitJobRequest(const nlohmann::json &reques
   {
     return "job_request is required";
   }
+  if (const std::optional<std::string> error = ValidateCloudBuildRequest(request["job_request"]); error.has_value())
+  {
+    return *error;
+  }
   return std::nullopt;
 }
 
-PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config, const size_t sequence)
+PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config)
 {
   return {
-      .job_id = JobIdForSequence(sequence),
+      .job_id = StableJobId(request),
       .tenant_id = request["tenant_id"].get<std::string>(),
       .workspace_id = request["workspace_id"].get<std::string>(),
       .action = request["action"].get<std::string>(),
       .status = "queued",
       .region = request.value("region", config.region),
       .worker_pool_key = WorkerPoolFromRequest(request),
+      .job_request = request["job_request"],
   };
 }
 
@@ -109,6 +152,10 @@ nlohmann::json SerializeJobRecord(const PlatformJobRecord &job)
   if (!job.finished_at.empty())
   {
     payload["finished_at"] = job.finished_at;
+  }
+  if (!job.job_request.empty())
+  {
+    payload["job_request"] = job.job_request;
   }
   if (!job.artifacts.empty())
   {

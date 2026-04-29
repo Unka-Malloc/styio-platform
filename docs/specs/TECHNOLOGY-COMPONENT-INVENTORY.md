@@ -2,7 +2,7 @@
 
 **Purpose:** Define the required technology-stack, internal-component, open-source-component, and dependency-manifest inventory for `styio-platform`.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-29
 
 This document is the repository-local maintenance rule for the manifest inventory audited by `styio-audit`. The canonical audit module must list the same surfaces in `for-styio-platform/module.json`; if this document and the audit manifest diverge, the change is not closed.
 
@@ -25,15 +25,32 @@ Technology stack:
 - Native JSON contract packages and canonical examples.
 - Python contract, registry, docs, hygiene, and stress gates.
 - Bash delivery and docs scripts.
+- YAML repository tool configuration.
 - Systemd-managed Linux VM deployment packaging for registry server nodes.
+- OCI image packaging for `styio-platformd`, `spio`, and `styio` through
+  Podman/Buildah-compatible `Containerfile`.
+- Kubernetes deployment manifests managed through Helm.
+- Postgres-backed platform state through libpq when the deployment selects the
+  `postgres` state backend.
+- Workgroup cluster registration and policy-controlled local multi-node
+  discovery.
+- PVC-backed filesystem registry, workspace, and artifact storage for the first
+  Kubernetes deployment target.
 - JSON and YAML control-plane artifacts.
 - TypeScript and web fixture surfaces present in the repository.
-- GitHub Actions workflow automation.
+- Tekton pipeline automation as the open CI/CD source of truth, with GitHub
+  workflow wrappers retained only for repository-hosted status compatibility.
 
 Internal components:
 
-- `PlatformService` route dispatch, daemon self-test, identity, object-store, and job lifecycle code.
+- `PlatformService` route dispatch, daemon self-test, identity, object-store,
+  Postgres store, workgroup cluster registry, worker runtime, mirror sync, and
+  job lifecycle code.
 - Registry control-plane and registry v2 contract packages.
+- Helm chart, Tekton pipeline, and Containerfile for primary, worker, mirror,
+  and Postgres deployment.
+- One-command development environment wrapper and lifecycle script.
+- YAML tool configuration loader for repository-local scripts.
 - VM registry deployment package, installer, static read server, and smoke gate.
 - Native contract governance, example packs, and source gates.
 - Registry mirror distribution and regional node runbooks.
@@ -46,11 +63,17 @@ Open-source and external components:
 - `nlohmann_json`.
 - `tomlplusplus`.
 - `googletest`.
+- CMake `Threads::Threads`.
+- Boost.Beast/Asio headers from `libboost-dev`.
+- PostgreSQL libpq headers and runtime libraries from distro packages.
+- Podman, optional Buildah, kind, kubectl, and Helm for Kubernetes smoke
+  validation.
 - Python standard library tooling.
 - Bash shell tooling.
 - OpenSSL command-line tooling for registry role-key generation.
 - systemd-compatible Linux service management for VM deployment.
-- GitHub Actions.
+- Tekton.
+- GitHub Actions compatibility wrappers.
 
 Dependency manifest surfaces:
 
@@ -58,7 +81,16 @@ Dependency manifest surfaces:
 - `src/CMakeLists.txt`.
 - `tests/CMakeLists.txt`.
 - `contracts/**/*.json`.
+- `config/**/*.yaml`.
 - `.github/workflows/*.yml`.
+- `Containerfile`.
+- `.containerignore`.
+- `deploy/helm/styio-platform/**`.
+- `deploy/tekton/styio-platform-ci/**`.
+- `scripts/styio-platform`.
+- `scripts/dev-env.py`.
+- `scripts/k8s-smoke.py`.
+- `scripts/styio_yaml.py`.
 
 ## Maintenance Rule
 

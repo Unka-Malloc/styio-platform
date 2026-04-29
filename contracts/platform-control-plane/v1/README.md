@@ -2,7 +2,7 @@
 
 **Purpose:** Define the native JSON contract package for the first runnable `styio-platform` cloud service kernel.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-29
 
 ## Source Of Truth
 
@@ -17,8 +17,9 @@ Generated or third-party API description formats are not authoritative for
 ## Route Families
 
 The V1 package covers health, node introspection, hosted job lifecycle,
-worker-internal lifecycle, and mirror freshness/replay status. It is the route
-surface implemented by the C++ `styio-platformd` kernel.
+worker-internal lifecycle, workgroup cluster registration, and mirror
+freshness/replay status. It is the route surface implemented by the C++
+`styio-platformd` kernel.
 
 ## Implementation Target
 

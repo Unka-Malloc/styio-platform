@@ -25,12 +25,17 @@ namespace
 bool IsInternalRole(const MtlsIdentity &identity)
 {
   return identity.role == "control-plane" || identity.role == "worker" || identity.role == "mirror" ||
-         identity.role == "registry-writer" || identity.role == "operator";
+         identity.role == "registry-writer" || identity.role == "operator" || identity.role == "cluster-registrar";
 }
 
 bool IsRegistryOperation(std::string_view operation_id)
 {
   return operation_id == "registryStatus" || operation_id == "publishRelease" || operation_id == "verifyRegistry";
+}
+
+bool UsesPostgresState(const PlatformConfig &config)
+{
+  return config.state_backend == "postgres";
 }
 
 bool RoleIn(const MtlsIdentity &identity, std::initializer_list<std::string_view> allowed)
@@ -62,6 +67,14 @@ bool IsAuthorizedForOperation(std::string_view operation_id, const MtlsIdentity 
   if (operation_id == "mirrorStatus")
   {
     return RoleIn(identity, {"control-plane", "registry-writer", "mirror", "operator"});
+  }
+  if (operation_id == "registerWorkgroupCluster")
+  {
+    return RoleIn(identity, {"control-plane", "operator", "cluster-registrar"});
+  }
+  if (operation_id == "listWorkgroupClusters")
+  {
+    return IsInternalRole(identity);
   }
   return true;
 }
@@ -219,6 +232,122 @@ std::optional<std::string> ValidatePackageName(std::string_view package)
     return "package must use lowercase namespace/name segments";
   }
   return std::nullopt;
+}
+
+bool IsSafeWorkgroupId(std::string_view value)
+{
+  return IsSafeRegistrySegment(value);
+}
+
+bool LooksLikeHttpEndpoint(std::string_view value)
+{
+  return value.starts_with("http://") || value.starts_with("https://");
+}
+
+std::optional<std::string> ValidateStringArray(const nlohmann::json &body, const std::string &field)
+{
+  if (!body.contains(field))
+  {
+    return std::nullopt;
+  }
+  if (!body[field].is_array())
+  {
+    return field + " must be an array";
+  }
+  for (const nlohmann::json &entry : body[field])
+  {
+    if (!entry.is_string() || entry.get<std::string>().empty())
+    {
+      return field + " entries must be non-empty strings";
+    }
+  }
+  return std::nullopt;
+}
+
+nlohmann::json WorkgroupPolicyPayload(const PlatformConfig &config)
+{
+  return {
+      {"enabled", config.workgroup.enabled},
+      {"workgroup_id", config.workgroup.id},
+      {"trust_domain", config.workgroup.trust_domain},
+      {"registration_policy", config.workgroup.registration_policy},
+      {"registration_tenant", config.workgroup.registration_tenant},
+      {"registration_token_required", !config.workgroup.registration_token.empty()},
+      {"allowed_registration_roles", {"operator", "control-plane", "cluster-registrar"}},
+      {"allowed_read_roles", {"operator", "control-plane", "cluster-registrar", "worker", "mirror", "registry-writer"}},
+  };
+}
+
+std::optional<std::string> ValidateWorkgroupClusterRegistration(
+    const std::string &workgroup_id,
+    const nlohmann::json &body)
+{
+  if (!IsSafeWorkgroupId(workgroup_id))
+  {
+    return "workgroup_id must start with a lowercase letter or digit and contain only lowercase letters, digits, hyphen, or underscore";
+  }
+  for (const std::string field : {"cluster_id", "region", "node_id", "control_plane_endpoint"})
+  {
+    if (!HasNonEmptyString(body, field))
+    {
+      return field + " is required";
+    }
+  }
+  if (!IsSafeWorkgroupId(body["cluster_id"].get<std::string>()))
+  {
+    return "cluster_id must start with a lowercase letter or digit and contain only lowercase letters, digits, hyphen, or underscore";
+  }
+  if (!LooksLikeHttpEndpoint(body["control_plane_endpoint"].get<std::string>()))
+  {
+    return "control_plane_endpoint must be an http or https endpoint";
+  }
+  for (const std::string field : {"registry_endpoint", "mirror_endpoint", "internal_control_plane_endpoint"})
+  {
+    if (HasNonEmptyString(body, field) && !LooksLikeHttpEndpoint(body[field].get<std::string>()))
+    {
+      return field + " must be an http or https endpoint";
+    }
+  }
+  if (const std::optional<std::string> error = ValidateStringArray(body, "roles"); error.has_value())
+  {
+    return error;
+  }
+  if (body.contains("labels") && !body["labels"].is_object())
+  {
+    return "labels must be an object when present";
+  }
+  return std::nullopt;
+}
+
+nlohmann::json BuildWorkgroupClusterRecord(
+    const std::string &workgroup_id,
+    const nlohmann::json &body,
+    const PlatformConfig &config,
+    const std::optional<MtlsIdentity> &identity)
+{
+  nlohmann::json roles = body.value("roles", config.roles);
+  nlohmann::json record = {
+      {"workgroup_id", workgroup_id},
+      {"cluster_id", body["cluster_id"].get<std::string>()},
+      {"region", body["region"].get<std::string>()},
+      {"node_id", body["node_id"].get<std::string>()},
+      {"control_plane_endpoint", body["control_plane_endpoint"].get<std::string>()},
+      {"roles", std::move(roles)},
+      {"labels", body.value("labels", nlohmann::json::object())},
+      {"trust_domain", body.value("trust_domain", config.workgroup.trust_domain)},
+      {"registration_policy", config.workgroup.registration_policy},
+      {"status", "registered"},
+      {"registered_by", identity.has_value() ? SerializeMtlsIdentity(*identity)
+                                             : nlohmann::json{{"role", "anonymous"}, {"tenant_id", "anonymous"}, {"node_id", "anonymous"}}},
+  };
+  for (const std::string field : {"registry_endpoint", "mirror_endpoint", "internal_control_plane_endpoint"})
+  {
+    if (HasNonEmptyString(body, field))
+    {
+      record[field] = body[field].get<std::string>();
+    }
+  }
+  return record;
 }
 
 std::string RegistryIndexPathForPackage(std::string_view package)
@@ -459,6 +588,8 @@ std::vector<RouteSpec> BuildPlatformControlPlaneRoutes()
       {.operation_id = "claimJob", .method = HttpMethod::Post, .path = "/jobs/claim", .internal = true},
       {.operation_id = "heartbeatJob", .method = HttpMethod::Post, .path = "/jobs/{job_id}/heartbeat", .internal = true},
       {.operation_id = "completeJob", .method = HttpMethod::Post, .path = "/jobs/{job_id}/complete", .internal = true},
+      {.operation_id = "registerWorkgroupCluster", .method = HttpMethod::Post, .path = "/workgroups/{workgroup_id}/clusters/register", .internal = true},
+      {.operation_id = "listWorkgroupClusters", .method = HttpMethod::Get, .path = "/workgroups/{workgroup_id}/clusters", .internal = true},
       {.operation_id = "mirrorStatus", .method = HttpMethod::Get, .path = "/mirrors/{mirror_id}/status"},
   };
 }
@@ -498,6 +629,10 @@ PlatformRouter::PlatformRouter(PlatformConfig config)
       .freshness = "lagging",
       .replay_cursor = "checkpoint-0000",
   };
+  if (UsesPostgresState(config_))
+  {
+    postgres_ = std::make_unique<PostgresStore>(config_.postgres_dsn);
+  }
 }
 
 HttpResponse PlatformRouter::Dispatch(const HttpRequest &request)
@@ -552,6 +687,14 @@ HttpResponse PlatformRouter::Dispatch(const HttpRequest &request)
   if (operation == "completeJob")
   {
     return HandleCompleteJob(*match, request);
+  }
+  if (operation == "registerWorkgroupCluster")
+  {
+    return HandleRegisterWorkgroupCluster(*match, request);
+  }
+  if (operation == "listWorkgroupClusters")
+  {
+    return HandleListWorkgroupClusters(*match);
   }
   if (operation == "mirrorStatus")
   {
@@ -613,7 +756,9 @@ HttpResponse PlatformRouter::RequireIdentity(const RouteMatch &match, const Http
 
 HttpResponse PlatformRouter::HandleHealth() const
 {
-  const bool ready = !config_.postgres_dsn.empty() && IsObjectStoreProviderImplemented(ParseObjectStoreProvider(config_.object_store.provider));
+  const bool postgres_ready =
+      !UsesPostgresState(config_) || (LooksLikePostgresDsn(config_.postgres_dsn) && PostgresDriverAvailable());
+  const bool ready = postgres_ready && IsObjectStoreProviderImplemented(ParseObjectStoreProvider(config_.object_store.provider));
   nlohmann::json payload = {
       {"service", "styio-platformd"},
       {"status", ready ? "ready" : "degraded"},
@@ -621,6 +766,8 @@ HttpResponse PlatformRouter::HandleHealth() const
       {"node_id", config_.node_id},
       {"contract_version", "v1"},
       {"roles", config_.roles},
+      {"state_backend", config_.state_backend},
+      {"postgres_driver_available", PostgresDriverAvailable()},
   };
   return JsonResponse(200, SuccessEnvelope(ready ? "styio-platform is ready" : "styio-platform is degraded", payload));
 }
@@ -631,7 +778,9 @@ HttpResponse PlatformRouter::HandleNodeSelf() const
       {"node_id", config_.node_id},
       {"region", config_.region},
       {"roles", config_.roles},
+      {"state_backend", config_.state_backend},
       {"postgres_configured", LooksLikePostgresDsn(config_.postgres_dsn)},
+      {"postgres_driver_available", PostgresDriverAvailable()},
       {"object_store_provider", ToString(ParseObjectStoreProvider(config_.object_store.provider))},
       {"mtls_required", config_.mtls.required},
   };
@@ -644,7 +793,19 @@ HttpResponse PlatformRouter::HandleSubmitJob(const HttpRequest &request)
   {
     return JsonResponse(400, FailureEnvelope("job submission rejected", *error, "ValidationError", "submitJob", 2));
   }
-  PlatformJobRecord job = BuildQueuedJobRecord(request.body, config_, next_job_sequence_++);
+  PlatformJobRecord job = BuildQueuedJobRecord(request.body, config_);
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      postgres_->SubmitJob(job);
+      return JsonResponse(200, SuccessEnvelope("queued platform job", SerializeJobRecord(job)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "job submission failed", error.what(), "PostgresError", "submitJob");
+    }
+  }
   jobs_[job.job_id] = job;
   events_[job.job_id].push_back({
       .event_id = "event-queued",
@@ -657,6 +818,22 @@ HttpResponse PlatformRouter::HandleSubmitJob(const HttpRequest &request)
 
 HttpResponse PlatformRouter::HandleGetJob(const RouteMatch &match) const
 {
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      const std::optional<PlatformJobRecord> job = postgres_->GetJob(match.parameters.at("job_id"));
+      if (!job.has_value())
+      {
+        return JsonResponse(404, FailureEnvelope("job lookup failed", "job not found", "NotFound", "getJob"));
+      }
+      return JsonResponse(200, SuccessEnvelope("loaded platform job", SerializeJobRecord(*job)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "job lookup failed", error.what(), "PostgresError", "getJob");
+    }
+  }
   const auto job = jobs_.find(match.parameters.at("job_id"));
   if (job == jobs_.end())
   {
@@ -668,6 +845,26 @@ HttpResponse PlatformRouter::HandleGetJob(const RouteMatch &match) const
 HttpResponse PlatformRouter::HandleGetJobEvents(const RouteMatch &match) const
 {
   const std::string job_id = match.parameters.at("job_id");
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      if (!postgres_->GetJob(job_id).has_value())
+      {
+        return JsonResponse(404, FailureEnvelope("job event lookup failed", "job not found", "NotFound", "getJobEvents"));
+      }
+      nlohmann::json events = nlohmann::json::array();
+      for (const JobEventRecord &event : postgres_->GetJobEvents(job_id))
+      {
+        events.push_back(SerializeJobEvent(event));
+      }
+      return JsonResponse(200, SuccessEnvelope("loaded platform job events", {{"job_id", job_id}, {"events", events}}));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "job event lookup failed", error.what(), "PostgresError", "getJobEvents");
+    }
+  }
   const auto found = events_.find(job_id);
   if (found == events_.end())
   {
@@ -687,12 +884,28 @@ HttpResponse PlatformRouter::HandleCancelJob(const RouteMatch &match, const Http
   {
     return JsonResponse(400, FailureEnvelope("job cancellation failed", "reason is required", "ValidationError", "cancelJob", 2));
   }
-  const auto job_it = jobs_.find(match.parameters.at("job_id"));
-  if (job_it == jobs_.end())
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      const std::optional<PlatformJobRecord> job =
+          postgres_->CancelJob(match.parameters.at("job_id"), request.body["reason"].get<std::string>());
+      if (!job.has_value())
+      {
+        return JsonResponse(404, FailureEnvelope("job cancellation failed", "job not found or already completed", "NotFound", "cancelJob"));
+      }
+      return JsonResponse(200, SuccessEnvelope("cancelled platform job", SerializeJobRecord(*job)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "job cancellation failed", error.what(), "PostgresError", "cancelJob");
+    }
+  }
+  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
+  if (job.job_id.empty())
   {
     return JsonResponse(404, FailureEnvelope("job cancellation failed", "job not found", "NotFound", "cancelJob"));
   }
-  PlatformJobRecord &job = job_it->second;
   job.status = "cancelled";
   job.finished_at = "2026-04-24T00:01:00Z";
   events_[job.job_id].push_back({
@@ -723,8 +936,20 @@ HttpResponse PlatformRouter::HandleRegisterWorker(const HttpRequest &request)
       {"worker_id", request.body["worker_id"].get<std::string>()},
       {"region", request.body["region"].get<std::string>()},
       {"worker_pool_key", request.body["worker_pool_key"].get<std::string>()},
+      {"capacity", capacity},
       {"status", "registered"},
   };
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      return JsonResponse(200, SuccessEnvelope("registered platform worker", postgres_->RegisterWorker(worker)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "worker registration failed", error.what(), "PostgresError", "registerWorker");
+    }
+  }
   workers_[worker["worker_id"].get<std::string>()] = worker;
   return JsonResponse(200, SuccessEnvelope("registered platform worker", worker));
 }
@@ -739,12 +964,33 @@ HttpResponse PlatformRouter::HandleClaimJob(const HttpRequest &request)
     }
   }
   const std::string worker_id = request.body["worker_id"].get<std::string>();
+  const std::string region = request.body["region"].get<std::string>();
+  const std::string worker_pool_key = request.body["worker_pool_key"].get<std::string>();
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      const std::optional<PlatformJobRecord> job = postgres_->ClaimJob(worker_id, region, worker_pool_key);
+      if (!job.has_value())
+      {
+        return JsonResponse(200, SuccessEnvelope("no platform job available", {{"claimed", false}}));
+      }
+      return JsonResponse(200, SuccessEnvelope("claimed platform job", {{"claimed", true}, {"job", SerializeJobRecord(*job)}}));
+    }
+    catch (const PostgresStoreError &error)
+    {
+      const std::string detail = error.what();
+      if (detail.find("worker is not registered") != std::string::npos)
+      {
+        return JsonResponse(403, FailureEnvelope("job claim failed", "worker is not registered", "WorkerError", "claimJob"));
+      }
+      return FailureResponse(503, "job claim failed", detail, "PostgresError", "claimJob");
+    }
+  }
   if (!workers_.contains(worker_id))
   {
     return JsonResponse(403, FailureEnvelope("job claim failed", "worker is not registered", "WorkerError", "claimJob"));
   }
-  const std::string region = request.body["region"].get<std::string>();
-  const std::string worker_pool_key = request.body["worker_pool_key"].get<std::string>();
   for (auto &[job_id, job] : jobs_)
   {
     if (job.status == "queued" && job.region == region && job.worker_pool_key == worker_pool_key)
@@ -765,12 +1011,34 @@ HttpResponse PlatformRouter::HandleClaimJob(const HttpRequest &request)
 
 HttpResponse PlatformRouter::HandleHeartbeatJob(const RouteMatch &match, const HttpRequest &request)
 {
-  const auto job_it = jobs_.find(match.parameters.at("job_id"));
-  if (job_it == jobs_.end())
+  if (postgres_ != nullptr)
+  {
+    if (!request.body.contains("worker_id") || !request.body["worker_id"].is_string())
+    {
+      return JsonResponse(400, FailureEnvelope("job heartbeat failed", "worker_id is required", "ValidationError", "heartbeatJob", 2));
+    }
+    try
+    {
+      const std::optional<PlatformJobRecord> job = postgres_->HeartbeatJob(
+          match.parameters.at("job_id"),
+          request.body["worker_id"].get<std::string>(),
+          request.body.value("message", "worker heartbeat"));
+      if (!job.has_value())
+      {
+        return JsonResponse(403, FailureEnvelope("job heartbeat failed", "worker does not own job", "WorkerError", "heartbeatJob"));
+      }
+      return JsonResponse(200, SuccessEnvelope("recorded platform job heartbeat", SerializeJobRecord(*job)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "job heartbeat failed", error.what(), "PostgresError", "heartbeatJob");
+    }
+  }
+  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
+  if (job.job_id.empty())
   {
     return JsonResponse(404, FailureEnvelope("job heartbeat failed", "job not found", "NotFound", "heartbeatJob"));
   }
-  PlatformJobRecord &job = job_it->second;
   if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job heartbeat failed", "worker does not own job", "WorkerError", "heartbeatJob"));
@@ -786,12 +1054,54 @@ HttpResponse PlatformRouter::HandleHeartbeatJob(const RouteMatch &match, const H
 
 HttpResponse PlatformRouter::HandleCompleteJob(const RouteMatch &match, const HttpRequest &request)
 {
-  const auto job_it = jobs_.find(match.parameters.at("job_id"));
-  if (job_it == jobs_.end())
+  if (postgres_ != nullptr)
+  {
+    if (!request.body.contains("worker_id") || !request.body["worker_id"].is_string())
+    {
+      return JsonResponse(400, FailureEnvelope("job completion failed", "worker_id is required", "ValidationError", "completeJob", 2));
+    }
+    const std::string status = request.body.value("status", "");
+    if (status != "succeeded" && status != "failed" && status != "cancelled")
+    {
+      return JsonResponse(400, FailureEnvelope("job completion failed", "status must be succeeded, failed, or cancelled", "ValidationError", "completeJob", 2));
+    }
+    std::vector<ArtifactRecord> artifacts;
+    if (request.body.contains("artifacts") && request.body["artifacts"].is_array())
+    {
+      for (const nlohmann::json &artifact : request.body["artifacts"])
+      {
+        artifacts.push_back({
+            .artifact_id = artifact.value("artifact_id", "artifact"),
+            .object_key = artifact.value("object_key", ""),
+            .kind = artifact.value("kind", "artifact"),
+        });
+      }
+    }
+    try
+    {
+      const std::optional<PlatformJobRecord> job = postgres_->CompleteJob(
+          match.parameters.at("job_id"),
+          request.body["worker_id"].get<std::string>(),
+          status,
+          request.body.value("message", "job completed"),
+          artifacts,
+          request.body.value("result", nlohmann::json::object()));
+      if (!job.has_value())
+      {
+        return JsonResponse(403, FailureEnvelope("job completion failed", "worker does not own job", "WorkerError", "completeJob"));
+      }
+      return JsonResponse(200, SuccessEnvelope("completed platform job", SerializeJobRecord(*job)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "job completion failed", error.what(), "PostgresError", "completeJob");
+    }
+  }
+  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
+  if (job.job_id.empty())
   {
     return JsonResponse(404, FailureEnvelope("job completion failed", "job not found", "NotFound", "completeJob"));
   }
-  PlatformJobRecord &job = job_it->second;
   if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job completion failed", "worker does not own job", "WorkerError", "completeJob"));
@@ -824,9 +1134,115 @@ HttpResponse PlatformRouter::HandleCompleteJob(const RouteMatch &match, const Ht
   return JsonResponse(200, SuccessEnvelope("completed platform job", SerializeJobRecord(job)));
 }
 
+HttpResponse PlatformRouter::HandleRegisterWorkgroupCluster(const RouteMatch &match, const HttpRequest &request)
+{
+  const std::string workgroup_id = match.parameters.at("workgroup_id");
+  if (!config_.workgroup.enabled)
+  {
+    return JsonResponse(403, FailureEnvelope("workgroup registration rejected", "workgroup support is disabled", "PolicyError", "registerWorkgroupCluster", 2));
+  }
+  if (request.identity.has_value() && request.identity->tenant_id != config_.workgroup.registration_tenant)
+  {
+    return JsonResponse(403, FailureEnvelope("workgroup registration rejected", "identity tenant is not allowed to register clusters", "AuthError", "registerWorkgroupCluster", 2));
+  }
+  if (!config_.workgroup.registration_token.empty() &&
+      request.body.value("registration_token", "") != config_.workgroup.registration_token)
+  {
+    return JsonResponse(403, FailureEnvelope("workgroup registration rejected", "registration token is invalid", "AuthError", "registerWorkgroupCluster", 2));
+  }
+  if (const std::optional<std::string> error = ValidateWorkgroupClusterRegistration(workgroup_id, request.body); error.has_value())
+  {
+    return JsonResponse(400, FailureEnvelope("workgroup registration rejected", *error, "ValidationError", "registerWorkgroupCluster", 2));
+  }
+
+  nlohmann::json cluster = BuildWorkgroupClusterRecord(workgroup_id, request.body, config_, request.identity);
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      return JsonResponse(200, SuccessEnvelope("registered workgroup cluster", postgres_->RegisterWorkgroupCluster(workgroup_id, cluster)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "workgroup registration failed", error.what(), "PostgresError", "registerWorkgroupCluster");
+    }
+  }
+  workgroups_[workgroup_id][cluster["cluster_id"].get<std::string>()] = cluster;
+  return JsonResponse(200, SuccessEnvelope("registered workgroup cluster", cluster));
+}
+
+HttpResponse PlatformRouter::HandleListWorkgroupClusters(const RouteMatch &match) const
+{
+  const std::string workgroup_id = match.parameters.at("workgroup_id");
+  if (!IsSafeWorkgroupId(workgroup_id))
+  {
+    return JsonResponse(400, FailureEnvelope("workgroup lookup rejected", "workgroup_id is invalid", "ValidationError", "listWorkgroupClusters", 2));
+  }
+  nlohmann::json clusters = nlohmann::json::array();
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      clusters = postgres_->ListWorkgroupClusters(workgroup_id);
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "workgroup lookup failed", error.what(), "PostgresError", "listWorkgroupClusters");
+    }
+  }
+  else if (const auto workgroup = workgroups_.find(workgroup_id); workgroup != workgroups_.end())
+  {
+    for (const auto &[cluster_id, cluster] : workgroup->second)
+    {
+      (void) cluster_id;
+      clusters.push_back(cluster);
+    }
+  }
+  return JsonResponse(
+      200,
+      SuccessEnvelope(
+          "loaded workgroup clusters",
+          {
+              {"workgroup_id", workgroup_id},
+              {"policy", WorkgroupPolicyPayload(config_)},
+              {"clusters", clusters},
+          }));
+}
+
 HttpResponse PlatformRouter::HandleMirrorStatus(const RouteMatch &match) const
 {
   const std::string mirror_id = match.parameters.at("mirror_id");
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      const std::optional<MirrorCursorRecord> mirror = postgres_->GetMirrorState(mirror_id);
+      if (!mirror.has_value())
+      {
+        return FailureResponse(
+            404,
+            "mirror freshness unavailable",
+            "mirror cursor not found",
+            "MirrorError",
+            "mirrorStatus");
+      }
+      return JsonResponse(
+          200,
+          SuccessEnvelope(
+              "loaded mirror freshness",
+              {
+                  {"mirror_id", mirror->mirror_id},
+                  {"region", mirror->region},
+                  {"origin", mirror->origin},
+                  {"freshness", mirror->freshness},
+                  {"replay_cursor", mirror->replay_cursor},
+              }));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "mirror freshness unavailable", error.what(), "PostgresError", "mirrorStatus");
+    }
+  }
   const auto mirror = mirrors_.find(mirror_id);
   if (mirror == mirrors_.end())
   {
@@ -1048,6 +1464,15 @@ HttpResponse PlatformRouter::HandleVerifyRegistry(const HttpRequest &request)
 
 void PlatformRouter::RecordMirrorState(std::string freshness, std::string replay_cursor)
 {
+  if (postgres_ != nullptr)
+  {
+    postgres_->RecordMirrorState(
+        config_.registry.mirror_id,
+        config_.region,
+        config_.registry.mirror_origin,
+        freshness,
+        replay_cursor);
+  }
   mirrors_[config_.registry.mirror_id] = RegistryMirrorState{
       .mirror_id = config_.registry.mirror_id,
       .origin = config_.registry.mirror_origin,

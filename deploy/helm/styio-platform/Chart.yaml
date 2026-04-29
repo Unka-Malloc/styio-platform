@@ -1,0 +1,6 @@
+apiVersion: v2
+name: styio-platform
+description: Styio platform primary, worker, mirror, and Postgres deployment
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

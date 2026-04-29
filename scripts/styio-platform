@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/styio-platform dev <up|status|join-workgroup|workgroup-status|logs|shell|down> [options]
+
+Run `scripts/styio-platform dev up` to build and start the local Styio platform
+development environment. Use `join-workgroup` to register another local
+platform primary endpoint into the same workgroup.
+USAGE
+}
+
+if [[ $# -lt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+case "$1" in
+  dev)
+    shift
+    exec python3 "$ROOT/scripts/dev-env.py" "$@"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    echo "unknown command: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

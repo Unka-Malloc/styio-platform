@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "styio-platform.fullname" . }}-primary
+  labels:
+    {{- include "styio-platform.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: {{ .Values.primary.service.port }}
+      targetPort: http
+  selector:
+    {{- include "styio-platform.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: primary
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "styio-platform.fullname" . }}-primary
+  labels:
+    {{- include "styio-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: primary
+spec:
+  replicas: {{ .Values.primary.replicas }}
+  selector:
+    matchLabels:
+      {{- include "styio-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: primary
+  template:
+    metadata:
+      labels:
+        {{- include "styio-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: primary
+    spec:
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - until styio-platformd --migrate; do sleep 2; done
+          env:
+            - name: STYIO_PLATFORM_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "styio-platform.fullname" . }}-postgres
+                  key: password
+            - name: STYIO_PLATFORM_STATE_BACKEND
+              value: postgres
+            - name: STYIO_PLATFORM_POSTGRES_DSN
+              value: {{ include "styio-platform.postgresDsn" . | quote }}
+            - name: STYIO_PLATFORM_REGION
+              value: {{ .Values.region | quote }}
+            - name: STYIO_PLATFORM_NODE_ID
+              value: {{ .Values.primary.nodeId | quote }}
+      containers:
+        - name: primary
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --serve
+          ports:
+            - name: http
+              containerPort: 8787
+          env:
+            - name: STYIO_PLATFORM_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "styio-platform.fullname" . }}-postgres
+                  key: password
+            - name: STYIO_PLATFORM_BIND_HOST
+              value: 0.0.0.0
+            - name: STYIO_PLATFORM_BIND_PORT
+              value: "8787"
+            - name: STYIO_PLATFORM_STATE_BACKEND
+              value: postgres
+            - name: STYIO_PLATFORM_POSTGRES_DSN
+              value: {{ include "styio-platform.postgresDsn" . | quote }}
+            - name: STYIO_PLATFORM_OBJECT_STORE_PROVIDER
+              value: filesystem
+            - name: STYIO_PLATFORM_REGION
+              value: {{ .Values.region | quote }}
+            - name: STYIO_PLATFORM_NODE_ID
+              value: {{ .Values.primary.nodeId | quote }}
+            - name: STYIO_PLATFORM_NODE_ROLES
+              value: control-plane,registry-writer
+            - name: STYIO_PLATFORM_MTLS_REQUIRED
+              value: {{ .Values.mtls.required | quote }}
+            - name: STYIO_PLATFORM_WORKGROUP_ENABLED
+              value: {{ .Values.workgroup.enabled | quote }}
+            - name: STYIO_PLATFORM_WORKGROUP_ID
+              value: {{ .Values.workgroup.id | quote }}
+            - name: STYIO_PLATFORM_WORKGROUP_TRUST_DOMAIN
+              value: {{ .Values.workgroup.trustDomain | quote }}
+            - name: STYIO_PLATFORM_WORKGROUP_REGISTRATION_POLICY
+              value: {{ .Values.workgroup.registrationPolicy | quote }}
+            - name: STYIO_PLATFORM_WORKGROUP_REGISTRATION_TENANT
+              value: {{ .Values.workgroup.registrationTenant | quote }}
+            - name: STYIO_PLATFORM_WORKGROUP_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "styio-platform.fullname" . }}-workgroup
+                  key: registration-token
+            - name: STYIO_PLATFORM_REGISTRY_ROOT
+              value: /var/lib/styio-platform/registry
+            - name: STYIO_PLATFORM_REGISTRY_KEY_DIR
+              value: /var/lib/styio-platform/registry-keys
+            - name: STYIO_PLATFORM_REGISTRY_MIRROR_ID
+              value: {{ .Values.mirror.id | quote }}
+            - name: STYIO_PLATFORM_REGISTRY_MIRROR_ORIGIN
+              value: {{ .Values.mirror.origin | quote }}
+          readinessProbe:
+            httpGet:
+              path: /api/styio-platform/v1/health
+              port: http
+              httpHeaders:
+                - name: X-Styio-Mtls-Uri-San
+                  value: spiffe://styio-platform/tenant/platform/role/operator/node/kube-probe
+          livenessProbe:
+            httpGet:
+              path: /api/styio-platform/v1/health
+              port: http
+              httpHeaders:
+                - name: X-Styio-Mtls-Uri-San
+                  value: spiffe://styio-platform/tenant/platform/role/operator/node/kube-probe
+          volumeMounts:
+            - name: registry
+              mountPath: /var/lib/styio-platform/registry
+            - name: registry-keys
+              mountPath: /var/lib/styio-platform/registry-keys
+            - name: artifacts
+              mountPath: /var/lib/styio-platform/artifacts
+      volumes:
+        - name: registry
+          persistentVolumeClaim:
+            claimName: {{ include "styio-platform.fullname" . }}-registry
+        - name: registry-keys
+          emptyDir: {}
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: {{ include "styio-platform.fullname" . }}-artifacts

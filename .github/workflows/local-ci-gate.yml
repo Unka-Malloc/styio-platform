@@ -18,11 +18,14 @@ jobs:
   local-ci-gate:
     name: local-ci-gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 120
     env:
       STYIO_LLVM_MAJOR: "18"
       STYIO_CMAKE_VERSION: "3.31.6"
       STYIO_PYTHON_VERSION: "3.13.5"
+      STYIO_KIND_VERSION: "0.27.0"
+      STYIO_KUBECTL_VERSION: "v1.32.2"
+      KIND_EXPERIMENTAL_PROVIDER: podman
 
     steps:
       - name: Checkout styio-platform
@@ -48,7 +51,21 @@ jobs:
           sudo apt-get install -y \
             ninja-build \
             clang-${STYIO_LLVM_MAJOR} \
-            lld-${STYIO_LLVM_MAJOR}
+            lld-${STYIO_LLVM_MAJOR} \
+            libboost-dev \
+            libpq-dev \
+            podman \
+            buildah
+
+      - name: Install open Kubernetes smoke tools
+        run: |
+          curl -fsSL -o kind "https://kind.sigs.k8s.io/dl/v${STYIO_KIND_VERSION}/kind-linux-amd64"
+          chmod +x kind
+          sudo mv kind /usr/local/bin/kind
+          curl -fsSL -o kubectl "https://dl.k8s.io/release/${STYIO_KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
       - name: Verify standardized toolchain
         run: |
@@ -56,6 +73,11 @@ jobs:
           cmake --version | head -n1
           ctest --version | head -n1
           clang-${STYIO_LLVM_MAJOR} --version | head -n1
+          kind version
+          kubectl version --client=true
+          helm version --short
+          podman --version
+          buildah --version
 
       - name: Resolve CI refs
         id: ci_refs
@@ -97,4 +119,5 @@ jobs:
           --base "${{ steps.ci_refs.outputs.base_ref }}"
           --range "${{ steps.ci_refs.outputs.range }}"
           --skip-audit
+          --with-k8s
           --build-dir "$RUNNER_TEMP/styio-platform-build"

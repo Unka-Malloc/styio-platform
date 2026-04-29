@@ -15,7 +15,8 @@ handoff, and build job request payloads.
 - `src/SpioCore/`, `src/SpioManifest/`, `src/SpioResolve/`, and supporting imported client dependencies.
 - `src/SpioPlan/` compile-plan generation.
 - `src/SpioCloud/` cloud execution and job request contracts.
-- `src/PlatformService/` native service-kernel implementation once promoted.
+- `src/PlatformService/` native service-kernel implementation and local
+  Boost.Beast/Asio HTTP adapter with POSIX fallback.
 - `src/PlatformService/` registry control-plane route family for `/api/spio-registry-control/v1/status|publish|verify`, including redaction, mTLS role checks, local filesystem adapter behavior, and mirror freshness state.
 - `src/spio_registry_v2/` migrated registry v2 service helpers used by platform-local control-plane scripts, VM deployment initialization, and tests.
 - `contracts/platform-control-plane/` payload shape in coordination with Control Plane.
@@ -33,10 +34,7 @@ For registry service work, keep platform as the hosted publish/verify/mirror
 owner while preserving `styio-spio` offline client behavior and the shared
 registry-control-plane v1 route shape. When deployment scripts need a new
 registry helper, keep it covered by Python unit tests and avoid making the
-client-side package manager depend on platform availability. Job lifecycle
-handlers must not mutate queue state when a referenced job is missing, and
-repeated submissions for the same tenant/workspace/action tuple must receive
-distinct job identifiers instead of overwriting earlier queued jobs.
+client-side package manager depend on platform availability.
 
 ## Change Classes
 
@@ -46,12 +44,12 @@ request payload shape, platform service payload shape, or imported
 package-manager dependency changes. Registry kernel changes also include mTLS
 role policy, publish/verify status code semantics, mirror freshness transitions,
 VM initialization helper behavior, and migrated registry v2 helper behavior.
-Job queue changes include identifier allocation, lookup semantics, lifecycle
-event recording, and worker ownership checks.
 
 ## Required Gates
 
 Run `cmake --build build-codex` and `ctest --test-dir build-codex --output-on-failure`.
+For HTTP adapter changes, include
+`ctest --test-dir build-codex -R styio_platform_http_smoke --output-on-failure`.
 For registry kernel changes, also run `python3 tests/unit/test_registry_v2.py`
 and the native registry route tests in `styio_platform_native_tests`. For VM
 deployment helper changes, also run `python3 tests/unit/test_registry_vm_deploy.py`.

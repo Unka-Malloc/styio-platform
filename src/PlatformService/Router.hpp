@@ -3,9 +3,10 @@
 #include "PlatformService/Config.hpp"
 #include "PlatformService/Http.hpp"
 #include "PlatformService/JobQueue.hpp"
+#include "PlatformService/PostgresStore.hpp"
 
-#include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,8 @@ private:
   HttpResponse HandleClaimJob(const HttpRequest &request);
   HttpResponse HandleHeartbeatJob(const RouteMatch &match, const HttpRequest &request);
   HttpResponse HandleCompleteJob(const RouteMatch &match, const HttpRequest &request);
+  HttpResponse HandleRegisterWorkgroupCluster(const RouteMatch &match, const HttpRequest &request);
+  HttpResponse HandleListWorkgroupClusters(const RouteMatch &match) const;
   HttpResponse HandleMirrorStatus(const RouteMatch &match) const;
   HttpResponse HandleRegistryStatus() const;
   HttpResponse HandlePublishRelease(const HttpRequest &request);
@@ -52,9 +55,10 @@ private:
   std::map<std::string, PlatformJobRecord> jobs_;
   std::map<std::string, std::vector<JobEventRecord>> events_;
   std::map<std::string, nlohmann::json> workers_;
+  std::map<std::string, std::map<std::string, nlohmann::json>> workgroups_;
   std::map<std::string, RegistryMirrorState> mirrors_;
   std::map<std::string, nlohmann::json> published_releases_;
-  size_t next_job_sequence_ = 1;
+  std::unique_ptr<PostgresStore> postgres_;
 };
 
 std::vector<RouteSpec> BuildPlatformControlPlaneRoutes();

@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "styio-platform.fullname" . }}-worker
+  labels:
+    {{- include "styio-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "styio-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "styio-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --worker
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: STYIO_PLATFORM_REGION
+              value: {{ .Values.region | quote }}
+            - name: STYIO_PLATFORM_NODE_ID
+              value: $(POD_NAME)
+            - name: STYIO_PLATFORM_NODE_ROLES
+              value: worker
+            - name: STYIO_PLATFORM_CONTROL_URL
+              value: http://{{ include "styio-platform.fullname" . }}-primary:{{ .Values.primary.service.port }}/api/styio-platform/v1
+            - name: STYIO_PLATFORM_WORKER_ID
+              value: $(POD_NAME)
+            - name: STYIO_PLATFORM_WORKER_POOL_KEY
+              value: {{ .Values.worker.poolKey | quote }}
+            - name: STYIO_PLATFORM_WORKSPACE_ROOT
+              value: {{ .Values.worker.workspaceRoot | quote }}
+            - name: STYIO_PLATFORM_ARTIFACT_ROOT
+              value: {{ .Values.worker.artifactRoot | quote }}
+            - name: STYIO_PLATFORM_WORKER_POLL_INTERVAL_MS
+              value: {{ .Values.worker.pollIntervalMs | quote }}
+            - name: STYIO_PLATFORM_WORKER_SPIO_BIN
+              value: {{ .Values.worker.spioBin | quote }}
+            - name: STYIO_PLATFORM_WORKER_STYIO_BIN
+              value: {{ .Values.worker.styioBin | quote }}
+          volumeMounts:
+            - name: workspaces
+              mountPath: {{ .Values.worker.workspaceRoot | quote }}
+            - name: artifacts
+              mountPath: {{ .Values.worker.artifactRoot | quote }}
+      volumes:
+        - name: workspaces
+          persistentVolumeClaim:
+            claimName: {{ include "styio-platform.fullname" . }}-workspaces
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: {{ include "styio-platform.fullname" . }}-artifacts

@@ -2,7 +2,7 @@
 
 **Purpose:** Define the operating expectations for multi-region and cross-network `styio-platform` deployment nodes.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-29
 
 ## Node Roles
 
@@ -28,6 +28,52 @@ for operator, node, worker, and internal service traffic.
 The node must expose only the native JSON platform-control-plane V1 route
 families until matching gates exist for a broader topology.
 
+The Kubernetes V1 deployment is the first multi-node runnable topology. The
+Helm chart under `deploy/helm/styio-platform` starts:
+
+- a primary control-plane pod running `styio-platformd --serve`
+- a Postgres StatefulSet used by `STYIO_PLATFORM_STATE_BACKEND=postgres`
+- a worker deployment running `styio-platformd --worker`
+- a mirror deployment with control, static registry read, and sync containers
+- PVCs for registry, mirror registry, workspaces, and artifacts
+
+Primary pods must run `styio-platformd --migrate` before serving traffic.
+Workers claim jobs through the platform HTTP API, clone `job_request.source.origin`,
+run `spio build --manifest-path <relative path> --styio-bin <path>`, and write
+stdout, stderr, and result metadata under the artifact PVC. Mirror sync copies
+`config.json`, `trust/`, `artifacts/`, `index/`, and `log/` from the primary
+registry PVC to the mirror registry PVC, then records the freshness cursor in
+Postgres.
+
+For local development, operators can start the same topology with one command:
+
+```bash
+./scripts/styio-platform dev up
+```
+
+The command targets Linux OCI containers on Kubernetes. Native Linux is the
+primary local host; macOS should use Podman machine or a remote Kubernetes
+context, and Windows should use WSL2 or a remote Kubernetes context. Local tool
+defaults come from `config/styio-platform-tools.yaml`; JSON files under
+`contracts/` remain protocol contracts rather than operator configuration.
+
+Each dev environment self-registers into the configured workgroup after local
+port-forwarding is ready. Operators can merge another local primary endpoint
+with:
+
+```bash
+./scripts/styio-platform dev join-workgroup --peer http://127.0.0.1:8788/api/styio-platform/v1
+```
+
+The registration policy is enforced by the platform control plane: only the
+configured platform tenant may register clusters, only `operator`,
+`control-plane`, or `cluster-registrar` identities can write workgroup
+membership, and `worker`, `mirror`, and `registry-writer` roles are read-only.
+When `STYIO_PLATFORM_WORKGROUP_REGISTRATION_TOKEN` is set, the request must
+also carry the same token. Registered records include both host port-forwarded
+endpoints and Kubernetes service DNS endpoints so same-cluster dev nodes can
+discover each other without leaving the local workgroup.
+
 ## Cross-Network Deployment
 
 Cross-network deployments must avoid assuming a single low-latency control
@@ -43,4 +89,6 @@ Before a node role is promoted, validate:
 - mirror freshness and replay behavior
 - package read availability from the regional mirror
 - worker-pool health for compile-capable nodes
+- workgroup cluster registration and role-policy enforcement
 - failure isolation between regions
+- Podman or Buildah, Helm, and kind smoke through `python3 scripts/k8s-smoke.py`

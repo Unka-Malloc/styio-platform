@@ -27,6 +27,8 @@ EXPECTED_OPERATION_SNAPSHOT = [
     ("claimJob", "POST", "/jobs/claim"),
     ("heartbeatJob", "POST", "/jobs/{job_id}/heartbeat"),
     ("completeJob", "POST", "/jobs/{job_id}/complete"),
+    ("registerWorkgroupCluster", "POST", "/workgroups/{workgroup_id}/clusters/register"),
+    ("listWorkgroupClusters", "GET", "/workgroups/{workgroup_id}/clusters"),
     ("mirrorStatus", "GET", "/mirrors/{mirror_id}/status"),
 ]
 FORBIDDEN_NON_NATIVE_TERMS = [

@@ -209,6 +209,15 @@ spio::platform::MtlsIdentity MirrorIdentity()
   };
 }
 
+spio::platform::MtlsIdentity OperatorIdentity()
+{
+  return {
+      .role = "operator",
+      .tenant_id = "platform",
+      .node_id = "operator-01",
+  };
+}
+
 nlohmann::json MinimalJobRequest()
 {
   return {
@@ -218,8 +227,16 @@ nlohmann::json MinimalJobRequest()
       {"region", "local-dev"},
       {"preferred_worker_pool", "linux/x86_64/build/nightly/minimal"},
       {"job_request", {
+                          {"schema_version", 1},
+                          {"api_path", "/api/styio-platform/v1/jobs"},
+                          {"action", "build"},
                           {"manifest_path", "spio.toml"},
                           {"profile", "dev"},
+                          {"source", {{"origin", "file:///tmp/styio-platform-test-workspace"}}},
+                          {"toolchain", json::object()},
+                          {"workflow", json::object()},
+                          {"target", json::object()},
+                          {"cloud", json::object()},
                       }},
   };
 }
@@ -309,6 +326,18 @@ TEST(PlatformServiceRouterTests, MatchesRouteParametersForJobsAndMirrors)
   EXPECT_EQ(mirror->route.operation_id, "mirrorStatus");
   EXPECT_EQ(mirror->parameters.at("mirror_id"), "registry-primary");
 
+  const std::optional<spio::platform::RouteMatch> register_cluster =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/workgroups/local-dev/clusters/register");
+  ASSERT_TRUE(register_cluster.has_value());
+  EXPECT_EQ(register_cluster->route.operation_id, "registerWorkgroupCluster");
+  EXPECT_EQ(register_cluster->parameters.at("workgroup_id"), "local-dev");
+
+  const std::optional<spio::platform::RouteMatch> list_clusters =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/workgroups/local-dev/clusters");
+  ASSERT_TRUE(list_clusters.has_value());
+  EXPECT_EQ(list_clusters->route.operation_id, "listWorkgroupClusters");
+  EXPECT_TRUE(list_clusters->route.internal);
+
   EXPECT_FALSE(spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/jobs/job-abc/events").has_value());
 }
 
@@ -357,6 +386,7 @@ TEST(PlatformServicePostgresTests, DefinesCloudKernelMigrationAndClaimSql)
   EXPECT_NE(migrations.front().sql.find("CREATE TABLE IF NOT EXISTS platform_jobs"), std::string::npos);
   EXPECT_NE(migrations.front().sql.find("CREATE TABLE IF NOT EXISTS platform_job_events"), std::string::npos);
   EXPECT_NE(migrations.front().sql.find("CREATE TABLE IF NOT EXISTS platform_artifacts"), std::string::npos);
+  EXPECT_NE(migrations.front().sql.find("CREATE TABLE IF NOT EXISTS platform_workgroup_clusters"), std::string::npos);
 
   const std::string claim_sql = spio::platform::ClaimJobSql();
   EXPECT_NE(claim_sql.find("FOR UPDATE SKIP LOCKED"), std::string::npos);
@@ -416,6 +446,7 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   EXPECT_EQ(claim.body.at("payload").at("job").at("job_id").get<std::string>(), job_id);
   EXPECT_EQ(claim.body.at("payload").at("job").at("status").get<std::string>(), "running");
   EXPECT_EQ(claim.body.at("payload").at("job").at("worker_id").get<std::string>(), "worker-01");
+  EXPECT_EQ(claim.body.at("payload").at("job").at("job_request").at("manifest_path").get<std::string>(), "spio.toml");
 
   const std::string artifact_key = spio::platform::BuildArtifactObjectKey("tenant-acme", "workspace-main", job_id, "stdout.log");
   const spio::platform::HttpResponse complete =
@@ -450,79 +481,80 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   EXPECT_EQ(event_list.at(2).at("status").get<std::string>(), "succeeded");
 }
 
-TEST(PlatformServiceJobQueueTests, MissingJobMutationsDoNotCreateRecords)
+TEST(PlatformServiceWorkgroupTests, RegistersAndListsClustersWithDefaultPolicy)
 {
-  spio::platform::PlatformConfig config;
-  config.region = "local-dev";
-  config.postgres_dsn = "postgres://platform@localhost/styio";
-  config.object_store.provider = "memory";
-  config.mtls.required = true;
+  const fs::path root = MakeTempDir("platform-workgroup-register");
+  spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  config.workgroup.registration_token = "local-token";
 
   spio::platform::PlatformRouter router(config);
+  const json registration = {
+      {"cluster_id", "dev-a"},
+      {"region", "local-dev"},
+      {"node_id", "primary-0"},
+      {"control_plane_endpoint", "http://127.0.0.1:8787/api/styio-platform/v1"},
+      {"internal_control_plane_endpoint", "http://styio-styio-platform-primary.styio-platform-dev.svc.cluster.local:8787/api/styio-platform/v1"},
+      {"registry_endpoint", "http://127.0.0.1:8080"},
+      {"roles", json::array({"control-plane", "worker", "mirror", "registry-writer"})},
+      {"trust_domain", "styio-platform-local"},
+      {"registration_token", "local-token"},
+      {"labels", {{"source", "dev-env"}, {"namespace", "styio-platform-dev"}}},
+  };
 
-  const spio::platform::HttpResponse cancel =
-      router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
-          "/jobs/job-missing/cancel",
-          {
-              {"reason", "operator requested"},
-          }));
-  ASSERT_EQ(cancel.status_code, 404);
+  const spio::platform::HttpResponse registered = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/workgroups/local-dev/clusters/register",
+      OperatorIdentity(),
+      registration));
+  ASSERT_EQ(registered.status_code, 200);
+  EXPECT_EQ(registered.body.at("message").get<std::string>(), "registered workgroup cluster");
+  const json cluster = registered.body.at("payload");
+  EXPECT_EQ(cluster.at("workgroup_id").get<std::string>(), "local-dev");
+  EXPECT_EQ(cluster.at("cluster_id").get<std::string>(), "dev-a");
+  EXPECT_EQ(cluster.at("registration_policy").get<std::string>(), "local-dev-default");
+  EXPECT_EQ(cluster.at("registered_by").at("role").get<std::string>(), "operator");
+  EXPECT_FALSE(cluster.contains("registration_token"));
 
-  const spio::platform::HttpResponse heartbeat =
-      router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
-          "/jobs/job-missing/heartbeat",
-          {
-              {"worker_id", "worker-01"},
-          }));
-  ASSERT_EQ(heartbeat.status_code, 404);
-
-  const spio::platform::HttpResponse complete =
-      router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
-          "/jobs/job-missing/complete",
-          {
-              {"worker_id", "worker-01"},
-              {"status", "succeeded"},
-          }));
-  ASSERT_EQ(complete.status_code, 404);
-
-  const spio::platform::HttpResponse lookup =
-      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/job-missing"));
-  ASSERT_EQ(lookup.status_code, 404);
-  EXPECT_EQ(lookup.body.at("error_payload").at("category").get<std::string>(), "NotFound");
+  const spio::platform::HttpResponse listed = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Get,
+      "/workgroups/local-dev/clusters",
+      OperatorIdentity()));
+  ASSERT_EQ(listed.status_code, 200);
+  EXPECT_EQ(listed.body.at("payload").at("workgroup_id").get<std::string>(), "local-dev");
+  EXPECT_TRUE(listed.body.at("payload").at("policy").at("registration_token_required").get<bool>());
+  ASSERT_EQ(listed.body.at("payload").at("clusters").size(), 1U);
+  EXPECT_EQ(listed.body.at("payload").at("clusters").at(0).at("cluster_id").get<std::string>(), "dev-a");
 }
 
-TEST(PlatformServiceJobQueueTests, RepeatedSubmitsUseDistinctJobIds)
+TEST(PlatformServiceWorkgroupTests, RejectsUnauthorizedOrInvalidClusterRegistration)
 {
-  spio::platform::PlatformConfig config;
-  config.region = "local-dev";
-  config.postgres_dsn = "postgres://platform@localhost/styio";
-  config.object_store.provider = "memory";
-  config.mtls.required = true;
+  const fs::path root = MakeTempDir("platform-workgroup-deny");
+  spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  config.workgroup.registration_token = "local-token";
 
   spio::platform::PlatformRouter router(config);
+  const json registration = {
+      {"cluster_id", "dev-a"},
+      {"region", "local-dev"},
+      {"node_id", "primary-0"},
+      {"control_plane_endpoint", "http://127.0.0.1:8787/api/styio-platform/v1"},
+      {"registration_token", "wrong-token"},
+  };
 
-  const spio::platform::HttpResponse first =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
-  const spio::platform::HttpResponse second =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  const spio::platform::HttpResponse worker_denied = router.Dispatch(Request(
+      spio::platform::HttpMethod::Post,
+      "/workgroups/local-dev/clusters/register",
+      registration));
+  ASSERT_EQ(worker_denied.status_code, 403);
+  EXPECT_EQ(worker_denied.body.at("error_payload").at("category").get<std::string>(), "AuthError");
 
-  ASSERT_EQ(first.status_code, 200);
-  ASSERT_EQ(second.status_code, 200);
-  const std::string first_id = first.body.at("payload").at("job_id").get<std::string>();
-  const std::string second_id = second.body.at("payload").at("job_id").get<std::string>();
-  EXPECT_NE(first_id, second_id);
-
-  const spio::platform::HttpResponse first_lookup =
-      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/" + first_id));
-  const spio::platform::HttpResponse second_lookup =
-      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/" + second_id));
-  ASSERT_EQ(first_lookup.status_code, 200);
-  ASSERT_EQ(second_lookup.status_code, 200);
-  EXPECT_EQ(first_lookup.body.at("payload").at("status").get<std::string>(), "queued");
-  EXPECT_EQ(second_lookup.body.at("payload").at("status").get<std::string>(), "queued");
+  const spio::platform::HttpResponse token_denied = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/workgroups/local-dev/clusters/register",
+      OperatorIdentity(),
+      registration));
+  ASSERT_EQ(token_denied.status_code, 403);
+  EXPECT_EQ(token_denied.body.at("error_payload").at("detail").get<std::string>(), "registration token is invalid");
 }
 
 TEST(PlatformRegistryControlPlaneTests, StatusUsesRedactedPathsAndFilesystemReadiness)

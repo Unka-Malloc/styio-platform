@@ -2,7 +2,7 @@
 
 **Purpose:** Own global hosted workspace, native JSON platform control-plane, regional node, registry distribution, mirror sync, server-script, and cloud stress surfaces.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-28
 
 ## Mission
 
@@ -36,6 +36,8 @@ mirror synchronization.
 Update native JSON contracts and examples first, run contract gates, and
 refresh service runbooks in the same change. Regional node and mirror-sync
 changes must describe authority, lag, replay, and failure isolation explicitly.
+Platform HTTP adapter changes must keep the native JSON route package, daemon
+commands, and network smoke test aligned.
 Registry-management changes must keep hosted publish, verify, mirror
 freshness/replay, service cache, offline-client fallback, and security policy
 coverage visible in the affected docs or gates. VM deployment changes must keep
@@ -60,6 +62,8 @@ multi-region promotion.
 Run Python unit tests, native JSON contract gate tests, example smoke checks
 for touched contract packages, and mirror/regional-node validation once those
 executable gates exist.
+For platform HTTP adapter changes, include
+`ctest --test-dir build-codex -R styio_platform_http_smoke --output-on-failure`.
 For registry-control-plane changes, include
 `python3 tests/interop/registry-control-plane-contract-gate.py` and
 `python3 tests/interop/native-contract-source-gate.py`. For VM registry

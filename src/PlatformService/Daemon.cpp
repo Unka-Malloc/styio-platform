@@ -2,8 +2,10 @@
 #include "PlatformService/BeastServer.hpp"
 #include "PlatformService/Http.hpp"
 #include "PlatformService/Identity.hpp"
+#include "PlatformService/MirrorSync.hpp"
 #include "PlatformService/PostgresStore.hpp"
 #include "PlatformService/Router.hpp"
+#include "PlatformService/Worker.hpp"
 
 #include <iostream>
 #include <string>
@@ -14,7 +16,7 @@ namespace
 void PrintUsage()
 {
   std::cout
-      << "Usage: styio-platformd [--check-config|--self-test|--print-routes|--print-migrations]\n";
+      << "Usage: styio-platformd [--check-config|--migrate|--serve|--serve-once|--worker|--worker-once|--sync-mirror-once|--self-test|--print-routes|--print-migrations]\n";
 }
 
 spio::platform::MtlsIdentity SelfTestIdentity()
@@ -45,6 +47,42 @@ int main(int argc, char **argv)
     payload["http_adapter"] = spio::platform::DescribeBeastServerCapability();
     std::cout << payload.dump(2) << "\n";
     return 0;
+  }
+  if (command == "--serve")
+  {
+    return spio::platform::RunBeastServer(config);
+  }
+  if (command == "--serve-once")
+  {
+    return spio::platform::RunBeastServer(config, {.once = true});
+  }
+  if (command == "--migrate")
+  {
+    try
+    {
+      spio::platform::PostgresStore store(config.postgres_dsn);
+      store.ApplyMigrations();
+      store.UpsertNode(config);
+      std::cout << "styio-platform postgres migrations applied\n";
+      return 0;
+    }
+    catch (const std::exception &error)
+    {
+      std::cerr << "styio-platform migration failed: " << error.what() << "\n";
+      return 1;
+    }
+  }
+  if (command == "--worker")
+  {
+    return spio::platform::RunWorker(config);
+  }
+  if (command == "--worker-once")
+  {
+    return spio::platform::RunWorker(config, {.once = true});
+  }
+  if (command == "--sync-mirror-once")
+  {
+    return spio::platform::RunMirrorSyncOnce(config);
   }
   if (command == "--print-routes")
   {
@@ -84,7 +122,18 @@ int main(int argc, char **argv)
             {"workspace_id", "workspace-demo"},
             {"action", "build"},
             {"preferred_worker_pool", "linux/x86_64/build/nightly/minimal"},
-            {"job_request", {{"schema_version", 1}, {"action", "build"}}},
+            {"job_request",
+             {
+                 {"schema_version", 1},
+                 {"api_path", "/api/styio-platform/v1/jobs"},
+                 {"action", "build"},
+                 {"manifest_path", "spio.toml"},
+                 {"source", {{"origin", "file:///tmp/styio-platform-self-test"}}},
+                 {"toolchain", nlohmann::json::object()},
+                 {"workflow", nlohmann::json::object()},
+                 {"target", nlohmann::json::object()},
+                 {"cloud", nlohmann::json::object()},
+             }},
         },
         .identity = SelfTestIdentity(),
     });

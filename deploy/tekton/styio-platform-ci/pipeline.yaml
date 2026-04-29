@@ -1,0 +1,119 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: styio-platform-ci
+  labels:
+    app.kubernetes.io/name: styio-platform
+    app.kubernetes.io/component: ci
+spec:
+  description: Open Kubernetes-native CI pipeline for styio-platform.
+  params:
+    - name: repo-url
+      type: string
+      description: Git repository URL to test.
+    - name: revision
+      type: string
+      default: ai-dev
+      description: Git ref to test.
+    - name: image
+      type: string
+      default: styio-platform:smoke
+      description: Local OCI image name used by the Kubernetes smoke.
+    - name: run-k8s-smoke
+      type: string
+      default: "true"
+      description: Set to false for docs-only or non-privileged CI workers.
+  workspaces:
+    - name: source
+  tasks:
+    - name: clone
+      taskSpec:
+        params:
+          - name: repo-url
+          - name: revision
+        workspaces:
+          - name: source
+        steps:
+          - name: clone
+            image: alpine/git:2.47.2
+            script: |
+              #!/usr/bin/env sh
+              set -eu
+              rm -rf "$(workspaces.source.path)"/repo
+              git clone "$(params.repo-url)" "$(workspaces.source.path)"/repo
+              cd "$(workspaces.source.path)"/repo
+              git checkout "$(params.revision)"
+      params:
+        - name: repo-url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.revision)
+      workspaces:
+        - name: source
+          workspace: source
+    - name: local-gate
+      runAfter:
+        - clone
+      taskSpec:
+        workspaces:
+          - name: source
+        steps:
+          - name: delivery-floor
+            image: quay.io/fedora/fedora:41
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+              dnf install -y \
+                bash \
+                clang \
+                cmake \
+                gcc-c++ \
+                git \
+                libpq-devel \
+                ninja-build \
+                python3 \
+                python3-pip
+              cd "$(workspaces.source.path)"/repo
+              ./scripts/delivery-gate.sh --mode checkpoint --skip-audit --build-dir build-tekton
+      workspaces:
+        - name: source
+          workspace: source
+    - name: k8s-smoke
+      runAfter:
+        - local-gate
+      when:
+        - input: $(params.run-k8s-smoke)
+          operator: in
+          values:
+            - "true"
+      taskSpec:
+        params:
+          - name: image
+        workspaces:
+          - name: source
+        steps:
+          - name: kind-smoke
+            image: quay.io/podman/stable:v5.3.1
+            securityContext:
+              privileged: true
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+              dnf install -y \
+                bash \
+                buildah \
+                cmake \
+                curl \
+                git \
+                helm \
+                kind \
+                kubernetes-client \
+                python3
+              cd "$(workspaces.source.path)"/repo
+              python3 scripts/k8s-smoke.py --image "$(params.image)" --image-builder buildah --keep-cluster
+      params:
+        - name: image
+          value: $(params.image)
+      workspaces:
+        - name: source
+          workspace: source

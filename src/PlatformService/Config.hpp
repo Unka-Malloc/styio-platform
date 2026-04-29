@@ -31,6 +31,17 @@ struct RegistryControlConfig
   std::string registry_name = "spio-registry-v2";
   std::string mirror_id = "mirror-local";
   std::string mirror_origin = "registry-primary";
+  std::string mirror_source_root;
+};
+
+struct WorkgroupConfig
+{
+  bool enabled = true;
+  std::string id = "styio-local-workgroup";
+  std::string trust_domain = "styio-platform-local";
+  std::string registration_policy = "local-dev-default";
+  std::string registration_tenant = "platform";
+  std::string registration_token;
 };
 
 struct PlatformConfig
@@ -40,9 +51,11 @@ struct PlatformConfig
   std::string region = "local-dev";
   std::string node_id = "node-local";
   std::vector<std::string> roles = {"control-plane", "worker", "registry-writer", "mirror"};
+  std::string state_backend = "memory";
   std::string postgres_dsn;
   ObjectStoreConfig object_store;
   RegistryControlConfig registry;
+  WorkgroupConfig workgroup;
   MtlsConfig mtls;
 };
 

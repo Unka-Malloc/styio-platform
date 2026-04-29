@@ -15,6 +15,7 @@ Options:
   --range <rev-range>       Explicit revision range for repo-hygiene push mode
   --skip-health             Skip native/Python health checks (docs/process-only deliveries)
   --skip-audit              Skip external styio-audit gate
+  --with-k8s                Run Podman/Buildah/Helm/kind multi-node smoke validation
   --audit-bin <path>        Explicit styio-audit executable
   --build-dir <dir>         Build directory for CMake validation
   -h, --help                Show this help
@@ -49,6 +50,7 @@ BASE_REF=""
 REV_RANGE=""
 RUN_HEALTH=1
 RUN_AUDIT=1
+RUN_K8S=0
 AUDIT_BIN=""
 BUILD_DIR="build-codex"
 
@@ -72,6 +74,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-audit)
       RUN_AUDIT=0
+      shift
+      ;;
+    --with-k8s)
+      RUN_K8S=1
       shift
       ;;
     --audit-bin)
@@ -142,6 +148,12 @@ if [[ "$RUN_HEALTH" -eq 1 ]]; then
   run_cmd "${HEALTH_CMD[@]}"
 else
   log "native/Python health checks skipped"
+fi
+
+if [[ "$RUN_K8S" -eq 1 ]]; then
+  run_cmd python3 scripts/k8s-smoke.py
+else
+  log "k8s smoke skipped"
 fi
 
 log "all checks passed"

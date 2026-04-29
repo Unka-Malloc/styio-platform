@@ -2,7 +2,7 @@
 
 **Purpose:** Define `styio-platform` as the global cloud-computing and package-distribution foundation that serves `styio-spio` clients and hosted products.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-29
 
 ## Mission
 
@@ -43,9 +43,14 @@ must be able to distinguish authoritative write acceptance from eventually
 consistent mirror availability.
 
 The V1 service target is a single-region runnable kernel. It must prove health,
-node introspection, hosted job lifecycle, worker lifecycle, and mirror
-freshness/replay behavior before multi-region routing or provider fan-out is
-treated as production scope.
+node introspection, hosted job lifecycle, worker lifecycle, workgroup cluster
+registration, and mirror freshness/replay behavior before multi-region routing
+or provider fan-out is treated as production scope.
+
+The first deployment proof is a Kubernetes primary/worker/mirror topology. It
+keeps write acceptance centralized in the primary control plane, scales compile
+capacity through worker replicas, and treats mirror freshness as a persisted
+control-plane record rather than an implication of successful static reads.
 
 ## Implementation Target
 
@@ -53,8 +58,12 @@ The V1 cloud service implementation target is pure C++:
 
 - Boost.Beast and Boost.Asio for HTTP and async network execution
 - Postgres for control-plane state, hosted job lifecycle, mirror status, and
-  audit records
-- provider-neutral object storage with S3 as the first backend
+  workgroup cluster registration records
+- PVC-backed filesystem storage for the first Kubernetes registry, workspace,
+  and artifact deployment; provider-neutral object storage remains the follow-up
+  production backend
+- OCI images built with Podman/Buildah, a Helm chart, and a Tekton pipeline for
+  open Kubernetes deployment validation
 - mTLS across operator, regional-node, worker, and internal service traffic
 
 The service contract is maintained as native JSON under

@@ -92,6 +92,11 @@ add_test(
 )
 
 add_test(
+  NAME styio_platform_http_smoke
+  COMMAND "${CMAKE_COMMAND}" -E env "STYIO_PLATFORMD_BIN=$<TARGET_FILE:styio-platformd>" python3 "${CMAKE_SOURCE_DIR}/tests/interop/platform-http-smoke.py"
+)
+
+add_test(
   NAME styio_platform_native_contract_source_gate
   COMMAND python3 "${CMAKE_SOURCE_DIR}/tests/interop/native-contract-source-gate.py"
 )

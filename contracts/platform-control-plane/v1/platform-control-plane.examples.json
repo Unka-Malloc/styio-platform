@@ -75,7 +75,23 @@
       "job_request": {
         "schema_version": 1,
         "api_path": "/api/styio-platform/v1/jobs",
-        "action": "build"
+        "action": "build",
+        "manifest_path": "spio.toml",
+        "source": {
+          "origin": "https://github.com/eBioRing/styio-demo.git",
+          "requested_revision": "nightly-head"
+        },
+        "toolchain": {
+          "mode": "build",
+          "channel": "nightly",
+          "build_mode": "minimal"
+        },
+        "workflow": {
+          "locked": false,
+          "offline": false
+        },
+        "target": {},
+        "cloud": {}
       }
     },
     "success": {
@@ -91,7 +107,17 @@
         "status": "queued",
         "region": "local-dev",
         "worker_pool_key": "linux/x86_64/build/nightly/minimal",
-        "created_at": "2026-04-24T00:00:00Z"
+        "created_at": "2026-04-24T00:00:00Z",
+        "job_request": {
+          "schema_version": 1,
+          "api_path": "/api/styio-platform/v1/jobs",
+          "action": "build",
+          "manifest_path": "spio.toml",
+          "source": {
+            "origin": "https://github.com/eBioRing/styio-demo.git",
+            "requested_revision": "nightly-head"
+          }
+        }
       }
     },
     "failure": {
@@ -255,7 +281,17 @@
           "region": "local-dev",
           "worker_pool_key": "linux/x86_64/build/nightly/minimal",
           "created_at": "2026-04-24T00:00:00Z",
-          "worker_id": "worker-local"
+          "worker_id": "worker-local",
+          "job_request": {
+            "schema_version": 1,
+            "api_path": "/api/styio-platform/v1/jobs",
+            "action": "build",
+            "manifest_path": "spio.toml",
+            "source": {
+              "origin": "https://github.com/eBioRing/styio-demo.git",
+              "requested_revision": "nightly-head"
+            }
+          }
         }
       }
     },
@@ -352,6 +388,145 @@
         "category": "WorkerError",
         "detail": "worker does not own job",
         "operation_id": "completeJob"
+      }
+    }
+  },
+  "registerWorkgroupCluster": {
+    "request": {
+      "cluster_id": "dev-a",
+      "region": "local-dev",
+      "node_id": "primary-0",
+      "control_plane_endpoint": "http://127.0.0.1:8787/api/styio-platform/v1",
+      "internal_control_plane_endpoint": "http://styio-styio-platform-primary.styio-platform-dev.svc.cluster.local:8787/api/styio-platform/v1",
+      "registry_endpoint": "http://127.0.0.1:8080",
+      "roles": [
+        "control-plane",
+        "worker",
+        "mirror",
+        "registry-writer"
+      ],
+      "trust_domain": "styio-platform-local",
+      "registration_token": "styio-local-dev-token",
+      "labels": {
+        "source": "dev-env",
+        "namespace": "styio-platform-dev"
+      }
+    },
+    "success": {
+      "returncode": 0,
+      "message": "registered workgroup cluster",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "workgroup_id": "local-dev",
+        "cluster_id": "dev-a",
+        "region": "local-dev",
+        "node_id": "primary-0",
+        "control_plane_endpoint": "http://127.0.0.1:8787/api/styio-platform/v1",
+        "internal_control_plane_endpoint": "http://styio-styio-platform-primary.styio-platform-dev.svc.cluster.local:8787/api/styio-platform/v1",
+        "registry_endpoint": "http://127.0.0.1:8080",
+        "roles": [
+          "control-plane",
+          "worker",
+          "mirror",
+          "registry-writer"
+        ],
+        "labels": {
+          "source": "dev-env",
+          "namespace": "styio-platform-dev"
+        },
+        "trust_domain": "styio-platform-local",
+        "registration_policy": "local-dev-default",
+        "status": "registered",
+        "registered_by": {
+          "role": "operator",
+          "tenant_id": "platform",
+          "node_id": "dev-env"
+        }
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "workgroup registration rejected",
+      "stdout": "",
+      "stderr": "registration token is invalid",
+      "error_payload": {
+        "category": "AuthError",
+        "detail": "registration token is invalid",
+        "operation_id": "registerWorkgroupCluster"
+      }
+    }
+  },
+  "listWorkgroupClusters": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded workgroup clusters",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "workgroup_id": "local-dev",
+        "policy": {
+          "enabled": true,
+          "workgroup_id": "styio-local-workgroup",
+          "trust_domain": "styio-platform-local",
+          "registration_policy": "local-dev-default",
+          "registration_tenant": "platform",
+          "registration_token_required": true,
+          "allowed_registration_roles": [
+            "operator",
+            "control-plane",
+            "cluster-registrar"
+          ],
+          "allowed_read_roles": [
+            "operator",
+            "control-plane",
+            "cluster-registrar",
+            "worker",
+            "mirror",
+            "registry-writer"
+          ]
+        },
+        "clusters": [
+          {
+            "workgroup_id": "local-dev",
+            "cluster_id": "dev-a",
+            "region": "local-dev",
+            "node_id": "primary-0",
+            "control_plane_endpoint": "http://127.0.0.1:8787/api/styio-platform/v1",
+            "internal_control_plane_endpoint": "http://styio-styio-platform-primary.styio-platform-dev.svc.cluster.local:8787/api/styio-platform/v1",
+            "registry_endpoint": "http://127.0.0.1:8080",
+            "roles": [
+              "control-plane",
+              "worker",
+              "mirror",
+              "registry-writer"
+            ],
+            "labels": {
+              "source": "dev-env",
+              "namespace": "styio-platform-dev"
+            },
+            "trust_domain": "styio-platform-local",
+            "registration_policy": "local-dev-default",
+            "status": "registered",
+            "registered_by": {
+              "role": "operator",
+              "tenant_id": "platform",
+              "node_id": "dev-env"
+            }
+          }
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "workgroup lookup rejected",
+      "stdout": "",
+      "stderr": "workgroup_id is invalid",
+      "error_payload": {
+        "category": "ValidationError",
+        "detail": "workgroup_id is invalid",
+        "operation_id": "listWorkgroupClusters"
       }
     }
   },

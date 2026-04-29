@@ -55,6 +55,7 @@ build/
 build-codex/
 build-*/
 .spio/
+.styio-platform/
 tmp/
 dist/
 *.tmp

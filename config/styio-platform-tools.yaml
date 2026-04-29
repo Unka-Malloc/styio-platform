@@ -1,0 +1,37 @@
+# Repository-local tool configuration for styio-platform.
+# JSON files under contracts/ are API contracts and examples, not tool config.
+
+dev_env:
+  cluster: styio-platform-dev
+  namespace: styio-platform-dev
+  release: styio
+  image: styio-platform:dev
+  image_builder: podman
+  build_image: true
+  port_forward: true
+  primary_port: 8787
+  mirror_port: 8080
+  delete_cluster: false
+  region: local-dev
+  auto_register_workgroup: true
+  workgroup_id: styio-local-workgroup
+  workgroup_cluster_id: styio-platform-dev
+  workgroup_trust_domain: styio-platform-local
+  workgroup_registration_policy: local-dev-default
+  workgroup_registration_tenant: platform
+  workgroup_registration_token: styio-local-dev-token
+
+k8s_smoke:
+  cluster: styio-platform-smoke
+  namespace: styio-platform-smoke
+  release: styio
+  image: styio-platform:smoke
+  image_builder: podman
+  keep_cluster: false
+  region: local-dev
+  workgroup_id: styio-local-workgroup
+  workgroup_cluster_id: styio-platform-smoke
+  workgroup_trust_domain: styio-platform-local
+  workgroup_registration_policy: local-dev-default
+  workgroup_registration_tenant: platform
+  workgroup_registration_token: styio-local-dev-token

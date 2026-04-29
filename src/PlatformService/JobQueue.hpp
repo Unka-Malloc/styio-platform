@@ -4,7 +4,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
@@ -31,6 +30,7 @@ struct PlatformJobRecord
   std::string created_at = "2026-04-24T00:00:00Z";
   std::string worker_id;
   std::string finished_at;
+  nlohmann::json job_request = nlohmann::json::object();
   std::vector<ArtifactRecord> artifacts;
 };
 
@@ -44,7 +44,7 @@ struct JobEventRecord
 };
 
 std::optional<std::string> ValidateSubmitJobRequest(const nlohmann::json &request);
-PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config, size_t sequence);
+PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config);
 nlohmann::json SerializeArtifact(const ArtifactRecord &artifact);
 nlohmann::json SerializeJobRecord(const PlatformJobRecord &job);
 nlohmann::json SerializeJobEvent(const JobEventRecord &event);

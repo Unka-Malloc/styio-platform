@@ -1,0 +1,59 @@
+image:
+  repository: styio-platform
+  tag: smoke
+  pullPolicy: IfNotPresent
+
+region: local-dev
+mtls:
+  required: true
+
+workgroup:
+  enabled: true
+  id: styio-local-workgroup
+  trustDomain: styio-platform-local
+  registrationPolicy: local-dev-default
+  registrationTenant: platform
+  registrationToken: ""
+
+primary:
+  replicas: 1
+  nodeId: primary-0
+  service:
+    port: 8787
+
+worker:
+  replicas: 1
+  poolKey: linux/x86_64/build/nightly/minimal
+  workspaceRoot: /var/lib/styio-platform/workspaces
+  artifactRoot: /var/lib/styio-platform/artifacts
+  pollIntervalMs: 2000
+  spioBin: /usr/local/bin/spio
+  styioBin: /usr/local/bin/styio
+
+mirror:
+  replicas: 1
+  nodeId: mirror-0
+  id: mirror-local
+  origin: registry-primary
+  syncIntervalSeconds: 10
+  service:
+    controlPort: 8787
+    registryReadPort: 8080
+
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  database: styio_platform
+  username: styio
+  password: ""
+  storageSize: 1Gi
+  externalDsn: ""
+
+persistence:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  registrySize: 1Gi
+  mirrorRegistrySize: 1Gi
+  artifactSize: 1Gi
+  workspaceSize: 1Gi

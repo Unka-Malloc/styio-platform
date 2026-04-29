@@ -7,6 +7,9 @@ target_compile_definitions(styio_platform_build_config INTERFACE
 )
 target_link_libraries(styio_platform_build_config INTERFACE tomlplusplus::tomlplusplus nlohmann_json::nlohmann_json)
 
+find_package(Threads REQUIRED)
+find_package(PostgreSQL QUIET)
+
 function(styio_platform_add_static_library target)
   add_library(${target} STATIC ${ARGN})
   target_link_libraries(${target} PUBLIC styio_platform_build_config)
@@ -46,9 +49,11 @@ set(STYIO_PLATFORM_SERVICE_SOURCES
     PlatformService/Http.cpp
     PlatformService/Identity.cpp
     PlatformService/JobQueue.cpp
+    PlatformService/MirrorSync.cpp
     PlatformService/ObjectStore.cpp
     PlatformService/PostgresStore.cpp
     PlatformService/Router.cpp
+    PlatformService/Worker.cpp
 )
 
 styio_platform_add_static_library(styio_platform_foundation ${STYIO_PLATFORM_FOUNDATION_SOURCES})
@@ -66,7 +71,14 @@ styio_platform_add_static_library(styio_platform_cloud ${STYIO_PLATFORM_CLOUD_SO
 target_link_libraries(styio_platform_cloud PUBLIC styio_platform_compile)
 
 styio_platform_add_static_library(styio_platform_service ${STYIO_PLATFORM_SERVICE_SOURCES})
-target_link_libraries(styio_platform_service PUBLIC styio_platform_cloud)
+target_link_libraries(styio_platform_service PUBLIC styio_platform_cloud Threads::Threads)
+if(PostgreSQL_FOUND)
+  target_compile_definitions(styio_platform_service PUBLIC STYIO_PLATFORM_HAS_LIBPQ=1)
+  target_include_directories(styio_platform_service PUBLIC ${PostgreSQL_INCLUDE_DIRS})
+  target_link_libraries(styio_platform_service PUBLIC ${PostgreSQL_LIBRARIES})
+else()
+  target_compile_definitions(styio_platform_service PUBLIC STYIO_PLATFORM_HAS_LIBPQ=0)
+endif()
 
 add_library(styio_platform_kernel INTERFACE)
 target_link_libraries(styio_platform_kernel INTERFACE

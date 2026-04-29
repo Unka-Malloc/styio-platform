@@ -73,7 +73,7 @@ std::string ToString(ObjectStoreProvider provider)
 
 bool IsObjectStoreProviderImplemented(ObjectStoreProvider provider)
 {
-  return provider == ObjectStoreProvider::S3 || provider == ObjectStoreProvider::Memory;
+  return provider == ObjectStoreProvider::S3 || provider == ObjectStoreProvider::Filesystem || provider == ObjectStoreProvider::Memory;
 }
 
 std::string BuildArtifactObjectKey(std::string_view tenant_id, std::string_view workspace_id, std::string_view job_id, std::string_view artifact_name)

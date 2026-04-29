@@ -74,6 +74,7 @@ PlatformConfig LoadPlatformConfigFromEnvironment()
   {
     config.roles = roles;
   }
+  config.state_backend = EnvString("STYIO_PLATFORM_STATE_BACKEND", config.state_backend);
   config.postgres_dsn = EnvString("STYIO_PLATFORM_POSTGRES_DSN", "");
   config.object_store.provider = EnvString("STYIO_PLATFORM_OBJECT_STORE_PROVIDER", config.object_store.provider);
   config.object_store.bucket = EnvString("STYIO_PLATFORM_OBJECT_STORE_BUCKET", "");
@@ -84,6 +85,15 @@ PlatformConfig LoadPlatformConfigFromEnvironment()
   config.registry.registry_name = EnvString("STYIO_PLATFORM_REGISTRY_NAME", config.registry.registry_name);
   config.registry.mirror_id = EnvString("STYIO_PLATFORM_REGISTRY_MIRROR_ID", config.registry.mirror_id);
   config.registry.mirror_origin = EnvString("STYIO_PLATFORM_REGISTRY_MIRROR_ORIGIN", config.registry.mirror_origin);
+  config.registry.mirror_source_root = EnvString("STYIO_PLATFORM_REGISTRY_MIRROR_SOURCE_ROOT", config.registry.mirror_source_root);
+  config.workgroup.enabled = EnvBool("STYIO_PLATFORM_WORKGROUP_ENABLED", config.workgroup.enabled);
+  config.workgroup.id = EnvString("STYIO_PLATFORM_WORKGROUP_ID", config.workgroup.id);
+  config.workgroup.trust_domain = EnvString("STYIO_PLATFORM_WORKGROUP_TRUST_DOMAIN", config.workgroup.trust_domain);
+  config.workgroup.registration_policy =
+      EnvString("STYIO_PLATFORM_WORKGROUP_REGISTRATION_POLICY", config.workgroup.registration_policy);
+  config.workgroup.registration_tenant =
+      EnvString("STYIO_PLATFORM_WORKGROUP_REGISTRATION_TENANT", config.workgroup.registration_tenant);
+  config.workgroup.registration_token = EnvString("STYIO_PLATFORM_WORKGROUP_REGISTRATION_TOKEN", "");
   config.mtls.required = EnvBool("STYIO_PLATFORM_MTLS_REQUIRED", config.mtls.required);
   config.mtls.ca_path = EnvString("STYIO_PLATFORM_MTLS_CA", "");
   config.mtls.cert_path = EnvString("STYIO_PLATFORM_MTLS_CERT", "");
@@ -99,6 +109,7 @@ nlohmann::json SerializePublicConfig(const PlatformConfig &config)
       {"region", config.region},
       {"node_id", config.node_id},
       {"roles", config.roles},
+      {"state_backend", config.state_backend},
       {"postgres_configured", !config.postgres_dsn.empty()},
       {"object_store_provider", config.object_store.provider},
       {"object_store_bucket_configured", !config.object_store.bucket.empty()},
@@ -108,6 +119,13 @@ nlohmann::json SerializePublicConfig(const PlatformConfig &config)
       {"registry_name", config.registry.registry_name},
       {"registry_mirror_id", config.registry.mirror_id},
       {"registry_mirror_origin", config.registry.mirror_origin},
+      {"registry_mirror_source_root_configured", !config.registry.mirror_source_root.empty()},
+      {"workgroup_enabled", config.workgroup.enabled},
+      {"workgroup_id", config.workgroup.id},
+      {"workgroup_trust_domain", config.workgroup.trust_domain},
+      {"workgroup_registration_policy", config.workgroup.registration_policy},
+      {"workgroup_registration_tenant", config.workgroup.registration_tenant},
+      {"workgroup_registration_token_configured", !config.workgroup.registration_token.empty()},
       {"mtls_required", config.mtls.required},
       {"mtls_ca_configured", !config.mtls.ca_path.empty()},
       {"mtls_cert_configured", !config.mtls.cert_path.empty()},

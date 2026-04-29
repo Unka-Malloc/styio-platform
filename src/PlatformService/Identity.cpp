@@ -41,12 +41,13 @@ std::string ValueAfter(const std::vector<std::string> &parts, std::string_view k
 
 bool IsPlatformServiceRole(std::string_view role)
 {
-  static constexpr std::array<std::string_view, 5> kRoles = {
+  static constexpr std::array<std::string_view, 6> kRoles = {
       "control-plane",
       "worker",
       "registry-writer",
       "mirror",
       "operator",
+      "cluster-registrar",
   };
   for (const std::string_view candidate : kRoles)
   {

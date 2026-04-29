@@ -1,0 +1,11 @@
+.git
+build*
+cmake-build-*
+_deps
+.cache
+.styio-platform
+__pycache__
+*.pyc
+*.swp
+*.tmp
+docs/audit/styio-audit-report.json
