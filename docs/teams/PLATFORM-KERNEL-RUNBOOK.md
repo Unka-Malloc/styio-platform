@@ -2,7 +2,7 @@
 
 **Purpose:** Own the migrated compile-plan, mixed Styio/C++ compile model, cloud job request kernel, and C++ service-kernel integration boundary.
 
-**Last updated:** 2026-04-28
+**Last updated:** 2026-04-29
 
 ## Mission
 
@@ -35,6 +35,9 @@ owner while preserving `styio-spio` offline client behavior and the shared
 registry-control-plane v1 route shape. When deployment scripts need a new
 registry helper, keep it covered by Python unit tests and avoid making the
 client-side package manager depend on platform availability.
+For PostgreSQL-backed platform state, keep the no-driver fallback and libpq
+build path both compiling; CI installs `libpq-dev`, so RAII wrappers around
+`PGconn` or `PGresult` must be explicitly move-safe when returned from helpers.
 
 ## Change Classes
 
@@ -53,6 +56,8 @@ For HTTP adapter changes, include
 For registry kernel changes, also run `python3 tests/unit/test_registry_v2.py`
 and the native registry route tests in `styio_platform_native_tests`. For VM
 deployment helper changes, also run `python3 tests/unit/test_registry_vm_deploy.py`.
+For Postgres store changes, configure at least one local build with
+`libpq-dev` available before relying on CI to cover the driver-enabled path.
 
 ## Cross-Team Dependencies
 

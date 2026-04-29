@@ -40,6 +40,19 @@ public:
 
   PgResult(const PgResult &) = delete;
   PgResult &operator=(const PgResult &) = delete;
+  PgResult(PgResult &&other) noexcept : result_(std::exchange(other.result_, nullptr)) {}
+  PgResult &operator=(PgResult &&other) noexcept
+  {
+    if (this != &other)
+    {
+      if (result_ != nullptr)
+      {
+        PQclear(result_);
+      }
+      result_ = std::exchange(other.result_, nullptr);
+    }
+    return *this;
+  }
 
   PGresult *get() const { return result_; }
 
