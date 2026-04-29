@@ -25,7 +25,7 @@ K8S_SMOKE_DEFAULTS: dict[str, object] = {
     "cluster": "styio-platform-smoke",
     "namespace": "styio-platform-smoke",
     "release": "styio",
-    "image": "styio-platform:smoke",
+    "image": "localhost/styio-platform:smoke",
     "image_builder": "podman",
     "keep_cluster": False,
     "region": "local-dev",
@@ -117,6 +117,18 @@ def apply_tool_config(args: argparse.Namespace) -> None:
         setattr(args, key, typed_config_value(config_path, key, config_value, fallback))
     if args.image_builder not in {"podman", "buildah"}:
         raise YamlConfigError(f"{config_path}: k8s_smoke.image_builder must be podman or buildah")
+    args.image = normalize_kind_image(args.image)
+
+
+def has_explicit_registry(image: str) -> bool:
+    first_component = image.split("/", 1)[0]
+    return first_component == "localhost" or "." in first_component or ":" in first_component
+
+
+def normalize_kind_image(image: str) -> str:
+    if has_explicit_registry(image):
+        return image
+    return f"localhost/{image}"
 
 
 def build_oci_image(builder: str, image: str) -> Path:
@@ -170,7 +182,29 @@ def start_port_forward(namespace: str, target: str, remote_port: int) -> tuple[s
     return proc, local_port
 
 
-def apply_fixture_git_service(namespace: str) -> None:
+def dump_rollout_diagnostics(namespace: str, release: str) -> None:
+    print("styio-platform k8s rollout diagnostics", flush=True)
+    diagnostic_commands = [
+        ["kubectl", "-n", namespace, "get", "pods,deploy,statefulset,pvc,svc", "-o", "wide"],
+        ["kubectl", "-n", namespace, "get", "events", "--sort-by=.lastTimestamp"],
+        ["kubectl", "-n", namespace, "describe", "pods", "-l", f"app.kubernetes.io/instance={release}"],
+        ["kubectl", "-n", namespace, "logs", f"deploy/{release}-styio-platform-primary", "--all-containers", "--tail=200", "--prefix"],
+        ["kubectl", "-n", namespace, "logs", f"deploy/{release}-styio-platform-worker", "--all-containers", "--tail=200", "--prefix"],
+        ["kubectl", "-n", namespace, "logs", f"deploy/{release}-styio-platform-mirror", "--all-containers", "--tail=200", "--prefix"],
+    ]
+    for command in diagnostic_commands:
+        run(command, check=False)
+
+
+def rollout_status(namespace: str, release: str, target: str) -> None:
+    try:
+        run(["kubectl", "-n", namespace, "rollout", "status", target, "--timeout=180s"])
+    except subprocess.CalledProcessError:
+        dump_rollout_diagnostics(namespace, release)
+        raise
+
+
+def apply_fixture_git_service(namespace: str, image: str) -> None:
     manifest = """
 apiVersion: v1
 kind: Service
@@ -180,9 +214,9 @@ spec:
   selector:
     app: styio-platform-fixture-git
   ports:
-    - name: git
-      port: 9418
-      targetPort: 9418
+    - name: http
+      port: 8000
+      targetPort: 8000
 ---
 apiVersion: v1
 kind: Pod
@@ -194,14 +228,16 @@ spec:
   restartPolicy: Always
   initContainers:
     - name: seed
-      image: alpine/git:latest
+      image: __FIXTURE_IMAGE__
+      imagePullPolicy: Never
       command:
         - sh
         - -c
         - |
           set -eu
-          mkdir -p /repo/fixture/src
-          cd /repo/fixture
+          rm -rf /repo/fixture.git /tmp/fixture-src
+          mkdir -p /tmp/fixture-src/src
+          cd /tmp/fixture-src
           git init
           git config user.email smoke@example.invalid
           git config user.name smoke
@@ -225,23 +261,24 @@ spec:
           printf '# smoke := 1\\n' > src/lib.styio
           git add .
           git commit -m fixture
+          git clone --bare . /repo/fixture.git
+          git -C /repo/fixture.git update-server-info
       volumeMounts:
         - name: repo
           mountPath: /repo
   containers:
-    - name: git
-      image: alpine/git:latest
+    - name: git-http
+      image: __FIXTURE_IMAGE__
+      imagePullPolicy: Never
       command:
-        - git
-        - daemon
-        - --reuseaddr
-        - --base-path=/repo
-        - --export-all
-        - --verbose
-        - --listen=0.0.0.0
-        - --port=9418
+        - python3
+        - -m
+        - http.server
+        - "8000"
+        - --directory
+        - /repo
       ports:
-        - containerPort: 9418
+        - containerPort: 8000
       volumeMounts:
         - name: repo
           mountPath: /repo
@@ -249,6 +286,8 @@ spec:
     - name: repo
       emptyDir: {}
 """
+    manifest = manifest.replace("__FIXTURE_IMAGE__", json.dumps(image))
+    run(["kubectl", "-n", namespace, "delete", "pod/styio-platform-fixture-git", "--ignore-not-found"], check=False)
     run(["kubectl", "-n", namespace, "apply", "-f", "-"], input_text=textwrap.dedent(manifest))
     run(["kubectl", "-n", namespace, "wait", "--for=condition=Ready", "pod/styio-platform-fixture-git", "--timeout=120s"])
 
@@ -275,11 +314,16 @@ implicit-std = true
 path = "src/lib.styio"
 EOF
 printf '# publish := 1\n' > /tmp/styio-platform-publish/src/lib.styio
-curl -fsS \
+response="$(mktemp)"
+status="$(curl -sS -o "$response" -w '%{http_code}' \
   -H 'Content-Type: application/json' \
   -H 'X-Styio-Mtls-Uri-San: spiffe://styio-platform/tenant/platform/role/registry-writer/node/k8s-smoke' \
   -d '{"manifest_path":"/tmp/styio-platform-publish/spio.toml","publisher_id":"k8s-smoke"}' \
-  http://127.0.0.1:8787/api/spio-registry-control/v1/publish
+  http://127.0.0.1:8787/api/spio-registry-control/v1/publish)"
+cat "$response"
+if [ "$status" != "200" ] && [ "$status" != "409" ]; then
+  exit 1
+fi
 """
     run([
         "kubectl",
@@ -357,12 +401,12 @@ def main() -> int:
         f"workgroup.registrationToken={args.workgroup_registration_token}",
     ])
 
-    run(["kubectl", "-n", args.namespace, "rollout", "status", f"statefulset/{args.release}-styio-platform-postgres", "--timeout=180s"])
-    run(["kubectl", "-n", args.namespace, "rollout", "status", f"deploy/{args.release}-styio-platform-primary", "--timeout=180s"])
-    run(["kubectl", "-n", args.namespace, "rollout", "status", f"deploy/{args.release}-styio-platform-worker", "--timeout=180s"])
-    run(["kubectl", "-n", args.namespace, "rollout", "status", f"deploy/{args.release}-styio-platform-mirror", "--timeout=180s"])
+    rollout_status(args.namespace, args.release, f"statefulset/{args.release}-styio-platform-postgres")
+    rollout_status(args.namespace, args.release, f"deploy/{args.release}-styio-platform-primary")
+    rollout_status(args.namespace, args.release, f"deploy/{args.release}-styio-platform-worker")
+    rollout_status(args.namespace, args.release, f"deploy/{args.release}-styio-platform-mirror")
 
-    apply_fixture_git_service(args.namespace)
+    apply_fixture_git_service(args.namespace, args.image)
     publish_registry_fixture(args.namespace, args.release)
 
     forward, port = start_port_forward(args.namespace, f"svc/{args.release}-styio-platform-primary", 8787)
@@ -403,9 +447,9 @@ def main() -> int:
                     "api_path": "/api/styio-platform/v1/jobs",
                     "action": "build",
                     "manifest_path": "spio.toml",
-                    "source": {"origin": "git://styio-platform-fixture-git:9418/fixture"},
+                    "source": {"origin": "http://styio-platform-fixture-git:8000/fixture.git"},
                     "toolchain": {"mode": "build", "channel": "nightly", "build_mode": "minimal"},
-                    "workflow": {"locked": False, "offline": False},
+                    "workflow": {"locked": False, "offline": False, "dry_run": True},
                     "target": {"lib": True},
                     "cloud": {},
                 },

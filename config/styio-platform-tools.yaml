@@ -5,7 +5,7 @@ dev_env:
   cluster: styio-platform-dev
   namespace: styio-platform-dev
   release: styio
-  image: styio-platform:dev
+  image: localhost/styio-platform:dev
   image_builder: podman
   build_image: true
   port_forward: true
@@ -25,7 +25,7 @@ k8s_smoke:
   cluster: styio-platform-smoke
   namespace: styio-platform-smoke
   release: styio
-  image: styio-platform:smoke
+  image: localhost/styio-platform:smoke
   image_builder: podman
   keep_cluster: false
   region: local-dev

@@ -263,6 +263,11 @@ bool IsSafeRelativePath(const fs::path &path)
 std::vector<std::string> BuildSpioArgs(const nlohmann::json &job_request, const std::string &styio_bin)
 {
   std::vector<std::string> args = {"build", "--manifest-path", job_request.at("manifest_path").get<std::string>()};
+  if (job_request.contains("workflow") && job_request["workflow"].is_object() &&
+      job_request["workflow"].value("dry_run", false))
+  {
+    args.push_back("--dry-run");
+  }
   if (!styio_bin.empty())
   {
     args.push_back("--styio-bin");

@@ -38,6 +38,9 @@ client-side package manager depend on platform availability.
 For PostgreSQL-backed platform state, keep the no-driver fallback and libpq
 build path both compiling; CI installs `libpq-dev`, so RAII wrappers around
 `PGconn` or `PGresult` must be explicitly move-safe when returned from helpers.
+Worker job changes must preserve real-build defaults. Use `workflow.dry_run`
+only for smoke paths that need to verify clone, scheduling, artifact writeback,
+and control-plane completion without provisioning a full source-build toolchain.
 
 ## Change Classes
 

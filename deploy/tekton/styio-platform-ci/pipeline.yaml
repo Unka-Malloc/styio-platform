@@ -13,11 +13,11 @@ spec:
       description: Git repository URL to test.
     - name: revision
       type: string
-      default: ai-dev
+      default: nightly
       description: Git ref to test.
     - name: image
       type: string
-      default: styio-platform:smoke
+      default: localhost/styio-platform:smoke
       description: Local OCI image name used by the Kubernetes smoke.
     - name: run-k8s-smoke
       type: string

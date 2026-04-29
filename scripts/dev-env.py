@@ -27,7 +27,7 @@ DEV_ENV_DEFAULTS: dict[str, object] = {
     "cluster": "styio-platform-dev",
     "namespace": "styio-platform-dev",
     "release": "styio",
-    "image": "styio-platform:dev",
+    "image": "localhost/styio-platform:dev",
     "image_builder": "podman",
     "build_image": True,
     "port_forward": True,
@@ -149,6 +149,18 @@ def apply_tool_config(args: argparse.Namespace) -> None:
         setattr(args, key, typed_config_value(config_path, key, config_value, fallback))
     if args.image_builder not in {"podman", "buildah"}:
         raise YamlConfigError(f"{config_path}: dev_env.image_builder must be podman or buildah")
+    args.image = normalize_kind_image(args.image)
+
+
+def has_explicit_registry(image: str) -> bool:
+    first_component = image.split("/", 1)[0]
+    return first_component == "localhost" or "." in first_component or ":" in first_component
+
+
+def normalize_kind_image(image: str) -> str:
+    if has_explicit_registry(image):
+        return image
+    return f"localhost/{image}"
 
 
 def request_json(base_url: str, path: str, *, method: str = "GET", body: dict[str, object] | None = None) -> dict[str, object]:
@@ -301,10 +313,32 @@ def helm_install(args: argparse.Namespace, postgres_password: str) -> None:
 
 
 def wait_rollouts(namespace: str, release: str) -> None:
-    run(["kubectl", "-n", namespace, "rollout", "status", f"statefulset/{release}-styio-platform-postgres", "--timeout=180s"])
-    run(["kubectl", "-n", namespace, "rollout", "status", f"deploy/{release}-styio-platform-primary", "--timeout=180s"])
-    run(["kubectl", "-n", namespace, "rollout", "status", f"deploy/{release}-styio-platform-worker", "--timeout=180s"])
-    run(["kubectl", "-n", namespace, "rollout", "status", f"deploy/{release}-styio-platform-mirror", "--timeout=180s"])
+    rollout_status(namespace, release, f"statefulset/{release}-styio-platform-postgres")
+    rollout_status(namespace, release, f"deploy/{release}-styio-platform-primary")
+    rollout_status(namespace, release, f"deploy/{release}-styio-platform-worker")
+    rollout_status(namespace, release, f"deploy/{release}-styio-platform-mirror")
+
+
+def dump_rollout_diagnostics(namespace: str, release: str) -> None:
+    print("styio-platform dev rollout diagnostics", flush=True)
+    diagnostic_commands = [
+        ["kubectl", "-n", namespace, "get", "pods,deploy,statefulset,pvc,svc", "-o", "wide"],
+        ["kubectl", "-n", namespace, "get", "events", "--sort-by=.lastTimestamp"],
+        ["kubectl", "-n", namespace, "describe", "pods", "-l", f"app.kubernetes.io/instance={release}"],
+        ["kubectl", "-n", namespace, "logs", f"deploy/{release}-styio-platform-primary", "--all-containers", "--tail=200", "--prefix"],
+        ["kubectl", "-n", namespace, "logs", f"deploy/{release}-styio-platform-worker", "--all-containers", "--tail=200", "--prefix"],
+        ["kubectl", "-n", namespace, "logs", f"deploy/{release}-styio-platform-mirror", "--all-containers", "--tail=200", "--prefix"],
+    ]
+    for command in diagnostic_commands:
+        run(command, check=False)
+
+
+def rollout_status(namespace: str, release: str, target: str) -> None:
+    try:
+        run(["kubectl", "-n", namespace, "rollout", "status", target, "--timeout=180s"])
+    except subprocess.CalledProcessError:
+        dump_rollout_diagnostics(namespace, release)
+        raise
 
 
 def pid_alive(pid: int) -> bool:
