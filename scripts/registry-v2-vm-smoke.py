@@ -31,12 +31,14 @@ def run_smoke(control_url: str, read_url: str, *, timeout: float) -> dict[str, A
     control = control_url.rstrip("/")
     read = read_url.rstrip("/")
     status = load_json_url(f"{control}{BASE_PATH}/status", timeout=timeout)
+    descriptor = load_json_url(f"{control}{BASE_PATH}/descriptor", timeout=timeout)
     verify = load_json_url(f"{control}{BASE_PATH}/verify", timeout=timeout, method="POST", body=b"{}")
     config = json.loads(load_bytes_url(f"{read}/config.json", timeout=timeout).decode("utf-8"))
     root = json.loads(load_bytes_url(f"{read}/trust/root.json", timeout=timeout).decode("utf-8"))
     ok = (
         status.get("returncode") == 0
         and verify.get("returncode") == 0
+        and descriptor.get("returncode") == 0
         and config.get("protocol") == "spio-static-registry"
         and config.get("protocol_version") == 2
         and isinstance(root.get("signed"), dict)
@@ -44,6 +46,7 @@ def run_smoke(control_url: str, read_url: str, *, timeout: float) -> dict[str, A
     return {
         "ok": ok,
         "control_status": status,
+        "control_descriptor": descriptor,
         "control_verify": verify,
         "read_config": {
             "registry_name": config.get("registry_name"),

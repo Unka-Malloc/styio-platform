@@ -33,9 +33,11 @@ namespace
 
 struct ParsedUrl
 {
+  std::string scheme = "http";
   std::string host;
   std::string port = "80";
   std::string base_path;
+  std::string origin;
 };
 
 struct WorkerRuntimeConfig
@@ -47,6 +49,9 @@ struct WorkerRuntimeConfig
   fs::path artifact_root = ".styio-platform/artifacts";
   std::string spio_bin = "spio";
   std::string styio_bin = "styio";
+  std::string mtls_ca_path;
+  std::string mtls_cert_path;
+  std::string mtls_key_path;
   int poll_interval_ms = 2000;
 };
 
@@ -87,23 +92,42 @@ WorkerRuntimeConfig LoadWorkerRuntimeConfig()
   config.artifact_root = EnvString("STYIO_PLATFORM_ARTIFACT_ROOT", config.artifact_root.string());
   config.spio_bin = EnvString("STYIO_PLATFORM_WORKER_SPIO_BIN", config.spio_bin);
   config.styio_bin = EnvString("STYIO_PLATFORM_WORKER_STYIO_BIN", config.styio_bin);
+  config.mtls_ca_path = EnvString("STYIO_PLATFORM_MTLS_CA", "");
+  config.mtls_cert_path = EnvString("STYIO_PLATFORM_MTLS_CERT", "");
+  config.mtls_key_path = EnvString("STYIO_PLATFORM_MTLS_KEY", "");
   config.poll_interval_ms = EnvInt("STYIO_PLATFORM_WORKER_POLL_INTERVAL_MS", config.poll_interval_ms);
   return config;
 }
 
 ParsedUrl ParseHttpUrl(const std::string &url)
 {
-  constexpr std::string_view prefix = "http://";
-  if (!url.starts_with(prefix))
+  std::string scheme;
+  size_t prefix_size = 0;
+  std::string default_port;
+  if (url.starts_with("http://"))
   {
-    throw std::runtime_error("only http:// control URLs are supported");
+    scheme = "http";
+    prefix_size = std::string_view("http://").size();
+    default_port = "80";
   }
-  std::string rest = url.substr(prefix.size());
+  else if (url.starts_with("https://"))
+  {
+    scheme = "https";
+    prefix_size = std::string_view("https://").size();
+    default_port = "443";
+  }
+  else
+  {
+    throw std::runtime_error("only http:// or https:// control URLs are supported");
+  }
+  std::string rest = url.substr(prefix_size);
   const size_t slash = rest.find('/');
   std::string authority = slash == std::string::npos ? rest : rest.substr(0, slash);
   std::string base_path = slash == std::string::npos ? "" : rest.substr(slash);
   const size_t colon = authority.rfind(':');
   ParsedUrl parsed;
+  parsed.scheme = scheme;
+  parsed.port = default_port;
   if (colon == std::string::npos)
   {
     parsed.host = authority;
@@ -118,6 +142,7 @@ ParsedUrl ParseHttpUrl(const std::string &url)
   {
     throw std::runtime_error("control URL host is empty");
   }
+  parsed.origin = parsed.scheme + "://" + authority;
   return parsed;
 }
 
@@ -207,15 +232,61 @@ nlohmann::json HttpJson(
     const std::string &method,
     const std::string &path,
     const nlohmann::json &body,
-    const std::string &worker_id)
+    const WorkerRuntimeConfig &worker)
 {
   const std::string payload = body.is_null() ? "" : body.dump();
+  if (url.scheme == "https")
+  {
+    std::vector<std::string> args = {
+        "-sS",
+        "-f",
+        "-X",
+        method,
+        url.origin + JoinUrlPath(url.base_path, path),
+        "-H",
+        "Content-Type: application/json",
+        "-H",
+        "X-Styio-Mtls-Uri-San: spiffe://styio-platform/tenant/platform/role/worker/node/" + worker.worker_id,
+        "--data-binary",
+        "@-",
+    };
+    if (!worker.mtls_ca_path.empty())
+    {
+      args.push_back("--cacert");
+      args.push_back(worker.mtls_ca_path);
+    }
+    if (!worker.mtls_cert_path.empty())
+    {
+      args.push_back("--cert");
+      args.push_back(worker.mtls_cert_path);
+    }
+    if (!worker.mtls_key_path.empty())
+    {
+      args.push_back("--key");
+      args.push_back(worker.mtls_key_path);
+    }
+    spio::ProcessResult result = spio::RunProcess({
+        .program = "curl",
+        .args = std::move(args),
+        .timeout = spio::kExternalProcessProbeTimeout,
+        .max_stdout_bytes = 16U << 20,
+        .max_stderr_bytes = 1U << 20,
+        .stdin_text = payload,
+        .error_context = "worker HTTPS control-plane request",
+    });
+    if (result.exit_code != 0 || result.timed_out)
+    {
+      throw std::runtime_error("control plane returned non-success status: " + spio::DescribeProcessFailure(result));
+    }
+    return nlohmann::json::parse(result.stdout_text);
+  }
+
   std::ostringstream request;
   request << method << " " << JoinUrlPath(url.base_path, path) << " HTTP/1.1\r\n";
   request << "Host: " << url.host << "\r\n";
   request << "Connection: close\r\n";
   request << "Content-Type: application/json\r\n";
-  request << "X-Styio-Mtls-Uri-San: spiffe://styio-platform/tenant/platform/role/worker/node/" << worker_id << "\r\n";
+  request << "X-Styio-Mtls-Uri-San: spiffe://styio-platform/tenant/platform/role/worker/node/" << worker.worker_id << "\r\n";
   request << "Content-Length: " << payload.size() << "\r\n\r\n";
   request << payload;
 
@@ -319,7 +390,7 @@ void Complete(
           {"artifacts", artifacts},
           {"result", result},
       },
-      worker.worker_id);
+      worker);
 }
 
 void Heartbeat(const ParsedUrl &control, const WorkerRuntimeConfig &worker, const std::string &job_id, const std::string &message)
@@ -332,7 +403,7 @@ void Heartbeat(const ParsedUrl &control, const WorkerRuntimeConfig &worker, cons
           {"worker_id", worker.worker_id},
           {"message", message},
       },
-      worker.worker_id);
+      worker);
 }
 
 void RunHeartbeatLoop(
@@ -488,7 +559,7 @@ int RunWorker(const PlatformConfig &config, WorkerOptions options)
             {"worker_pool_key", worker.worker_pool_key},
             {"capacity", 1},
         },
-        worker.worker_id);
+        worker);
 
     do
     {
@@ -501,7 +572,7 @@ int RunWorker(const PlatformConfig &config, WorkerOptions options)
               {"region", config.region},
               {"worker_pool_key", worker.worker_pool_key},
           },
-          worker.worker_id);
+          worker);
       const nlohmann::json payload = claim.at("payload");
       if (payload.value("claimed", false))
       {

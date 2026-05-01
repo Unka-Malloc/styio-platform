@@ -44,7 +44,7 @@ struct JobEventRecord
 };
 
 std::optional<std::string> ValidateSubmitJobRequest(const nlohmann::json &request);
-PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config);
+PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config, std::string job_id);
 nlohmann::json SerializeArtifact(const ArtifactRecord &artifact);
 nlohmann::json SerializeJobRecord(const PlatformJobRecord &job);
 nlohmann::json SerializeJobEvent(const JobEventRecord &event);

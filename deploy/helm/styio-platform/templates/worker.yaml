@@ -35,7 +35,7 @@ spec:
             - name: STYIO_PLATFORM_NODE_ROLES
               value: worker
             - name: STYIO_PLATFORM_CONTROL_URL
-              value: http://{{ include "styio-platform.fullname" . }}-primary:{{ .Values.primary.service.port }}/api/styio-platform/v1
+              value: {{ ternary "https" "http" .Values.mtls.tlsEnabled }}://{{ include "styio-platform.fullname" . }}-primary:{{ .Values.primary.service.port }}/api/styio-platform/v1
             - name: STYIO_PLATFORM_WORKER_ID
               value: $(POD_NAME)
             - name: STYIO_PLATFORM_WORKER_POOL_KEY
@@ -50,11 +50,22 @@ spec:
               value: {{ .Values.worker.spioBin | quote }}
             - name: STYIO_PLATFORM_WORKER_STYIO_BIN
               value: {{ .Values.worker.styioBin | quote }}
+            {{- include "styio-platform.clientMtlsEnv" . | nindent 12 }}
           volumeMounts:
             - name: workspaces
               mountPath: {{ .Values.worker.workspaceRoot | quote }}
             - name: artifacts
               mountPath: {{ .Values.worker.artifactRoot | quote }}
+            {{- if .Values.mtls.caSecretName }}
+            - name: mtls-ca
+              mountPath: /etc/styio-platform/mtls/ca
+              readOnly: true
+            {{- end }}
+            {{- if .Values.mtls.clientSecretName }}
+            - name: mtls-client
+              mountPath: /etc/styio-platform/mtls/client
+              readOnly: true
+            {{- end }}
       volumes:
         - name: workspaces
           persistentVolumeClaim:
@@ -62,3 +73,13 @@ spec:
         - name: artifacts
           persistentVolumeClaim:
             claimName: {{ include "styio-platform.fullname" . }}-artifacts
+        {{- if .Values.mtls.caSecretName }}
+        - name: mtls-ca
+          secret:
+            secretName: {{ .Values.mtls.caSecretName }}
+        {{- end }}
+        {{- if .Values.mtls.clientSecretName }}
+        - name: mtls-client
+          secret:
+            secretName: {{ .Values.mtls.clientSecretName }}
+        {{- end }}

@@ -46,8 +46,10 @@ private:
   HttpResponse HandleListWorkgroupClusters(const RouteMatch &match) const;
   HttpResponse HandleMirrorStatus(const RouteMatch &match) const;
   HttpResponse HandleRegistryStatus() const;
+  HttpResponse HandleRegistryDescriptor() const;
   HttpResponse HandlePublishRelease(const HttpRequest &request);
   HttpResponse HandleVerifyRegistry(const HttpRequest &request);
+  std::string NextMemoryJobId();
   void RecordMirrorState(std::string freshness, std::string replay_cursor);
 
   PlatformConfig config_;
@@ -58,6 +60,7 @@ private:
   std::map<std::string, std::map<std::string, nlohmann::json>> workgroups_;
   std::map<std::string, RegistryMirrorState> mirrors_;
   std::map<std::string, nlohmann::json> published_releases_;
+  size_t next_memory_job_sequence_ = 1;
   std::unique_ptr<PostgresStore> postgres_;
 };
 

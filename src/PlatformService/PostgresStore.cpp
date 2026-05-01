@@ -246,6 +246,8 @@ CREATE TABLE IF NOT EXISTS platform_workers (
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE SEQUENCE IF NOT EXISTS platform_job_id_seq;
+
 CREATE TABLE IF NOT EXISTS platform_jobs (
   job_id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES platform_tenants(tenant_id),
@@ -379,6 +381,22 @@ void PostgresStore::UpsertNode(const PlatformConfig &config) const
       {config.node_id, config.region, JsonText(config.roles)});
 #else
   (void) config;
+  throw PostgresStoreError("postgres driver is not available; install libpq development headers");
+#endif
+}
+
+std::string PostgresStore::NextJobId() const
+{
+#if STYIO_PLATFORM_HAS_LIBPQ
+  PgConnection connection(dsn_);
+  PgResult result = connection.ExecParams("SELECT nextval('platform_job_id_seq')::text AS job_id_seq", {});
+  if (PQntuples(result.get()) == 0)
+  {
+    throw PostgresStoreError("postgres did not return a job id sequence value");
+  }
+  const std::string value = ColumnText(result.get(), 0, "job_id_seq");
+  return "job-" + std::string(12U - std::min<size_t>(12U, value.size()), '0') + value;
+#else
   throw PostgresStoreError("postgres driver is not available; install libpq development headers");
 #endif
 }

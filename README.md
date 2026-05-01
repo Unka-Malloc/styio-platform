@@ -55,18 +55,21 @@ status from the native JSON platform-control-plane contract.
 The first network adapter is available through `styio-platformd --serve`. It
 binds the native `PlatformRouter` to a local HTTP listener, preferring
 Boost.Beast/Asio when those headers are available and using a synchronous POSIX
-fallback otherwise. The adapter accepts proxied mTLS identity evidence through
-`X-Styio-Mtls-Uri-San` while the direct TLS termination layer is still being
-integrated.
+fallback otherwise. Set `STYIO_PLATFORM_TLS_ENABLED=1` with
+`STYIO_PLATFORM_MTLS_CA`, `STYIO_PLATFORM_MTLS_CERT`, and
+`STYIO_PLATFORM_MTLS_KEY` to terminate TLS in-process and derive service
+identity from the client certificate URI SAN. Proxied identity headers remain
+available only when `STYIO_PLATFORM_TRUST_PROXY_IDENTITY_HEADERS=1`.
 
 The first multi-node deployment target is Kubernetes through
 `deploy/helm/styio-platform`. The chart deploys a primary control plane, a
-real compile worker, a mirror node, Postgres, and PVC-backed registry,
-workspace, and artifact storage. `styio-platformd --migrate` applies the
-control-plane schema, `styio-platformd --worker` claims Git-backed build jobs
-and invokes `spio build`, and `styio-platformd --sync-mirror-once` copies the
-registry v2 filesystem layout from the primary PVC into the mirror PVC and
-records freshness in Postgres.
+real compile worker, a mirror node, Postgres, and S3-backed registry/object
+storage with PVCs retained for staging, workspaces, and local mirror caches.
+`styio-platformd --migrate` applies the control-plane schema,
+`styio-platformd --worker` claims Git-backed build jobs and invokes
+`spio build`, and `styio-platformd --sync-mirror-once` copies the registry v2
+filesystem layout from the primary PVC into the mirror PVC and records
+freshness in Postgres.
 
 ## One-Command Development Environment
 

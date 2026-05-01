@@ -50,6 +50,7 @@ public:
 
   void ApplyMigrations() const;
   void UpsertNode(const PlatformConfig &config) const;
+  std::string NextJobId() const;
   void SubmitJob(const PlatformJobRecord &job) const;
   std::optional<PlatformJobRecord> GetJob(const std::string &job_id) const;
   std::vector<JobEventRecord> GetJobEvents(const std::string &job_id) const;

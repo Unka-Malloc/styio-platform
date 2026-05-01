@@ -5,7 +5,33 @@ image:
 
 region: local-dev
 mtls:
+  tlsEnabled: false
   required: true
+  trustProxyIdentityHeaders: true
+  caSecretName: ""
+  serverSecretName: ""
+  clientSecretName: ""
+  caPath: /etc/styio-platform/mtls/ca/ca.crt
+  certPath: /etc/styio-platform/mtls/server/tls.crt
+  keyPath: /etc/styio-platform/mtls/server/tls.key
+  clientCertPath: /etc/styio-platform/mtls/client/tls.crt
+  clientKeyPath: /etc/styio-platform/mtls/client/tls.key
+
+objectStore:
+  provider: s3
+  bucket: ""
+  endpoint: ""
+  region: ""
+  prefix: registry-v2
+  pathStyle: true
+  existingSecret: ""
+  accessKeyId: ""
+  secretAccessKey: ""
+  sessionToken: ""
+
+registry:
+  readRootUrl: ""
+  controlPlaneBaseUrl: ""
 
 workgroup:
   enabled: true

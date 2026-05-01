@@ -2,7 +2,7 @@
 
 **Purpose:** Own global hosted workspace, native JSON platform control-plane, regional node, registry distribution, mirror sync, server-script, and cloud stress surfaces.
 
-**Last updated:** 2026-04-28
+**Last updated:** 2026-05-02
 
 ## Mission
 
@@ -43,6 +43,11 @@ freshness/replay, service cache, offline-client fallback, and security policy
 coverage visible in the affected docs or gates. VM deployment changes must keep
 the package bundle, installer, systemd services, static read plane, and smoke
 check aligned in the same change.
+Registry descriptor changes must keep
+`GET /api/spio-registry-control/v1/descriptor`, examples, smoke scripts, and
+client trust-import docs aligned. Hosted publish changes that move registry
+objects to S3 must describe the write authority, static read root URL, and
+object immutability assumptions in the registry operations runbook.
 
 ## Change Classes
 
@@ -50,7 +55,9 @@ Control-plane changes include route shape, native JSON contract/example
 packages, registry server behavior, hosted workspace envelopes, regional node
 behavior, mirror freshness, package distribution, workspace target selection,
 mixed Styio/C++ execution envelopes, VM deployment packaging, and cloud stress
-scenarios.
+scenarios. S3-backed registry publication and in-process mTLS termination are
+control-plane changes because they affect deployment authority and service
+trust boundaries.
 
 The V1 cloud-service implementation boundary is pure C++ with Boost.Beast and
 Boost.Asio, Postgres for durable state, provider-neutral object storage with S3
@@ -66,8 +73,10 @@ For platform HTTP adapter changes, include
 `ctest --test-dir build-codex -R styio_platform_http_smoke --output-on-failure`.
 For registry-control-plane changes, include
 `python3 tests/interop/registry-control-plane-contract-gate.py` and
-`python3 tests/interop/native-contract-source-gate.py`. For VM registry
-deployment changes, include `python3 tests/unit/test_registry_vm_deploy.py`.
+`python3 tests/interop/native-contract-source-gate.py`. For hosted registry
+route changes, include the native registry route tests inside `ctest --test-dir
+build-codex --output-on-failure`. For VM registry deployment changes, include
+`python3 tests/unit/test_registry_vm_deploy.py`.
 
 ## Cross-Team Dependencies
 

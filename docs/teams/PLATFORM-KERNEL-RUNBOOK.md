@@ -2,7 +2,7 @@
 
 **Purpose:** Own the migrated compile-plan, mixed Styio/C++ compile model, cloud job request kernel, and C++ service-kernel integration boundary.
 
-**Last updated:** 2026-04-29
+**Last updated:** 2026-05-02
 
 ## Mission
 
@@ -17,7 +17,10 @@ handoff, and build job request payloads.
 - `src/SpioCloud/` cloud execution and job request contracts.
 - `src/PlatformService/` native service-kernel implementation and local
   Boost.Beast/Asio HTTP adapter with POSIX fallback.
-- `src/PlatformService/` registry control-plane route family for `/api/spio-registry-control/v1/status|publish|verify`, including redaction, mTLS role checks, local filesystem adapter behavior, and mirror freshness state.
+- `src/PlatformService/` registry control-plane route family for
+  `/api/spio-registry-control/v1/status|descriptor|publish|verify`, including
+  redaction, mTLS role checks, C++ signed registry v2 metadata, S3 object-store
+  publication, local staging behavior, and mirror freshness state.
 - `src/spio_registry_v2/` migrated registry v2 service helpers used by platform-local control-plane scripts, VM deployment initialization, and tests.
 - `contracts/platform-control-plane/` payload shape in coordination with Control Plane.
 - `docs/governance/Platform-Workspace-Compile-Model.md`
@@ -41,6 +44,8 @@ build path both compiling; CI installs `libpq-dev`, so RAII wrappers around
 Worker job changes must preserve real-build defaults. Use `workflow.dry_run`
 only for smoke paths that need to verify clone, scheduling, artifact writeback,
 and control-plane completion without provisioning a full source-build toolchain.
+Worker control-plane transport changes must keep HTTP compatibility for local
+smoke tests and HTTPS client-certificate support for direct mTLS deployments.
 
 ## Change Classes
 
@@ -48,8 +53,9 @@ Kernel changes include compile-plan schema behavior, cloud execution policy,
 Styio/C++ target selection, native C++ invocation, fallback payload shape, job
 request payload shape, platform service payload shape, or imported
 package-manager dependency changes. Registry kernel changes also include mTLS
-role policy, publish/verify status code semantics, mirror freshness transitions,
-VM initialization helper behavior, and migrated registry v2 helper behavior.
+role policy, TLS listener behavior, S3 object-store signing/upload behavior,
+publish/verify status code semantics, mirror freshness transitions, VM
+initialization helper behavior, and migrated registry v2 helper behavior.
 
 ## Required Gates
 
@@ -61,6 +67,8 @@ and the native registry route tests in `styio_platform_native_tests`. For VM
 deployment helper changes, also run `python3 tests/unit/test_registry_vm_deploy.py`.
 For Postgres store changes, configure at least one local build with
 `libpq-dev` available before relying on CI to cover the driver-enabled path.
+For Helm or direct mTLS changes, render both default and TLS-enabled chart
+variants with `helm template`.
 
 ## Cross-Team Dependencies
 

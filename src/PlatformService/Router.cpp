@@ -3,16 +3,24 @@
 #include "PlatformService/ObjectStore.hpp"
 #include "PlatformService/PostgresStore.hpp"
 #include "SpioCore/Errors.hpp"
+#include "SpioCore/Process.hpp"
 #include "SpioCore/Sha256.hpp"
 #include "SpioManifest/Manifest.hpp"
 
+#include <array>
+#include <chrono>
 #include <cctype>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <initializer_list>
 #include <sstream>
 #include <system_error>
+#include <tuple>
+
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 
 namespace fs = std::filesystem;
 
@@ -30,7 +38,8 @@ bool IsInternalRole(const MtlsIdentity &identity)
 
 bool IsRegistryOperation(std::string_view operation_id)
 {
-  return operation_id == "registryStatus" || operation_id == "publishRelease" || operation_id == "verifyRegistry";
+  return operation_id == "registryStatus" || operation_id == "registryDescriptor" ||
+         operation_id == "publishRelease" || operation_id == "verifyRegistry";
 }
 
 bool UsesPostgresState(const PlatformConfig &config)
@@ -53,6 +62,10 @@ bool RoleIn(const MtlsIdentity &identity, std::initializer_list<std::string_view
 bool IsAuthorizedForOperation(std::string_view operation_id, const MtlsIdentity &identity)
 {
   if (operation_id == "registryStatus")
+  {
+    return RoleIn(identity, {"control-plane", "registry-writer", "mirror", "operator"});
+  }
+  if (operation_id == "registryDescriptor")
   {
     return RoleIn(identity, {"control-plane", "registry-writer", "mirror", "operator"});
   }
@@ -242,6 +255,53 @@ bool IsSafeWorkgroupId(std::string_view value)
 bool LooksLikeHttpEndpoint(std::string_view value)
 {
   return value.starts_with("http://") || value.starts_with("https://");
+}
+
+std::string FileUrlForPath(const fs::path &path)
+{
+  return "file://" + fs::absolute(path).lexically_normal().generic_string();
+}
+
+std::string RegistryReadRootUrl(const PlatformConfig &config)
+{
+  if (!config.registry.read_root_url.empty())
+  {
+    return config.registry.read_root_url;
+  }
+  if (ParseObjectStoreProvider(config.object_store.provider) == ObjectStoreProvider::S3 &&
+      !config.object_store.endpoint.empty() && !config.object_store.bucket.empty() && config.object_store.path_style)
+  {
+    std::string root = config.object_store.endpoint;
+    while (!root.empty() && root.back() == '/')
+    {
+      root.pop_back();
+    }
+    root += "/" + config.object_store.bucket;
+    std::string prefix = config.object_store.prefix;
+    while (!prefix.empty() && prefix.front() == '/')
+    {
+      prefix.erase(prefix.begin());
+    }
+    while (!prefix.empty() && prefix.back() == '/')
+    {
+      prefix.pop_back();
+    }
+    if (!prefix.empty())
+    {
+      root += "/" + prefix;
+    }
+    return root;
+  }
+  return FileUrlForPath(config.registry.root);
+}
+
+std::string RegistryControlPlaneBaseUrl(const PlatformConfig &config)
+{
+  if (!config.registry.control_plane_base_url.empty())
+  {
+    return config.registry.control_plane_base_url;
+  }
+  return "/api/spio-registry-control/v1";
 }
 
 std::optional<std::string> ValidateStringArray(const nlohmann::json &body, const std::string &field)
@@ -474,6 +534,344 @@ void AppendJsonLine(const fs::path &path, const nlohmann::json &payload)
   out << payload.dump() << "\n";
 }
 
+std::string ReadFileBytes(const fs::path &path)
+{
+  std::ifstream in(path, std::ios::binary);
+  if (!in)
+  {
+    throw std::runtime_error("failed to read file: " + path.string());
+  }
+  std::ostringstream out;
+  out << in.rdbuf();
+  return out.str();
+}
+
+void WriteTextFile(const fs::path &path, const std::string &payload)
+{
+  fs::create_directories(path.parent_path());
+  std::ofstream out(path, std::ios::binary);
+  out << payload;
+}
+
+std::string CanonicalJson(const nlohmann::json &payload)
+{
+  return payload.dump(-1, ' ', false, nlohmann::json::error_handler_t::strict);
+}
+
+std::string JsonText(const nlohmann::json &payload)
+{
+  return payload.dump(2) + "\n";
+}
+
+std::string HexBytes(const unsigned char *data, const size_t size)
+{
+  std::ostringstream out;
+  out << std::hex << std::setfill('0');
+  for (size_t index = 0; index < size; ++index)
+  {
+    out << std::setw(2) << static_cast<int>(data[index]);
+  }
+  return out.str();
+}
+
+std::string Sha256Bytes(std::string_view payload)
+{
+  unsigned char digest[SHA256_DIGEST_LENGTH];
+  SHA256(reinterpret_cast<const unsigned char *>(payload.data()), payload.size(), digest);
+  return HexBytes(digest, SHA256_DIGEST_LENGTH);
+}
+
+std::string Base64Encode(std::string_view payload)
+{
+  std::string encoded(4U * ((payload.size() + 2U) / 3U), '\0');
+  const int written = EVP_EncodeBlock(
+      reinterpret_cast<unsigned char *>(encoded.data()),
+      reinterpret_cast<const unsigned char *>(payload.data()),
+      static_cast<int>(payload.size()));
+  if (written < 0)
+  {
+    throw std::runtime_error("base64 encoding failed");
+  }
+  encoded.resize(static_cast<size_t>(written));
+  return encoded;
+}
+
+std::string UtcTimestampPlusDays(const int days)
+{
+  const auto now = std::chrono::system_clock::now() + std::chrono::hours(24 * days);
+  const std::time_t time = std::chrono::system_clock::to_time_t(now);
+  std::tm utc{};
+  gmtime_r(&time, &utc);
+  std::ostringstream out;
+  out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
+  return out.str();
+}
+
+std::string UtcTimestampNow()
+{
+  return UtcTimestampPlusDays(0);
+}
+
+spio::ProcessResult RunRegistryOpenSsl(
+    std::vector<std::string> args,
+    std::string input = {},
+    const size_t max_stdout_bytes = 1U << 20)
+{
+  spio::ProcessResult result = spio::RunProcess({
+      .program = "openssl",
+      .args = std::move(args),
+      .timeout = std::chrono::seconds{30},
+      .max_stdout_bytes = max_stdout_bytes,
+      .max_stderr_bytes = 1U << 20,
+      .stdin_text = std::move(input),
+      .error_context = "registry v2 openssl command",
+  });
+  if (result.exit_code != 0 || result.timed_out)
+  {
+    throw std::runtime_error("registry v2 openssl command failed: " + spio::DescribeProcessFailure(result));
+  }
+  return result;
+}
+
+struct RegistryRoleKey
+{
+  std::string role;
+  std::string keyid;
+  fs::path private_key_path;
+  fs::path public_key_path;
+  std::string public_key_pem;
+};
+
+const std::vector<std::string> &RegistryRoleNames()
+{
+  static const std::vector<std::string> roles = {"root", "timestamp", "snapshot", "targets", "log"};
+  return roles;
+}
+
+std::string RegistryFileKeyId(const fs::path &public_key_path)
+{
+  const spio::ProcessResult der = RunRegistryOpenSsl(
+      {"pkey", "-pubin", "-in", public_key_path.string(), "-outform", "DER"},
+      {},
+      64U << 10);
+  return Sha256Bytes(der.stdout_text);
+}
+
+void GenerateRegistryKeyDirectory(const fs::path &key_dir)
+{
+  fs::create_directories(key_dir / "private");
+  fs::create_directories(key_dir / "public");
+  nlohmann::json roles = nlohmann::json::object();
+  for (const std::string &role : RegistryRoleNames())
+  {
+    const fs::path private_key = key_dir / "private" / (role + ".pem");
+    const fs::path public_key = key_dir / "public" / (role + ".pem");
+    if (!fs::exists(private_key) || !fs::exists(public_key))
+    {
+      RunRegistryOpenSsl({"genpkey", "-algorithm", "Ed25519", "-out", private_key.string()});
+      RunRegistryOpenSsl({"pkey", "-in", private_key.string(), "-pubout", "-out", public_key.string()});
+    }
+    roles[role] = {
+        {"keyid", RegistryFileKeyId(public_key)},
+        {"private_key_path", ("private/" + role + ".pem")},
+        {"public_key_path", ("public/" + role + ".pem")},
+    };
+  }
+  WriteTextFile(
+      key_dir / "keys.json",
+      JsonText({
+          {"schema_version", 1},
+          {"algorithm", "ed25519"},
+          {"roles", roles},
+      }));
+}
+
+std::map<std::string, RegistryRoleKey> LoadOrCreateRegistryRoleKeys(const fs::path &key_dir)
+{
+  if (!fs::exists(key_dir / "keys.json"))
+  {
+    GenerateRegistryKeyDirectory(key_dir);
+  }
+  const nlohmann::json manifest = nlohmann::json::parse(ReadFileBytes(key_dir / "keys.json"));
+  std::map<std::string, RegistryRoleKey> loaded;
+  for (const std::string &role : RegistryRoleNames())
+  {
+    const nlohmann::json role_payload = manifest.at("roles").at(role);
+    RegistryRoleKey key = {
+        .role = role,
+        .keyid = role_payload.at("keyid").get<std::string>(),
+        .private_key_path = key_dir / role_payload.at("private_key_path").get<std::string>(),
+        .public_key_path = key_dir / role_payload.at("public_key_path").get<std::string>(),
+    };
+    key.public_key_pem = ReadFileBytes(key.public_key_path);
+    loaded.emplace(role, std::move(key));
+  }
+  return loaded;
+}
+
+nlohmann::json RegistryRoleKeysPayload(const std::map<std::string, RegistryRoleKey> &role_keys)
+{
+  nlohmann::json keys = nlohmann::json::object();
+  for (const auto &[role, key] : role_keys)
+  {
+    (void) role;
+    keys[key.keyid] = {
+        {"keytype", "ed25519"},
+        {"scheme", "ed25519"},
+        {"keyval", {{"public", key.public_key_pem}}},
+    };
+  }
+  return keys;
+}
+
+nlohmann::json RegistryRolesPolicyPayload(const std::map<std::string, RegistryRoleKey> &role_keys)
+{
+  nlohmann::json roles = nlohmann::json::object();
+  for (const std::string &role : RegistryRoleNames())
+  {
+    roles[role] = {
+        {"keyids", {role_keys.at(role).keyid}},
+        {"threshold", 1},
+    };
+  }
+  return roles;
+}
+
+nlohmann::json SignedRegistryPayload(
+    const nlohmann::json &signed_payload,
+    const RegistryRoleKey &role_key,
+    const fs::path &temp_root)
+{
+  fs::create_directories(temp_root);
+  const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+  const fs::path message_path = temp_root / (role_key.role + "-" + std::to_string(stamp) + ".json");
+  const fs::path signature_path = temp_root / (role_key.role + "-" + std::to_string(stamp) + ".sig");
+  WriteTextFile(message_path, CanonicalJson(signed_payload));
+  try
+  {
+    RunRegistryOpenSsl({
+        "pkeyutl",
+        "-sign",
+        "-inkey",
+        role_key.private_key_path.string(),
+        "-rawin",
+        "-in",
+        message_path.string(),
+        "-out",
+        signature_path.string(),
+    });
+    const std::string signature = ReadFileBytes(signature_path);
+    fs::remove(message_path);
+    fs::remove(signature_path);
+    return {
+        {"signed", signed_payload},
+        {"signatures", {{
+                           {"keyid", role_key.keyid},
+                           {"sig", Base64Encode(signature)},
+                       }}},
+    };
+  }
+  catch (...)
+  {
+    std::error_code ec;
+    fs::remove(message_path, ec);
+    fs::remove(signature_path, ec);
+    throw;
+  }
+}
+
+nlohmann::json RegistryConfigPayload(const PlatformConfig &config, const std::string &generated_at)
+{
+  return {
+      {"schema_version", 1},
+      {"protocol", "spio-static-registry"},
+      {"protocol_version", 2},
+      {"registry_name", config.registry.registry_name},
+      {"generated_at", generated_at},
+      {"capabilities", {
+                           {"append_only_index", true},
+                           {"source_artifacts", true},
+                           {"binary_artifacts", true},
+                           {"transparency_log", true},
+                       }},
+      {"paths", {
+                    {"root", "trust/root.json"},
+                    {"timestamp", "trust/timestamp.json"},
+                    {"snapshot", "trust/snapshot.json"},
+                    {"targets_prefix", "trust/targets/"},
+                    {"index_prefix", "index/"},
+                    {"source_artifact_prefix", "artifacts/source/"},
+                    {"binary_artifact_prefix", "artifacts/binary/"},
+                    {"transparency_checkpoint", "log/checkpoint.json"},
+                    {"transparency_leaves_prefix", "log/leaves/"},
+                }},
+  };
+}
+
+nlohmann::json SignedFileMeta(const fs::path &path, const int version)
+{
+  return {
+      {"version", version},
+      {"length", static_cast<int64_t>(fs::file_size(path))},
+      {"hashes", {{"sha256", spio::Sha256File(path)}}},
+  };
+}
+
+int ReadSignedVersion(const fs::path &path)
+{
+  if (!fs::exists(path))
+  {
+    return 0;
+  }
+  try
+  {
+    return nlohmann::json::parse(ReadFileBytes(path)).at("signed").value("version", 0);
+  }
+  catch (...)
+  {
+    return 0;
+  }
+}
+
+std::vector<fs::path> LeafSequencePaths(const fs::path &root)
+{
+  std::vector<fs::path> paths;
+  const fs::path leaves_root = root / "log" / "leaves";
+  std::error_code ec;
+  if (!fs::exists(leaves_root, ec))
+  {
+    return paths;
+  }
+  for (const fs::directory_entry &entry : fs::directory_iterator(leaves_root, ec))
+  {
+    if (entry.is_regular_file(ec) && entry.path().extension() == ".json")
+    {
+      paths.push_back(entry.path());
+    }
+  }
+  std::sort(paths.begin(), paths.end());
+  return paths;
+}
+
+std::string TransparencyRootHash(const std::vector<std::string> &leaf_hashes)
+{
+  std::string state(32, '\0');
+  for (const std::string &leaf_hash : leaf_hashes)
+  {
+    std::string leaf_bytes;
+    leaf_bytes.reserve(32);
+    for (size_t index = 0; index + 1 < leaf_hash.size(); index += 2)
+    {
+      leaf_bytes.push_back(static_cast<char>(std::stoi(leaf_hash.substr(index, 2), nullptr, 16)));
+    }
+    const std::string combined = state + leaf_bytes;
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char *>(combined.data()), combined.size(), digest);
+    state.assign(reinterpret_cast<const char *>(digest), SHA256_DIGEST_LENGTH);
+  }
+  return HexBytes(reinterpret_cast<const unsigned char *>(state.data()), state.size());
+}
+
 struct PublishDraft
 {
   std::string package;
@@ -552,25 +950,435 @@ PublishDraft BuildPublishDraft(
   return draft;
 }
 
+bool VersionLess(const std::string &left, const std::string &right)
+{
+  auto parse = [](const std::string &version) {
+    std::array<int, 3> numeric = {0, 0, 0};
+    std::string suffix;
+    std::stringstream stream(version);
+    std::string part;
+    size_t index = 0;
+    while (std::getline(stream, part, '.') && index < numeric.size())
+    {
+      try
+      {
+        numeric[index] = std::stoi(part);
+      }
+      catch (...)
+      {
+        suffix = version;
+        break;
+      }
+      ++index;
+    }
+    if (index != numeric.size() || stream.good())
+    {
+      suffix = version;
+    }
+    return std::tuple<int, int, int, std::string>(numeric[0], numeric[1], numeric[2], suffix);
+  };
+  return parse(left) < parse(right);
+}
+
+nlohmann::json BuildReleaseRecord(
+    const PublishDraft &draft,
+    const std::string &published_at,
+    const std::string &archive_sha256,
+    const uintmax_t archive_size,
+    const std::string &artifact_path)
+{
+  const nlohmann::json dependencies = nlohmann::json::array();
+  const nlohmann::json dev_dependencies = nlohmann::json::array();
+  const nlohmann::json metadata_source = {
+      {"package", draft.package},
+      {"version", draft.version},
+      {"publisher_id", draft.publisher_id},
+      {"published_at", published_at},
+      {"archive_sha256", archive_sha256},
+      {"dependencies", dependencies},
+      {"dev_dependencies", dev_dependencies},
+  };
+  return {
+      {"schema_version", 1},
+      {"package", draft.package},
+      {"version", draft.version},
+      {"release_revision", 1},
+      {"published_at", published_at},
+      {"publisher_id", draft.publisher_id},
+      {"yanked", false},
+      {"deprecated_message", ""},
+      {"source_artifact", {
+                              {"sha256", archive_sha256},
+                              {"size_bytes", static_cast<int64_t>(archive_size)},
+                              {"path", artifact_path},
+                              {"archive_format", "tar"},
+                              {"compression", "none"},
+                          }},
+      {"binary_artifacts", nlohmann::json::array()},
+      {"dependencies", dependencies},
+      {"dev_dependencies", dev_dependencies},
+      {"features", {
+                       {"default", nlohmann::json::array()},
+                       {"optional", nlohmann::json::array()},
+                   }},
+      {"manifest_digest", Sha256Bytes(draft.package + "@" + draft.version)},
+      {"metadata_digest", Sha256Bytes(CanonicalJson(metadata_source))},
+  };
+}
+
+struct LocalAppendResult
+{
+  std::string index_path;
+  std::string log_leaf_path;
+  size_t sequence = 0;
+};
+
+LocalAppendResult AppendRegistryReleaseToLocal(
+    const PlatformConfig &config,
+    const PublishDraft &draft,
+    const nlohmann::json &release_record,
+    const std::string &artifact_path)
+{
+  const fs::path registry_root(config.registry.root);
+  const fs::path artifact_dest_path = registry_root / artifact_path;
+  fs::create_directories(artifact_dest_path.parent_path());
+  if (fs::exists(artifact_dest_path))
+  {
+    if (spio::Sha256File(artifact_dest_path) != release_record.at("source_artifact").at("sha256").get<std::string>())
+    {
+      throw std::runtime_error("destination artifact already exists with different content");
+    }
+  }
+  else
+  {
+    fs::copy_file(draft.archive_path, artifact_dest_path);
+  }
+
+  const std::string index_path = RegistryIndexPathForPackage(draft.package);
+  const fs::path index_file = registry_root / index_path;
+  if (fs::exists(index_file))
+  {
+    std::ifstream in(index_file);
+    std::string line;
+    while (std::getline(in, line))
+    {
+      if (JsonLineHasRelease(line, draft.package, draft.version))
+      {
+        throw std::runtime_error("package version is already published");
+      }
+    }
+  }
+  AppendJsonLine(index_file, release_record);
+
+  const size_t sequence = LeafSequencePaths(registry_root).size() + 1;
+  const std::string log_leaf_path = "log/leaves/" + PaddedNumber(sequence, 12) + ".json";
+  const std::string package_namespace = SplitPackageName(draft.package).front();
+  const nlohmann::json leaf = {
+      {"schema_version", 1},
+      {"sequence", static_cast<int64_t>(sequence)},
+      {"namespace", package_namespace},
+      {"package", draft.package},
+      {"version", draft.version},
+      {"release_revision", 1},
+      {"index_path", index_path},
+      {"index_record_sha256", Sha256Bytes(CanonicalJson(release_record))},
+      {"source_artifact_sha256", release_record.at("source_artifact").at("sha256").get<std::string>()},
+      {"source_artifact_path", artifact_path},
+  };
+  WriteTextFile(registry_root / log_leaf_path, JsonText(leaf));
+  return {.index_path = index_path, .log_leaf_path = log_leaf_path, .sequence = sequence};
+}
+
+struct PackageMaps
+{
+  nlohmann::json namespace_packages = nlohmann::json::object();
+  nlohmann::json snapshot_meta = nlohmann::json::object();
+};
+
+PackageMaps CollectPackageMaps(const fs::path &registry_root)
+{
+  PackageMaps result;
+  const fs::path index_root = registry_root / "index";
+  std::error_code ec;
+  if (!fs::exists(index_root, ec))
+  {
+    return result;
+  }
+  for (const fs::directory_entry &entry : fs::recursive_directory_iterator(index_root, ec))
+  {
+    if (!entry.is_regular_file(ec) || entry.path().extension() != ".jsonl")
+    {
+      continue;
+    }
+    std::ifstream in(entry.path());
+    std::vector<nlohmann::json> records;
+    std::string line;
+    while (std::getline(in, line))
+    {
+      if (!line.empty())
+      {
+        records.push_back(nlohmann::json::parse(line));
+      }
+    }
+    if (records.empty())
+    {
+      throw std::runtime_error("registry index file is empty: " + entry.path().string());
+    }
+    const std::string package_name = records.front().at("package").get<std::string>();
+    const std::string package_namespace = SplitPackageName(package_name).front();
+    std::vector<std::string> versions;
+    nlohmann::json releases = nlohmann::json::object();
+    for (const nlohmann::json &record : records)
+    {
+      if (record.at("package").get<std::string>() != package_name)
+      {
+        throw std::runtime_error("registry index file contains mixed package names: " + entry.path().string());
+      }
+      const std::string version = record.at("version").get<std::string>();
+      const nlohmann::json source_artifact = record.at("source_artifact");
+      versions.push_back(version);
+      releases[version] = {
+          {"release_revision", record.value("release_revision", 1)},
+          {"index_record_sha256", Sha256Bytes(CanonicalJson(record))},
+          {"source_artifact_sha256", source_artifact.at("sha256").get<std::string>()},
+          {"source_artifact_path", source_artifact.at("path").get<std::string>()},
+          {"binary_artifact_count", record.value("binary_artifacts", nlohmann::json::array()).size()},
+      };
+    }
+    std::sort(versions.begin(), versions.end(), VersionLess);
+    const std::string relative = fs::relative(entry.path(), registry_root).generic_string();
+    result.namespace_packages[package_namespace][package_name] = {
+        {"index_path", relative},
+        {"latest_version", versions.back()},
+        {"releases", releases},
+    };
+    result.snapshot_meta[relative] = SignedFileMeta(entry.path(), 1);
+  }
+  return result;
+}
+
+struct MetadataVersions
+{
+  int checkpoint_version = 0;
+  int snapshot_version = 0;
+  int timestamp_version = 0;
+  size_t namespaces = 0;
+};
+
+MetadataVersions RefreshSignedRegistryMetadata(
+    const PlatformConfig &config,
+    const std::map<std::string, RegistryRoleKey> &role_keys,
+    const std::string &registry_time)
+{
+  const fs::path registry_root(config.registry.root);
+  const fs::path temp_root = registry_root / "_tmp";
+  PackageMaps package_maps = CollectPackageMaps(registry_root);
+  for (auto &[namespace_name, package_map] : package_maps.namespace_packages.items())
+  {
+    const fs::path targets_path = registry_root / "trust" / "targets" / (namespace_name + ".json");
+    const int targets_version = ReadSignedVersion(targets_path) + 1;
+    const nlohmann::json targets_signed = {
+        {"type", "targets"},
+        {"spec_version", "1"},
+        {"version", targets_version},
+        {"expires", UtcTimestampPlusDays(30)},
+        {"namespace", namespace_name},
+        {"packages", package_map},
+    };
+    WriteTextFile(targets_path, JsonText(SignedRegistryPayload(targets_signed, role_keys.at("targets"), temp_root)));
+    package_maps.snapshot_meta[fs::relative(targets_path, registry_root).generic_string()] =
+        SignedFileMeta(targets_path, targets_version);
+  }
+
+  std::vector<std::string> leaf_hashes;
+  for (const fs::path &leaf_path : LeafSequencePaths(registry_root))
+  {
+    leaf_hashes.push_back(Sha256Bytes(CanonicalJson(nlohmann::json::parse(ReadFileBytes(leaf_path)))));
+  }
+  const fs::path checkpoint_path = registry_root / "log" / "checkpoint.json";
+  const int checkpoint_version = ReadSignedVersion(checkpoint_path) + 1;
+  const nlohmann::json checkpoint_signed = {
+      {"type", "checkpoint"},
+      {"spec_version", "1"},
+      {"version", checkpoint_version},
+      {"generated_at", registry_time},
+      {"tree_size", static_cast<int64_t>(leaf_hashes.size())},
+      {"root_hash", TransparencyRootHash(leaf_hashes)},
+  };
+  WriteTextFile(checkpoint_path, JsonText(SignedRegistryPayload(checkpoint_signed, role_keys.at("log"), temp_root)));
+
+  const fs::path snapshot_path = registry_root / "trust" / "snapshot.json";
+  const int snapshot_version = ReadSignedVersion(snapshot_path) + 1;
+  const nlohmann::json snapshot_signed = {
+      {"type", "snapshot"},
+      {"spec_version", "1"},
+      {"version", snapshot_version},
+      {"expires", UtcTimestampPlusDays(7)},
+      {"meta", package_maps.snapshot_meta},
+      {"log_meta", {{"log/checkpoint.json", SignedFileMeta(checkpoint_path, checkpoint_version)}}},
+  };
+  WriteTextFile(snapshot_path, JsonText(SignedRegistryPayload(snapshot_signed, role_keys.at("snapshot"), temp_root)));
+
+  const fs::path timestamp_path = registry_root / "trust" / "timestamp.json";
+  const int timestamp_version = ReadSignedVersion(timestamp_path) + 1;
+  const nlohmann::json timestamp_signed = {
+      {"type", "timestamp"},
+      {"spec_version", "1"},
+      {"version", timestamp_version},
+      {"expires", UtcTimestampPlusDays(1)},
+      {"meta", {{"trust/snapshot.json", SignedFileMeta(snapshot_path, snapshot_version)}}},
+  };
+  WriteTextFile(timestamp_path, JsonText(SignedRegistryPayload(timestamp_signed, role_keys.at("timestamp"), temp_root)));
+  std::error_code ec;
+  fs::remove_all(temp_root, ec);
+
+  return {
+      .checkpoint_version = checkpoint_version,
+      .snapshot_version = snapshot_version,
+      .timestamp_version = timestamp_version,
+      .namespaces = package_maps.namespace_packages.size(),
+  };
+}
+
 void EnsureRegistryRootInitialized(const PlatformConfig &config)
 {
   const fs::path root(config.registry.root);
   fs::create_directories(root);
-  fs::create_directories(fs::path(config.registry.key_dir));
-  WriteJsonFileIfMissing(
-      root / "config.json",
+  const fs::path key_dir(config.registry.key_dir);
+  fs::create_directories(key_dir);
+  const std::map<std::string, RegistryRoleKey> role_keys = LoadOrCreateRegistryRoleKeys(key_dir);
+  const fs::path temp_root = root / "_tmp";
+  const std::string registry_time = UtcTimestampNow();
+
+  if (!fs::exists(root / "config.json"))
+  {
+    WriteTextFile(root / "config.json", JsonText(RegistryConfigPayload(config, registry_time)));
+  }
+  if (!fs::exists(root / "log" / "checkpoint.json"))
+  {
+    const nlohmann::json checkpoint_signed = {
+        {"type", "checkpoint"},
+        {"spec_version", "1"},
+        {"version", 1},
+        {"generated_at", registry_time},
+        {"tree_size", 0},
+        {"root_hash", TransparencyRootHash({})},
+    };
+    WriteTextFile(root / "log" / "checkpoint.json", JsonText(SignedRegistryPayload(checkpoint_signed, role_keys.at("log"), temp_root)));
+  }
+  if (!fs::exists(root / "trust" / "snapshot.json"))
+  {
+    const nlohmann::json snapshot_signed = {
+        {"type", "snapshot"},
+        {"spec_version", "1"},
+        {"version", 1},
+        {"expires", UtcTimestampPlusDays(7)},
+        {"meta", nlohmann::json::object()},
+        {"log_meta", {{"log/checkpoint.json", SignedFileMeta(root / "log" / "checkpoint.json", 1)}}},
+    };
+    WriteTextFile(root / "trust" / "snapshot.json", JsonText(SignedRegistryPayload(snapshot_signed, role_keys.at("snapshot"), temp_root)));
+  }
+  if (!fs::exists(root / "trust" / "timestamp.json"))
+  {
+    const nlohmann::json timestamp_signed = {
+        {"type", "timestamp"},
+        {"spec_version", "1"},
+        {"version", 1},
+        {"expires", UtcTimestampPlusDays(1)},
+        {"meta", {{"trust/snapshot.json", SignedFileMeta(root / "trust" / "snapshot.json", 1)}}},
+    };
+    WriteTextFile(root / "trust" / "timestamp.json", JsonText(SignedRegistryPayload(timestamp_signed, role_keys.at("timestamp"), temp_root)));
+  }
+  if (!fs::exists(root / "trust" / "root.json"))
+  {
+    const nlohmann::json root_signed = {
+        {"type", "root"},
+        {"spec_version", "1"},
+        {"version", 1},
+        {"expires", UtcTimestampPlusDays(365)},
+        {"keys", RegistryRoleKeysPayload(role_keys)},
+        {"roles", RegistryRolesPolicyPayload(role_keys)},
+    };
+    WriteTextFile(root / "trust" / "root.json", JsonText(SignedRegistryPayload(root_signed, role_keys.at("root"), temp_root)));
+  }
+  std::error_code ec;
+  fs::remove_all(temp_root, ec);
+}
+
+bool UsesS3ObjectStore(const PlatformConfig &config)
+{
+  return ParseObjectStoreProvider(config.object_store.provider) == ObjectStoreProvider::S3;
+}
+
+void RemoveLocalRegistryMetadataCache(const PlatformConfig &config)
+{
+  const fs::path root(config.registry.root);
+  std::error_code ec;
+  fs::remove(root / "config.json", ec);
+  fs::remove_all(root / "trust", ec);
+  fs::remove_all(root / "index", ec);
+  fs::remove_all(root / "log", ec);
+  fs::remove_all(root / "artifacts", ec);
+}
+
+void SyncS3RegistryStateToLocal(const PlatformConfig &config)
+{
+  RemoveLocalRegistryMetadataCache(config);
+  const fs::path root(config.registry.root);
+  if (const std::optional<std::string> config_text = GetObjectText(config.object_store, "config.json"); config_text.has_value())
+  {
+    WriteTextFile(root / "config.json", *config_text);
+  }
+  for (const std::string &prefix : {"trust/", "index/", "log/"})
+  {
+    for (const std::string &key : ListObjectKeys(config.object_store, prefix))
+    {
+      if (key.starts_with("artifacts/") || key.starts_with("_"))
       {
-          {"schema_version", 1},
-          {"registry_name", config.registry.registry_name},
-          {"layout", "spio-registry-v2"},
-      });
-  WriteJsonFileIfMissing(
-      root / "trust" / "root.json",
+        continue;
+      }
+      if (const std::optional<std::string> payload = GetObjectText(config.object_store, key); payload.has_value())
       {
-          {"schema_version", 1},
-          {"registry_name", config.registry.registry_name},
-          {"keys", nlohmann::json::array()},
-      });
+        WriteTextFile(root / NormalizeObjectKey(key), *payload);
+      }
+    }
+  }
+}
+
+std::string RegistryContentTypeForPath(const std::string &relative_path)
+{
+  if (relative_path.ends_with(".json"))
+  {
+    return "application/json";
+  }
+  if (relative_path.ends_with(".jsonl"))
+  {
+    return "application/x-ndjson";
+  }
+  return "application/octet-stream";
+}
+
+void UploadRegistryTreeToS3(const PlatformConfig &config)
+{
+  const fs::path root(config.registry.root);
+  std::error_code ec;
+  if (!fs::exists(root, ec))
+  {
+    return;
+  }
+  for (const fs::directory_entry &entry : fs::recursive_directory_iterator(root, ec))
+  {
+    if (!entry.is_regular_file(ec))
+    {
+      continue;
+    }
+    const std::string relative = fs::relative(entry.path(), root).generic_string();
+    if (relative.starts_with("_staging/") || relative.starts_with("_tmp/"))
+    {
+      continue;
+    }
+    PutObjectFile(config.object_store, relative, entry.path(), RegistryContentTypeForPath(relative));
+  }
 }
 
 }  // namespace
@@ -601,6 +1409,12 @@ std::vector<RouteSpec> BuildRegistryControlPlaneRoutes()
           .operation_id = "registryStatus",
           .method = HttpMethod::Get,
           .path = "/api/spio-registry-control/v1/status",
+          .internal = true,
+      },
+      {
+          .operation_id = "registryDescriptor",
+          .method = HttpMethod::Get,
+          .path = "/api/spio-registry-control/v1/descriptor",
           .internal = true,
       },
       {
@@ -704,6 +1518,10 @@ HttpResponse PlatformRouter::Dispatch(const HttpRequest &request)
   {
     return HandleRegistryStatus();
   }
+  if (operation == "registryDescriptor")
+  {
+    return HandleRegistryDescriptor();
+  }
   if (operation == "publishRelease")
   {
     return HandlePublishRelease(request);
@@ -793,7 +1611,23 @@ HttpResponse PlatformRouter::HandleSubmitJob(const HttpRequest &request)
   {
     return JsonResponse(400, FailureEnvelope("job submission rejected", *error, "ValidationError", "submitJob", 2));
   }
-  PlatformJobRecord job = BuildQueuedJobRecord(request.body, config_);
+  std::string job_id;
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      job_id = postgres_->NextJobId();
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "job submission failed", error.what(), "PostgresError", "submitJob");
+    }
+  }
+  else
+  {
+    job_id = NextMemoryJobId();
+  }
+  PlatformJobRecord job = BuildQueuedJobRecord(request.body, config_, std::move(job_id));
   if (postgres_ != nullptr)
   {
     try
@@ -901,11 +1735,12 @@ HttpResponse PlatformRouter::HandleCancelJob(const RouteMatch &match, const Http
       return FailureResponse(503, "job cancellation failed", error.what(), "PostgresError", "cancelJob");
     }
   }
-  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
-  if (job.job_id.empty())
+  const auto found = jobs_.find(match.parameters.at("job_id"));
+  if (found == jobs_.end())
   {
     return JsonResponse(404, FailureEnvelope("job cancellation failed", "job not found", "NotFound", "cancelJob"));
   }
+  PlatformJobRecord &job = found->second;
   job.status = "cancelled";
   job.finished_at = "2026-04-24T00:01:00Z";
   events_[job.job_id].push_back({
@@ -1034,11 +1869,12 @@ HttpResponse PlatformRouter::HandleHeartbeatJob(const RouteMatch &match, const H
       return FailureResponse(503, "job heartbeat failed", error.what(), "PostgresError", "heartbeatJob");
     }
   }
-  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
-  if (job.job_id.empty())
+  const auto found = jobs_.find(match.parameters.at("job_id"));
+  if (found == jobs_.end())
   {
     return JsonResponse(404, FailureEnvelope("job heartbeat failed", "job not found", "NotFound", "heartbeatJob"));
   }
+  PlatformJobRecord &job = found->second;
   if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job heartbeat failed", "worker does not own job", "WorkerError", "heartbeatJob"));
@@ -1097,11 +1933,12 @@ HttpResponse PlatformRouter::HandleCompleteJob(const RouteMatch &match, const Ht
       return FailureResponse(503, "job completion failed", error.what(), "PostgresError", "completeJob");
     }
   }
-  PlatformJobRecord &job = jobs_[match.parameters.at("job_id")];
-  if (job.job_id.empty())
+  const auto found = jobs_.find(match.parameters.at("job_id"));
+  if (found == jobs_.end())
   {
     return JsonResponse(404, FailureEnvelope("job completion failed", "job not found", "NotFound", "completeJob"));
   }
+  PlatformJobRecord &job = found->second;
   if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job completion failed", "worker does not own job", "WorkerError", "completeJob"));
@@ -1265,6 +2102,32 @@ HttpResponse PlatformRouter::HandleMirrorStatus(const RouteMatch &match) const
 
 HttpResponse PlatformRouter::HandleRegistryStatus() const
 {
+  if (UsesS3ObjectStore(config_))
+  {
+    try
+    {
+      const bool config_present = ObjectExists(config_.object_store, "config.json");
+      const bool root_metadata_present = ObjectExists(config_.object_store, "trust/root.json");
+      nlohmann::json payload = {
+          {"registry_root", "<redacted>"},
+          {"key_dir", "<redacted>"},
+          {"registry_name", config_.registry.registry_name},
+          {"object_store_provider", config_.object_store.provider},
+          {"root_initialized", config_present && root_metadata_present},
+          {"config_present", config_present},
+          {"root_metadata_present", root_metadata_present},
+          {"publish_endpoint", "/api/spio-registry-control/v1/publish"},
+          {"verify_endpoint", "/api/spio-registry-control/v1/verify"},
+          {"descriptor_endpoint", "/api/spio-registry-control/v1/descriptor"},
+      };
+      return JsonResponse(200, SuccessEnvelope("registry control plane is ready", payload));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "registry status failed", error.what(), "RegistryStatusError", "registryStatus");
+    }
+  }
+
   const fs::path registry_root(config_.registry.root);
   const fs::path key_dir(config_.registry.key_dir);
   std::error_code ec;
@@ -1298,8 +2161,68 @@ HttpResponse PlatformRouter::HandleRegistryStatus() const
       {"root_metadata_present", root_metadata_present},
       {"publish_endpoint", "/api/spio-registry-control/v1/publish"},
       {"verify_endpoint", "/api/spio-registry-control/v1/verify"},
+      {"descriptor_endpoint", "/api/spio-registry-control/v1/descriptor"},
   };
   return JsonResponse(200, SuccessEnvelope("registry control plane is ready", payload));
+}
+
+HttpResponse PlatformRouter::HandleRegistryDescriptor() const
+{
+  if (UsesS3ObjectStore(config_))
+  {
+    try
+    {
+      const std::optional<std::string> root_metadata = GetObjectText(config_.object_store, "trust/root.json");
+      if (!root_metadata.has_value())
+      {
+        return FailureResponse(
+            422,
+            "registry descriptor failed",
+            "registry root metadata is not initialized",
+            "RegistryDescriptorError",
+            "registryDescriptor");
+      }
+      nlohmann::json payload = {
+          {"schema_version", 1},
+          {"registry_name", config_.registry.registry_name},
+          {"registry_root", RegistryReadRootUrl(config_)},
+          {"control_plane_base_url", RegistryControlPlaneBaseUrl(config_)},
+          {"root_sha256", Sha256Bytes(*root_metadata)},
+          {"issued_at", UtcTimestampNow()},
+          {"expires", UtcTimestampPlusDays(31)},
+          {"descriptor_signature", "platform-control-plane-mtls"},
+      };
+      return JsonResponse(200, SuccessEnvelope("published registry trust descriptor", payload));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "registry descriptor failed", error.what(), "RegistryDescriptorError", "registryDescriptor");
+    }
+  }
+
+  const fs::path registry_root(config_.registry.root);
+  const fs::path root_metadata = registry_root / "trust" / "root.json";
+  std::error_code ec;
+  if (!fs::exists(root_metadata, ec))
+  {
+    return FailureResponse(
+        422,
+        "registry descriptor failed",
+        "registry root metadata is not initialized",
+        "RegistryDescriptorError",
+        "registryDescriptor");
+  }
+  nlohmann::json payload = {
+      {"schema_version", 1},
+      {"registry_name", config_.registry.registry_name},
+      {"registry_root", RegistryReadRootUrl(config_)},
+      {"control_plane_base_url", RegistryControlPlaneBaseUrl(config_)},
+      {"root_sha256", spio::Sha256File(root_metadata)},
+      {"issued_at", "2026-05-02T00:00:00Z"},
+      {"expires", "2026-06-02T00:00:00Z"},
+      {"descriptor_signature", "platform-control-plane-mtls"},
+  };
+  return JsonResponse(200, SuccessEnvelope("published registry trust descriptor", payload));
 }
 
 HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
@@ -1341,6 +2264,20 @@ HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
   {
     const fs::path registry_root(config_.registry.root);
     const std::string release_key = RegistryReleaseKey(draft.package, draft.version);
+    if (UsesS3ObjectStore(config_))
+    {
+      const bool remote_initialized = ObjectExists(config_.object_store, "config.json") ||
+                                      ObjectExists(config_.object_store, "trust/root.json");
+      if (remote_initialized)
+      {
+        SyncS3RegistryStateToLocal(config_);
+      }
+      else
+      {
+        RemoveLocalRegistryMetadataCache(config_);
+      }
+    }
+
     if (published_releases_.contains(release_key) || ReleaseExistsOnDisk(registry_root, draft.package, draft.version))
     {
       return FailureResponse(
@@ -1354,43 +2291,28 @@ HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
     const bool created_root =
         !fs::exists(registry_root / "config.json") || !fs::exists(registry_root / "trust" / "root.json");
     EnsureRegistryRootInitialized(config_);
+    const std::map<std::string, RegistryRoleKey> role_keys = LoadOrCreateRegistryRoleKeys(fs::path(config_.registry.key_dir));
 
     const std::string archive_sha256 = spio::Sha256File(draft.archive_path);
     const uintmax_t archive_size = fs::file_size(draft.archive_path);
     const std::string artifact_path =
         "artifacts/source/sha256/" + archive_sha256.substr(0, 2) + "/" + archive_sha256.substr(2, 2) + "/" +
         archive_sha256 + ".spio.src.tar";
-    fs::create_directories((registry_root / artifact_path).parent_path());
-    if (!fs::exists(registry_root / artifact_path))
+    const std::string published_at = UtcTimestampNow();
+    const nlohmann::json release_record =
+        BuildReleaseRecord(draft, published_at, archive_sha256, archive_size, artifact_path);
+    const LocalAppendResult append_result =
+        AppendRegistryReleaseToLocal(config_, draft, release_record, artifact_path);
+    const MetadataVersions metadata_versions = RefreshSignedRegistryMetadata(config_, role_keys, published_at);
+    if (UsesS3ObjectStore(config_))
     {
-      fs::copy_file(draft.archive_path, registry_root / artifact_path);
+      UploadRegistryTreeToS3(config_);
     }
-
-    const size_t sequence = CountRegularFiles(registry_root / "log" / "leaves") + 1;
-    const std::string log_leaf_path = "log/leaves/" + PaddedNumber(sequence, 12) + ".json";
-    const std::string index_path = RegistryIndexPathForPackage(draft.package);
-    const std::string published_at = "2026-04-24T00:00:00Z";
-
-    const nlohmann::json release_record = {
-        {"package", draft.package},
-        {"version", draft.version},
-        {"publisher_id", draft.publisher_id},
-        {"published_at", published_at},
-        {"archive_sha256", archive_sha256},
-        {"archive_size_bytes", static_cast<int64_t>(archive_size)},
-        {"artifact_path", artifact_path},
-        {"sequence", static_cast<int64_t>(sequence)},
-    };
-    AppendJsonLine(registry_root / index_path, release_record);
-    WriteJsonFileIfMissing(
-        registry_root / log_leaf_path,
-        {
-            {"sequence", static_cast<int64_t>(sequence)},
-            {"release", release_record},
-        });
 
     nlohmann::json payload = {
         {"registry_root", registry_root.string()},
+        {"registry_read_root", RegistryReadRootUrl(config_)},
+        {"object_store_provider", config_.object_store.provider},
         {"created_root", created_root},
         {"package", draft.package},
         {"version", draft.version},
@@ -1400,14 +2322,18 @@ HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
         {"archive_sha256", archive_sha256},
         {"archive_size_bytes", static_cast<int64_t>(archive_size)},
         {"artifact_path", artifact_path},
-        {"index_path", index_path},
-        {"log_leaf_path", log_leaf_path},
-        {"sequence", static_cast<int64_t>(sequence)},
+        {"index_path", append_result.index_path},
+        {"log_leaf_path", append_result.log_leaf_path},
+        {"sequence", static_cast<int64_t>(append_result.sequence)},
         {"dependencies", draft.dependencies},
         {"dev_dependencies", draft.dev_dependencies},
+        {"checkpoint_version", metadata_versions.checkpoint_version},
+        {"snapshot_version", metadata_versions.snapshot_version},
+        {"timestamp_version", metadata_versions.timestamp_version},
+        {"namespaces", static_cast<int64_t>(metadata_versions.namespaces)},
     };
     published_releases_[release_key] = payload;
-    RecordMirrorState("fresh", "checkpoint-" + PaddedNumber(sequence, 4));
+    RecordMirrorState("fresh", "checkpoint-" + PaddedNumber(append_result.sequence, 4));
     return JsonResponse(200, SuccessEnvelope("published registry v2 release", payload));
   }
   catch (const std::exception &error)
@@ -1432,6 +2358,19 @@ HttpResponse PlatformRouter::HandleVerifyRegistry(const HttpRequest &request)
   try
   {
     const fs::path registry_root(config_.registry.root);
+    if (UsesS3ObjectStore(config_))
+    {
+      if (!ObjectExists(config_.object_store, "config.json") || !ObjectExists(config_.object_store, "trust/root.json"))
+      {
+        return FailureResponse(
+            422,
+            "registry verification failed",
+            "registry root is not initialized",
+            "VerifyError",
+            "verifyRegistry");
+      }
+      SyncS3RegistryStateToLocal(config_);
+    }
     if (!fs::exists(registry_root / "config.json") || !fs::exists(registry_root / "trust" / "root.json"))
     {
       return FailureResponse(
@@ -1448,6 +2387,8 @@ HttpResponse PlatformRouter::HandleVerifyRegistry(const HttpRequest &request)
     nlohmann::json payload = {
         {"ok", true},
         {"root", registry_root.string()},
+        {"registry_read_root", RegistryReadRootUrl(config_)},
+        {"object_store_provider", config_.object_store.provider},
         {"namespaces", static_cast<int64_t>(namespaces)},
         {"index_files", static_cast<int64_t>(index_files)},
         {"releases", static_cast<int64_t>(releases)},
@@ -1479,6 +2420,11 @@ void PlatformRouter::RecordMirrorState(std::string freshness, std::string replay
       .freshness = std::move(freshness),
       .replay_cursor = std::move(replay_cursor),
   };
+}
+
+std::string PlatformRouter::NextMemoryJobId()
+{
+  return "job-" + PaddedNumber(next_memory_job_sequence_++, 12);
 }
 
 }  // namespace spio::platform

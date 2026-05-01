@@ -10,11 +10,12 @@ RUN apt-get update \
     cmake \
     curl \
     git \
-    libboost-dev \
-    libclang-18-dev \
-    libcurl4-openssl-dev \
-    libedit-dev \
-    libpq-dev \
+	    libboost-dev \
+	    libclang-18-dev \
+	    libcurl4-openssl-dev \
+	    libedit-dev \
+	    libpq-dev \
+	    libssl-dev \
     libzstd-dev \
     lld-18 \
     llvm-18-dev \
@@ -64,8 +65,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    git \
-    libpq5 \
+	    git \
+	    openssl \
+	    libpq5 \
     python3 \
   && rm -rf /var/lib/apt/lists/*
 

@@ -54,6 +54,7 @@ jobs:
             lld-${STYIO_LLVM_MAJOR} \
             libboost-dev \
             libpq-dev \
+            libssl-dev \
             podman \
             buildah
 

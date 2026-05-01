@@ -2,7 +2,7 @@
 
 **Purpose:** Define the server-side responsibilities that produce the immutable `spio` registry `v2` static read plane without leaking dynamic publish behavior into the client-facing distribution protocol.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-05-02
 
 ## 1. Role
 
@@ -99,10 +99,18 @@ The tracked repository now implements:
 - local role-key generation
 - local publish worker for direct source-package commits into a `v2` root
 - static-root verification gates
+- native C++ publish-control-plane routing in `styio-platformd`
+- S3-backed static registry object publication for `config/`, `trust/`,
+  `index/`, `artifacts/`, and `log/`
+- in-process TLS/mTLS termination for the hosted control-plane daemon
 
 The local worker entrypoint is:
 
 - `scripts/registry-v2-publish.py`
+
+The hosted C++ entrypoint is:
+
+- `styio-platformd --serve`
 
 It updates:
 
@@ -112,4 +120,9 @@ It updates:
 - snapshot and timestamp metadata
 - transparency-log checkpoint and leaves
 
-It does not yet ship the hosted publish service itself. That omission is intentional; the repository now freezes the control-plane boundary so backend implementation can proceed independently of clients and mirrors while the public static protocol remains stable.
+When `STYIO_PLATFORM_OBJECT_STORE_PROVIDER=s3`, the hosted C++ route uses the
+local registry root as a staging cache, synchronizes existing remote metadata
+from S3, writes signed registry v2 metadata locally, and uploads the resulting
+static read-plane objects back to S3. Deployments must set bucket, endpoint,
+region, credentials, and a public `STYIO_PLATFORM_REGISTRY_READ_ROOT_URL` when
+clients consume the read plane through HTTP or a CDN.

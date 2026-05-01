@@ -351,6 +351,12 @@ TEST(PlatformServiceRouterTests, MatchesRegistryControlPlaneRoutesWithContractBa
   EXPECT_EQ(status->route.operation_id, "registryStatus");
   EXPECT_TRUE(status->route.internal);
 
+  const std::optional<spio::platform::RouteMatch> descriptor =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/api/spio-registry-control/v1/descriptor");
+  ASSERT_TRUE(descriptor.has_value());
+  EXPECT_EQ(descriptor->route.operation_id, "registryDescriptor");
+  EXPECT_TRUE(descriptor->route.internal);
+
   const std::optional<spio::platform::RouteMatch> publish =
       spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/api/spio-registry-control/v1/publish");
   ASSERT_TRUE(publish.has_value());
@@ -375,6 +381,15 @@ TEST(PlatformServiceObjectStoreTests, SanitizesArtifactObjectKeyParts)
   EXPECT_EQ(key.find("workspace main"), std::string::npos);
   EXPECT_EQ(key.find("job:42"), std::string::npos);
   EXPECT_EQ(key.find("../out"), std::string::npos);
+}
+
+TEST(PlatformServiceObjectStoreTests, NormalizesObjectKeysAsCanonicalRelativePaths)
+{
+  EXPECT_EQ(spio::platform::NormalizeObjectKey("/index/demo/app.jsonl"), "index/demo/app.jsonl");
+  EXPECT_THROW(spio::platform::NormalizeObjectKey(""), std::runtime_error);
+  EXPECT_THROW(spio::platform::NormalizeObjectKey("index/../root.json"), std::runtime_error);
+  EXPECT_THROW(spio::platform::NormalizeObjectKey("index//root.json"), std::runtime_error);
+  EXPECT_THROW(spio::platform::NormalizeObjectKey("index\\root.json"), std::runtime_error);
 }
 
 TEST(PlatformServicePostgresTests, DefinesCloudKernelMigrationAndClaimSql)
@@ -481,6 +496,49 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   EXPECT_EQ(event_list.at(2).at("status").get<std::string>(), "succeeded");
 }
 
+TEST(PlatformServiceJobQueueTests, RepeatedSubmissionsUseMonotonicIdsAndMissingMutationsDoNotCreateJobs)
+{
+  spio::platform::PlatformConfig config;
+  config.region = "local-dev";
+  config.node_id = "node-test";
+  config.object_store.provider = "memory";
+  config.mtls.required = true;
+
+  spio::platform::PlatformRouter router(config);
+
+  const spio::platform::HttpResponse first =
+      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  const spio::platform::HttpResponse second =
+      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+
+  ASSERT_EQ(first.status_code, 200);
+  ASSERT_EQ(second.status_code, 200);
+  EXPECT_EQ(first.body.at("payload").at("job_id").get<std::string>(), "job-000000000001");
+  EXPECT_EQ(second.body.at("payload").at("job_id").get<std::string>(), "job-000000000002");
+
+  const spio::platform::HttpResponse cancel_missing = router.Dispatch(Request(
+      spio::platform::HttpMethod::Post,
+      "/jobs/job-000000999999/cancel",
+      {{"reason", "missing"}}));
+  EXPECT_EQ(cancel_missing.status_code, 404);
+
+  const spio::platform::HttpResponse heartbeat_missing = router.Dispatch(Request(
+      spio::platform::HttpMethod::Post,
+      "/jobs/job-000000999999/heartbeat",
+      {{"worker_id", "worker-01"}}));
+  EXPECT_EQ(heartbeat_missing.status_code, 404);
+
+  const spio::platform::HttpResponse complete_missing = router.Dispatch(Request(
+      spio::platform::HttpMethod::Post,
+      "/jobs/job-000000999999/complete",
+      {{"worker_id", "worker-01"}, {"status", "succeeded"}}));
+  EXPECT_EQ(complete_missing.status_code, 404);
+
+  const spio::platform::HttpResponse lookup_missing =
+      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/job-000000999999"));
+  EXPECT_EQ(lookup_missing.status_code, 404);
+}
+
 TEST(PlatformServiceWorkgroupTests, RegistersAndListsClustersWithDefaultPolicy)
 {
   const fs::path root = MakeTempDir("platform-workgroup-register");
@@ -582,6 +640,7 @@ TEST(PlatformRegistryControlPlaneTests, StatusUsesRedactedPathsAndFilesystemRead
   EXPECT_TRUE(payload.at("root_metadata_present").get<bool>());
   EXPECT_EQ(payload.at("publish_endpoint").get<std::string>(), "/api/spio-registry-control/v1/publish");
   EXPECT_EQ(payload.at("verify_endpoint").get<std::string>(), "/api/spio-registry-control/v1/verify");
+  EXPECT_EQ(payload.at("descriptor_endpoint").get<std::string>(), "/api/spio-registry-control/v1/descriptor");
   EXPECT_EQ(status.body.dump().find(config.registry.root), std::string::npos);
   EXPECT_EQ(status.body.dump().find(config.registry.key_dir), std::string::npos);
 }
@@ -626,6 +685,30 @@ TEST(PlatformRegistryControlPlaneTests, PublishVerifyAndMirrorStatusUseLocalStat
   EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / published.at("artifact_path").get<std::string>()));
   EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / published.at("index_path").get<std::string>()));
   EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / published.at("log_leaf_path").get<std::string>()));
+  EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / "trust/timestamp.json"));
+  EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / "trust/snapshot.json"));
+  EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / "trust/targets/demo.json"));
+  EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / "log/checkpoint.json"));
+
+  const json registry_config = json::parse(ReadFile(fs::path(config.registry.root) / "config.json"));
+  EXPECT_EQ(registry_config.at("protocol").get<std::string>(), "spio-static-registry");
+  EXPECT_EQ(registry_config.at("protocol_version").get<int>(), 2);
+  const json root_metadata = json::parse(ReadFile(fs::path(config.registry.root) / "trust/root.json"));
+  EXPECT_EQ(root_metadata.at("signed").at("type").get<std::string>(), "root");
+  ASSERT_FALSE(root_metadata.at("signatures").empty());
+
+  const spio::platform::HttpResponse descriptor = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Get,
+      "/api/spio-registry-control/v1/descriptor",
+      RegistryWriterIdentity()));
+  ASSERT_EQ(descriptor.status_code, 200);
+  ASSERT_EQ(descriptor.body.at("returncode").get<int>(), 0);
+  const json descriptor_payload = descriptor.body.at("payload");
+  EXPECT_EQ(descriptor_payload.at("schema_version").get<int>(), 1);
+  EXPECT_EQ(descriptor_payload.at("registry_name").get<std::string>(), "test-registry");
+  EXPECT_EQ(descriptor_payload.at("root_sha256").get<std::string>().size(), 64U);
+  EXPECT_EQ(descriptor_payload.at("control_plane_base_url").get<std::string>(), "/api/spio-registry-control/v1");
+  EXPECT_EQ(descriptor_payload.at("descriptor_signature").get<std::string>(), "platform-control-plane-mtls");
 
   const spio::platform::HttpResponse verify = router.Dispatch(RequestWithIdentity(
       spio::platform::HttpMethod::Post,

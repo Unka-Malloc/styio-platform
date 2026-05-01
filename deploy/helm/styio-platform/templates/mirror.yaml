@@ -58,16 +58,14 @@ spec:
               value: postgres
             - name: STYIO_PLATFORM_POSTGRES_DSN
               value: {{ include "styio-platform.postgresDsn" . | quote }}
-            - name: STYIO_PLATFORM_OBJECT_STORE_PROVIDER
-              value: filesystem
+            {{- include "styio-platform.objectStoreEnv" . | nindent 12 }}
             - name: STYIO_PLATFORM_REGION
               value: {{ .Values.region | quote }}
             - name: STYIO_PLATFORM_NODE_ID
               value: {{ .Values.mirror.nodeId | quote }}
             - name: STYIO_PLATFORM_NODE_ROLES
               value: mirror
-            - name: STYIO_PLATFORM_MTLS_REQUIRED
-              value: {{ .Values.mtls.required | quote }}
+            {{- include "styio-platform.mtlsEnv" . | nindent 12 }}
             - name: STYIO_PLATFORM_WORKGROUP_ENABLED
               value: {{ .Values.workgroup.enabled | quote }}
             - name: STYIO_PLATFORM_WORKGROUP_ID
@@ -85,20 +83,39 @@ spec:
                   key: registration-token
             - name: STYIO_PLATFORM_REGISTRY_ROOT
               value: /var/lib/styio-platform/mirror-registry
+            - name: STYIO_PLATFORM_REGISTRY_READ_ROOT_URL
+              value: {{ .Values.registry.readRootUrl | quote }}
+            - name: STYIO_PLATFORM_REGISTRY_CONTROL_PLANE_BASE_URL
+              value: {{ .Values.registry.controlPlaneBaseUrl | quote }}
             - name: STYIO_PLATFORM_REGISTRY_MIRROR_ID
               value: {{ .Values.mirror.id | quote }}
             - name: STYIO_PLATFORM_REGISTRY_MIRROR_ORIGIN
               value: {{ .Values.mirror.origin | quote }}
           readinessProbe:
+            {{- if .Values.mtls.tlsEnabled }}
+            tcpSocket:
+              port: control
+            {{- else }}
             httpGet:
               path: /api/styio-platform/v1/health
               port: control
               httpHeaders:
                 - name: X-Styio-Mtls-Uri-San
                   value: spiffe://styio-platform/tenant/platform/role/operator/node/kube-probe
+            {{- end }}
           volumeMounts:
             - name: mirror-registry
               mountPath: /var/lib/styio-platform/mirror-registry
+            {{- if .Values.mtls.caSecretName }}
+            - name: mtls-ca
+              mountPath: /etc/styio-platform/mtls/ca
+              readOnly: true
+            {{- end }}
+            {{- if .Values.mtls.serverSecretName }}
+            - name: mtls-server
+              mountPath: /etc/styio-platform/mtls/server
+              readOnly: true
+            {{- end }}
         - name: registry-read
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -144,6 +161,7 @@ spec:
               value: {{ .Values.mirror.id | quote }}
             - name: STYIO_PLATFORM_REGISTRY_MIRROR_ORIGIN
               value: {{ .Values.mirror.origin | quote }}
+            {{- include "styio-platform.objectStoreEnv" . | nindent 12 }}
           volumeMounts:
             - name: registry-source
               mountPath: /var/lib/styio-platform/source-registry
@@ -157,3 +175,13 @@ spec:
         - name: mirror-registry
           persistentVolumeClaim:
             claimName: {{ include "styio-platform.fullname" . }}-mirror-registry
+        {{- if .Values.mtls.caSecretName }}
+        - name: mtls-ca
+          secret:
+            secretName: {{ .Values.mtls.caSecretName }}
+        {{- end }}
+        {{- if .Values.mtls.serverSecretName }}
+        - name: mtls-server
+          secret:
+            secretName: {{ .Values.mtls.serverSecretName }}
+        {{- end }}

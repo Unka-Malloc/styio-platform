@@ -2,7 +2,7 @@
 
 **Purpose:** Own platform documentation structure, generated indexes, and docs gate automation.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-05-02
 
 ## Mission
 
@@ -42,7 +42,9 @@ effective branch rules when required status-check governance changes.
 Registry-management docs must explicitly cover publish,
 verify, mirror freshness/replay, offline client fallback, service/client cache
 separation, VM one-command deployment, and security boundaries before
-docs/audit closure is claimed.
+docs/audit closure is claimed. When docs index behavior changes, keep empty
+collections anchored to their README `Last updated` value instead of allowing
+the generated date to drift without a source-document change.
 
 ## Change Classes
 
@@ -51,12 +53,17 @@ runbooks, gate scripts, post-push workflow specs, native JSON contract
 governance docs, technology/component inventory docs, regional-node docs, VM
 registry deployment docs, and mirror sync docs, including minimum
 registry-management audit coverage.
+S3 registry, mTLS, and Helm deployment docs are docs-delivery changes when they
+alter tracked install commands, values, secret names, generated indexes, or
+audit-gate discovery.
 
 ## Required Gates
 
 Run `python3 scripts/docs-index.py --write`, `python3 scripts/docs-audit.py`,
 `./scripts/audit-gate.sh`, and `python3 scripts/repo-hygiene-gate.py --mode
 tracked`.
+For Helm-facing docs changes, also render `helm template` with default values
+and with TLS/mTLS values enabled.
 
 ## Cross-Team Dependencies
 

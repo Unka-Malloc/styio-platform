@@ -2,7 +2,7 @@
 
 **Purpose:** Provide the executable validation and deployment procedure for a shared `spio` registry `v2` origin without mixing it with client cache behavior or hosted publish-service policy.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-05-02
 
 ## 1. Scope
 
@@ -203,6 +203,16 @@ Auth-bearing write-origin smoke tests are intentionally not shipped in the track
 ## 10. Production Checklist
 
 - use `https` for remote publish and fetch roots
+- terminate service-to-service TLS/mTLS in `styio-platformd` with
+  `STYIO_PLATFORM_TLS_ENABLED=1`, `STYIO_PLATFORM_MTLS_CA`,
+  `STYIO_PLATFORM_MTLS_CERT`, and `STYIO_PLATFORM_MTLS_KEY`
+- set `STYIO_PLATFORM_TRUST_PROXY_IDENTITY_HEADERS=0` when traffic is not
+  behind a trusted identity-terminating proxy
+- set `STYIO_PLATFORM_OBJECT_STORE_PROVIDER=s3` with bucket, endpoint, region,
+  prefix, access key, and secret key values for the registry read plane
+- set `STYIO_PLATFORM_REGISTRY_READ_ROOT_URL` to the public HTTP(S) or CDN root
+  that serves the S3-backed `config.json`, `trust/`, `index/`, `artifacts/`,
+  and `log/` objects
 - keep the VM installer smoke gate green before advertising the read endpoint
 - keep write/control-plane exposure private unless a deployment-owned gateway enforces authorization
 - preserve immutable object semantics for artifacts and log leaves
@@ -215,7 +225,31 @@ Auth-bearing write-origin smoke tests are intentionally not shipped in the track
 - if a policy file is used for write-origin headers, keep it outside the source tree and rotate its contents through deployment config rather than project manifests
 - if a named profile is used, provision it through the private security module under deployment-owned state rather than from project state
 
-## 11. Failure Triage
+## 11. Helm S3 and mTLS Baseline
+
+The Kubernetes chart exposes the production registry settings under
+`objectStore`, `registry`, and `mtls` values:
+
+```text
+helm upgrade --install styio deploy/helm/styio-platform \
+  --set objectStore.provider=s3 \
+  --set objectStore.bucket=styio-registry \
+  --set objectStore.endpoint=https://s3.example.internal \
+  --set objectStore.region=us-east-1 \
+  --set objectStore.existingSecret=styio-registry-s3 \
+  --set registry.readRootUrl=https://registry.example.internal \
+  --set mtls.tlsEnabled=true \
+  --set mtls.caSecretName=styio-platform-ca \
+  --set mtls.serverSecretName=styio-platform-server \
+  --set mtls.clientSecretName=styio-platform-worker
+```
+
+The object-store secret must provide `access-key-id`, `secret-access-key`, and
+optionally `session-token`. The server secret is mounted into the control-plane
+pods. The client secret is mounted into workers so HTTPS control-plane calls can
+present a SPIFFE URI SAN accepted by the platform router.
+
+## 12. Failure Triage
 
 - VM smoke fails on `config.json`:
   check `styio-registry-read.service`, read bind/port policy, and registry root permissions
