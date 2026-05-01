@@ -857,6 +857,10 @@ void HandlePosixConnection(int client, PlatformRouter &router)
 
 int RunBeastServer(const PlatformConfig &config, BeastServerOptions options)
 {
+  if (config.mtls.tls_enabled)
+  {
+    return RunOpenSslServer(config, options);
+  }
   try
   {
     const int listener = CreateListener(config);
