@@ -15,6 +15,13 @@ validation, external audit validation, and repository governance gates.
 - `registry-v2-control-plane-server.py` runs the local registry control-plane server.
 - `registry-v2-static-read-server.py` runs a read-only static registry read plane.
 - `registry-v2-vm-smoke.py` validates a deployed VM registry node.
+- `publish-spio-tool-release.py` publishes a prebuilt tool executable such as
+  `spio` or `styio` into a static read-plane root under `tools/<tool>/`, writes
+  shell-friendly channel pointers under
+  `channel/<channel>/<platform>/version`, updates `latest.json` for API
+  consumers, copies the installer script when provided, and rejects
+  same-version same-platform artifact overwrite attempts with different
+  content.
 - `k8s-smoke.py` validates the Helm-based primary, worker, mirror, Postgres,
   and PVC deployment in a kind cluster with Podman/Buildah OCI tooling, using
   the same YAML tool configuration file for defaults.
