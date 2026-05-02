@@ -34,6 +34,14 @@ host={{ include "styio-platform.fullname" . }}-postgres port=5432 dbname={{ .Val
 {{- default (printf "%s-object-store" (include "styio-platform.fullname" .)) .Values.objectStore.existingSecret -}}
 {{- end -}}
 
+{{- define "styio-platform.validateObjectStore" -}}
+{{- if eq .Values.objectStore.provider "s3" -}}
+{{- if or (not .Values.objectStore.bucket) (not .Values.objectStore.endpoint) -}}
+{{- fail "objectStore.provider=s3 requires non-empty objectStore.bucket and objectStore.endpoint" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "styio-platform.objectStoreEnv" -}}
 - name: STYIO_PLATFORM_OBJECT_STORE_PROVIDER
   value: {{ .Values.objectStore.provider | quote }}

@@ -63,8 +63,10 @@ available only when `STYIO_PLATFORM_TRUST_PROXY_IDENTITY_HEADERS=1`.
 
 The first multi-node deployment target is Kubernetes through
 `deploy/helm/styio-platform`. The chart deploys a primary control plane, a
-real compile worker, a mirror node, Postgres, and S3-backed registry/object
-storage with PVCs retained for staging, workspaces, and local mirror caches.
+real compile worker, a mirror node, Postgres, and filesystem-backed
+registry/object storage with PVCs retained for staging, workspaces, and local
+mirror caches. Production S3 publication remains opt-in through Helm
+`objectStore` values.
 `styio-platformd --migrate` applies the control-plane schema,
 `styio-platformd --worker` claims Git-backed build jobs and invokes
 `spio build`, and `styio-platformd --sync-mirror-once` copies the registry v2
@@ -149,7 +151,10 @@ scripts and use Podman/Buildah instead of Docker CLI.
 
 For direct Helm installs, set `postgres.password` or provide
 `postgres.externalDsn`; the repository default intentionally leaves the
-password empty so credentials are not stored in tracked values.
+password empty so credentials are not stored in tracked values. The default
+object store is filesystem-backed for local smoke runs; setting
+`objectStore.provider=s3` requires non-empty `objectStore.bucket` and
+`objectStore.endpoint` values.
 
 The common delivery wrapper keeps this smoke opt-in for local checkpoints:
 

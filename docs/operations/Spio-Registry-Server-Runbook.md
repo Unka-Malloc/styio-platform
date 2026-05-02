@@ -227,7 +227,8 @@ Auth-bearing write-origin smoke tests are intentionally not shipped in the track
 
 ## 11. Helm S3 and mTLS Baseline
 
-The Kubernetes chart exposes the production registry settings under
+The Kubernetes chart defaults to filesystem-backed PVC storage for local smoke
+runs. Production registry deployments must set the S3 registry values under
 `objectStore`, `registry`, and `mtls` values:
 
 ```text
@@ -247,7 +248,9 @@ helm upgrade --install styio deploy/helm/styio-platform \
 The object-store secret must provide `access-key-id`, `secret-access-key`, and
 optionally `session-token`. The server secret is mounted into the control-plane
 pods. The client secret is mounted into workers so HTTPS control-plane calls can
-present a SPIFFE URI SAN accepted by the platform router.
+present a SPIFFE URI SAN accepted by the platform router. Helm rendering fails
+when `objectStore.provider=s3` is selected without both `objectStore.bucket`
+and `objectStore.endpoint`.
 
 ## 12. Failure Triage
 

@@ -18,7 +18,7 @@ mtls:
   clientKeyPath: /etc/styio-platform/mtls/client/tls.key
 
 objectStore:
-  provider: s3
+  provider: filesystem
   bucket: ""
   endpoint: ""
   region: ""
