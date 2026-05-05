@@ -92,16 +92,120 @@ class ToolReleaseTests(unittest.TestCase):
             )
             self.assertEqual(styio.returncode, 0, styio.stderr)
             styio_result = json.loads(styio.stdout)
-            self.assertEqual(styio_result["binary_path"], "tools/styio/releases/0.0.1/linux-aarch64/styio")
+            self.assertEqual(styio_result["release_target"], "styio-linux")
+            self.assertEqual(styio_result["binary_path"], "tools/styio-linux/releases/0.0.1/linux-aarch64/styio")
             self.assertEqual(
                 styio_result["channel_version_path"],
-                "tools/styio/channel/stable/linux-aarch64/version",
+                "tools/styio-linux/channel/stable/linux-aarch64/version",
             )
             self.assertEqual(
-                (registry_root / "tools" / "styio" / "channel" / "stable" / "linux-aarch64" / "version").read_text(
+                (
+                    registry_root
+                    / "tools"
+                    / "styio-linux"
+                    / "channel"
+                    / "stable"
+                    / "linux-aarch64"
+                    / "version"
+                ).read_text(
                     encoding="utf-8"
                 ),
                 "0.0.1\n",
+            )
+
+            alpine = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--registry-root",
+                    str(registry_root),
+                    "--binary",
+                    str(styio_binary),
+                    "--version",
+                    "0.0.1",
+                    "--platform",
+                    "linux-musl-aarch64",
+                    "--tool",
+                    "styio",
+                    "--binary-name",
+                    "styio",
+                    "--channel",
+                    "stable",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(alpine.returncode, 0, alpine.stderr)
+            alpine_result = json.loads(alpine.stdout)
+            self.assertEqual(alpine_result["release_target"], "styio-linux")
+            self.assertEqual(
+                alpine_result["binary_path"],
+                "tools/styio-linux/releases/0.0.1/linux-musl-aarch64/styio",
+            )
+
+            macos_cli = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--registry-root",
+                    str(registry_root),
+                    "--binary",
+                    str(styio_binary),
+                    "--version",
+                    "0.0.1",
+                    "--platform",
+                    "darwin-aarch64",
+                    "--tool",
+                    "styio",
+                    "--binary-name",
+                    "styio",
+                    "--channel",
+                    "stable",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(macos_cli.returncode, 0, macos_cli.stderr)
+            macos_cli_result = json.loads(macos_cli.stdout)
+            self.assertEqual(macos_cli_result["release_target"], "styio-macos-cli")
+            self.assertEqual(
+                macos_cli_result["channel_version_path"],
+                "tools/styio-macos-cli/channel/stable/darwin-aarch64/version",
+            )
+
+            macos_gui = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--registry-root",
+                    str(registry_root),
+                    "--binary",
+                    str(styio_binary),
+                    "--version",
+                    "0.0.1",
+                    "--platform",
+                    "darwin-aarch64",
+                    "--tool",
+                    "styio",
+                    "--binary-name",
+                    "styio",
+                    "--channel",
+                    "stable",
+                    "--release-target",
+                    "styio-macos-desktop-gui",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(macos_gui.returncode, 0, macos_gui.stderr)
+            macos_gui_result = json.loads(macos_gui.stdout)
+            self.assertEqual(macos_gui_result["release_target"], "styio-macos-desktop-gui")
+            self.assertEqual(
+                macos_gui_result["binary_path"],
+                "tools/styio-macos-desktop-gui/releases/0.0.1/darwin-aarch64/styio",
             )
 
             second = subprocess.run(

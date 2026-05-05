@@ -2,7 +2,7 @@
 
 **Purpose:** Own the migrated compile-plan, mixed Styio/C++ compile model, cloud job request kernel, and C++ service-kernel integration boundary.
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-05
 
 ## Mission
 
@@ -46,6 +46,9 @@ only for smoke paths that need to verify clone, scheduling, artifact writeback,
 and control-plane completion without provisioning a full source-build toolchain.
 Worker control-plane transport changes must keep HTTP compatibility for local
 smoke tests and HTTPS client-certificate support for direct mTLS deployments.
+Tool-release helper tests must preserve the static read-plane layout consumed
+by the `styio-spio` installer and avoid coupling package-manager behavior to
+the platform control plane at install time.
 
 ## Change Classes
 
@@ -69,6 +72,8 @@ For Postgres store changes, configure at least one local build with
 `libpq-dev` available before relying on CI to cover the driver-enabled path.
 For Helm or direct mTLS changes, render both default and TLS-enabled chart
 variants with `helm template`.
+For tool-release helper changes, include
+`python3 -m unittest tests/unit/test_tool_release.py`.
 
 ## Cross-Team Dependencies
 

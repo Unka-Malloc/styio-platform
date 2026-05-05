@@ -2,7 +2,7 @@
 
 **Purpose:** Own global hosted workspace, native JSON platform control-plane, regional node, registry distribution, mirror sync, server-script, and cloud stress surfaces.
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-05
 
 ## Mission
 
@@ -48,6 +48,9 @@ Registry descriptor changes must keep
 client trust-import docs aligned. Hosted publish changes that move registry
 objects to S3 must describe the write authority, static read root URL, and
 object immutability assumptions in the registry operations runbook.
+Tool-release publication changes must keep `scripts/publish-spio-tool-release.py`,
+the release target namespace map, and `tests/unit/test_tool_release.py`
+aligned with the client-side installer contract in `styio-spio`.
 
 ## Change Classes
 
@@ -77,6 +80,8 @@ For registry-control-plane changes, include
 route changes, include the native registry route tests inside `ctest --test-dir
 build-codex --output-on-failure`. For VM registry deployment changes, include
 `python3 tests/unit/test_registry_vm_deploy.py`.
+For tool-release namespace changes, include
+`python3 -m unittest tests/unit/test_tool_release.py`.
 
 ## Cross-Team Dependencies
 

@@ -16,10 +16,15 @@ validation, external audit validation, and repository governance gates.
 - `registry-v2-static-read-server.py` runs a read-only static registry read plane.
 - `registry-v2-vm-smoke.py` validates a deployed VM registry node.
 - `publish-spio-tool-release.py` publishes a prebuilt tool executable such as
-  `spio` or `styio` into a static read-plane root under `tools/<tool>/`, writes
-  shell-friendly channel pointers under
+  `spio` or `styio` into a static read-plane root. `spio` is published under
+  `tools/spio/`; `styio` client builds are published under release target
+  namespaces such as `tools/styio-linux/`, `tools/styio-macos-cli/`,
+  `tools/styio-macos-desktop-gui/`, `tools/styio-windows-cli/`,
+  `tools/styio-windows-desktop-gui/`, `tools/styio-ios/`, or
+  `tools/styio-android/`. The script writes shell-friendly channel pointers under
   `channel/<channel>/<platform>/version`, updates `latest.json` for API
-  consumers, copies the installer script when provided, and rejects
+  consumers, distinguishes `linux-*` and `linux-musl-*` platform keys when
+  publishing from Linux build hosts, copies the installer script when provided, and rejects
   same-version same-platform artifact overwrite attempts with different
   content.
 - `k8s-smoke.py` validates the Helm-based primary, worker, mirror, Postgres,

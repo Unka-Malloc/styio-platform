@@ -4,12 +4,24 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform as host_platform
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
+
+STYIO_RELEASE_TARGETS = {
+    "styio-linux",
+    "styio-windows-cli",
+    "styio-windows-desktop-gui",
+    "styio-macos-cli",
+    "styio-macos-desktop-gui",
+    "styio-ios",
+    "styio-android",
+}
 
 
 def die(message: str) -> None:
@@ -48,9 +60,11 @@ def detect_platform() -> str:
     system = host_platform.system().lower()
     machine = host_platform.machine().lower()
     if system == "linux":
-        os_name = "linux"
+        os_name = "linux-musl" if detect_linux_libc() == "musl" else "linux"
     elif system == "darwin":
         os_name = "darwin"
+    elif system == "windows":
+        os_name = "windows"
     else:
         die(f"unsupported OS for automatic platform detection: {host_platform.system()}")
 
@@ -63,6 +77,81 @@ def detect_platform() -> str:
     return f"{os_name}-{arch}"
 
 
+def detect_linux_libc() -> str:
+    override = os.environ.get("STYIO_PLATFORM_RELEASE_LIBC", "").strip().lower()
+    if override:
+        if override in {"glibc", "musl"}:
+            return override
+        die(f"unsupported STYIO_PLATFORM_RELEASE_LIBC value: {override}")
+
+    if Path("/etc/alpine-release").exists():
+        return "musl"
+
+    libc_name, _ = host_platform.libc_ver()
+    normalized = libc_name.lower()
+    if "musl" in normalized:
+        return "musl"
+    if "glibc" in normalized:
+        return "glibc"
+
+    try:
+        proc = subprocess.run(["ldd", "--version"], capture_output=True, text=True, check=False)
+    except OSError:
+        return "glibc"
+    ldd_text = (proc.stdout + proc.stderr).lower()
+    if "musl" in ldd_text:
+        return "musl"
+    return "glibc"
+
+
+def infer_styio_release_target(platform_key: str) -> str:
+    if platform_key.startswith(("linux-", "linux-musl-")):
+        return "styio-linux"
+    if platform_key.startswith("darwin-"):
+        return "styio-macos-cli"
+    if platform_key.startswith("windows-"):
+        return "styio-windows-cli"
+    if platform_key.startswith("ios-"):
+        return "styio-ios"
+    if platform_key.startswith("android-"):
+        return "styio-android"
+    die(f"cannot infer styio release target from platform: {platform_key}")
+
+
+def validate_styio_release_target(target: str, platform_key: str) -> None:
+    if target not in STYIO_RELEASE_TARGETS:
+        die(
+            "unsupported styio release target: "
+            + target
+            + " (expected one of "
+            + ", ".join(sorted(STYIO_RELEASE_TARGETS))
+            + ")"
+        )
+    if target == "styio-linux" and not platform_key.startswith(("linux-", "linux-musl-")):
+        die(f"release target {target} requires a linux or linux-musl platform, got {platform_key}")
+    if target.startswith("styio-windows-") and not platform_key.startswith("windows-"):
+        die(f"release target {target} requires a windows platform, got {platform_key}")
+    if target.startswith("styio-macos-") and not platform_key.startswith("darwin-"):
+        die(f"release target {target} requires a darwin platform, got {platform_key}")
+    if target == "styio-ios" and not platform_key.startswith("ios-"):
+        die(f"release target {target} requires an ios platform, got {platform_key}")
+    if target == "styio-android" and not platform_key.startswith("android-"):
+        die(f"release target {target} requires an android platform, got {platform_key}")
+
+
+def resolve_release_target(tool: str, platform_key: str, explicit_target: str) -> str:
+    if explicit_target:
+        if tool != "styio":
+            die("--release-target is currently supported only for --tool styio")
+        validate_styio_release_target(explicit_target, platform_key)
+        return explicit_target
+    if tool == "styio":
+        target = infer_styio_release_target(platform_key)
+        validate_styio_release_target(target, platform_key)
+        return target
+    return tool
+
+
 def copy_immutable(source: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
@@ -73,11 +162,12 @@ def copy_immutable(source: Path, dest: Path) -> None:
     dest.chmod(0o755)
 
 
-def load_latest(path: Path, *, version: str, tool: str) -> dict[str, Any]:
+def load_latest(path: Path, *, version: str, tool: str, release_target: str) -> dict[str, Any]:
     if not path.exists():
         return {
             "schema_version": 1,
             "tool": tool,
+            "release_target": release_target,
             "version": version,
             "platforms": {},
         }
@@ -91,6 +181,7 @@ def load_latest(path: Path, *, version: str, tool: str) -> dict[str, Any]:
         payload = {
             "schema_version": 1,
             "tool": tool,
+            "release_target": release_target,
             "version": version,
             "platforms": {},
         }
@@ -99,6 +190,7 @@ def load_latest(path: Path, *, version: str, tool: str) -> dict[str, Any]:
         die(f"latest metadata platforms must be an object: {path}")
     payload["schema_version"] = 1
     payload["tool"] = tool
+    payload["release_target"] = release_target
     payload["version"] = version
     return payload
 
@@ -109,6 +201,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--binary", required=True, help="Tool executable to publish.")
     parser.add_argument("--version", required=True, help="Release version, for example 0.1.0-dev.")
     parser.add_argument("--platform", default="", help="Release platform key. Defaults to host detection.")
+    parser.add_argument(
+        "--release-target",
+        default="",
+        help=(
+            "Client release target namespace for styio, for example styio-linux, "
+            "styio-macos-cli, or styio-windows-desktop-gui. Defaults from --platform for --tool styio."
+        ),
+    )
     parser.add_argument(
         "--install-script",
         default="",
@@ -134,8 +234,9 @@ def main() -> int:
         die(f"registry root is not a directory: {registry_root}")
 
     platform_key = args.platform or detect_platform()
-    tool_root = registry_root / "tools" / args.tool
-    relative_binary_path = Path("tools") / args.tool / "releases" / args.version / platform_key / args.binary_name
+    release_target = resolve_release_target(args.tool, platform_key, args.release_target)
+    tool_root = registry_root / "tools" / release_target
+    relative_binary_path = Path("tools") / release_target / "releases" / args.version / platform_key / args.binary_name
     binary_dest = registry_root / relative_binary_path
     copy_immutable(binary, binary_dest)
     digest = sha256_file(binary_dest)
@@ -154,7 +255,7 @@ def main() -> int:
     atomic_write_text(channel_version_path, f"{args.version}\n")
 
     latest_path = tool_root / "latest.json"
-    latest = load_latest(latest_path, version=args.version, tool=args.tool)
+    latest = load_latest(latest_path, version=args.version, tool=args.tool, release_target=release_target)
     latest["platforms"][platform_key] = {
         "path": relative_binary_path.as_posix(),
         "sha256": digest,
@@ -165,6 +266,7 @@ def main() -> int:
     result = {
         "ok": True,
         "tool": args.tool,
+        "release_target": release_target,
         "version": args.version,
         "platform": platform_key,
         "binary_path": relative_binary_path.as_posix(),
