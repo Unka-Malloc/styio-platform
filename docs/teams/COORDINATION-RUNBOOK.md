@@ -23,13 +23,13 @@ distribution foundation for `styio-spio`.
 - `src/PlatformCloud/DeveloperWorkspace/` owns cloud job queues, worker runtime, compile-container/workspace factories, and workspace compile stress harnesses.
 - `src/PlatformService/` owns external HTTP routing, adapters, and daemon entrypoints.
 - `src/SpioPlatformProtocols/` owns all Spio-to-Platform interaction payloads and serializers for compile plans, project graphs, cloud policy, and build job requests.
-- `manifests/` declares business capability ownership and future extraction checklists.
+- `manifests/` declares business capability ownership and extraction checklists.
 - `docs/governance/Platform-Workspace-Compile-Model.md` owns the Styio default target, C++/LLVM workspace, and mixed compile rule.
 - `contracts/` publishes compile-plan, hosted control-plane, platform control-plane, registry control-plane, and registry v2 packages.
 - `docs/registry/` owns package distribution and mirror synchronization rules.
 - `docs/operations/` owns regional node deployment and recovery rules.
 - `scripts/` owns server tools, docs gates, and stress harnesses.
-- `docs/` owns service governance and migration history.
+- `docs/` owns service governance and operational policy.
 
 ## Ownership Table
 

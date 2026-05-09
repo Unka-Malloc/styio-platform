@@ -1,4 +1,4 @@
-#include "PlatformService/Router.hpp"
+#include "PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.hpp"
 
 namespace spio::platform
 {
@@ -101,6 +101,14 @@ std::vector<RouteSpec> BuildRegistryControlPlaneRoutes()
       {.operation_id = "rollbackDistribution",
        .method = HttpMethod::Post,
        .path = "/api/spio-registry-control/v1/distributions/{distribution_id}/rollback",
+       .internal = true},
+      {.operation_id = "listReleaseChannels",
+       .method = HttpMethod::Get,
+       .path = "/api/spio-registry-control/v1/release-channels",
+       .internal = true},
+      {.operation_id = "rolloutReleaseChannel",
+       .method = HttpMethod::Post,
+       .path = "/api/spio-registry-control/v1/release-channels/{channel}/rollout",
        .internal = true},
   };
 }

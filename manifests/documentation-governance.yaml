@@ -1,0 +1,66 @@
+id: documentation-governance
+kind: business-capability
+owner: docs-delivery
+description: Unified documentation governance for Styio platform and ecosystem repositories.
+depends_on:
+  - platform-foundation
+integrates_with:
+  - ecosystem-management
+split_policy:
+  extractable: true
+  extraction_shape: documentation-governance-control-plane + docs-gate-planner
+  base_must_remain_shared:
+    - platform-foundation
+cmake_targets:
+  - styio_platform_documentation_governance
+modules:
+  control_plane:
+    - src/PlatformCloud/DocumentationGovernance
+    - src/PlatformCloud/DocumentationGovernance/DocumentationGovernanceRoutes.cpp
+documentation_domains:
+  source_of_truth:
+    - native-json-contracts
+    - business-manifests
+    - generated-docs-indexes
+    - team-runbooks
+  collections:
+    - docs/governance
+    - docs/registry
+    - docs/operations
+    - docs/security
+    - docs/specs
+    - docs/adr
+    - docs/planning
+    - docs/external
+    - docs/assets
+    - docs/teams
+    - docs/audit
+ecosystem_repositories:
+  managed:
+    - styio
+    - styio-spio
+    - styio-view
+    - styio-platform
+    - styio-community
+  branch_policy:
+    long_lived_branch: stable
+apis:
+  control_plane_base_path: /api/styio-platform/v1
+  operations:
+    - listDocumentationGovernance
+    - planDocumentationChange
+security:
+  required_roles:
+    - operator
+    - control-plane
+quality_gates:
+  - docs-index
+  - docs-audit
+  - team-docs-gate
+  - repo-hygiene-gate
+  - contract-gate
+tests:
+  native:
+    - tests/native/PlatformKernelTests.cpp
+  contract:
+    - tests/interop/platform-control-plane-contract-gate.py

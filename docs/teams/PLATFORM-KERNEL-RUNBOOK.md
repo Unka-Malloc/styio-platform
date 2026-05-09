@@ -12,23 +12,28 @@ handoff, and build job request payloads.
 
 ## Owned Surface
 
-- `src/PlatformCore/` core package, resolver, registry-client, and toolchain dependencies.
+- `src/PlatformCore/` core package, resolver, source-fetch, registry-client, and toolchain dependencies.
 - `src/PlatformCore/System/` config loading, filesystem/process helpers, and operating-system adapters.
 - `src/PlatformStorage/PlatformCache/` cache and local state layout shared by resolver, registry-client, source-build toolchain, and protocol payloads.
 - `src/PlatformStorage/PlatformPersistence/` persisted state records, memory-backed development state, Postgres migrations/state access, and object storage access for platform artifacts and registry objects.
+- `src/PlatformStorage/PlatformRecovery/` filesystem snapshot, backup, restore, and storage-status primitives.
 - `src/SpioPlatformProtocols/` protocol payloads and serializers, including compile-plan generation, project-graph envelopes, cloud execution policy, and job request contracts.
-- `src/PlatformService/` native service-kernel implementation and local
-  Boost.Beast/Asio HTTP adapter with POSIX fallback.
+- `src/PlatformService/` native service-kernel implementation, route catalog,
+  and local Boost.Beast/Asio HTTP adapter with POSIX fallback.
 - `src/PlatformService/` registry control-plane route family for
   `/api/spio-registry-control/v1/status|descriptor|publish|verify`, including
   redaction, mTLS role checks, C++ signed registry v2 metadata, S3 object-store
   publication, local staging behavior, and mirror freshness state.
 - `src/PlatformSecurity/PlatformCA/` certificate authority, trust-anchor lifecycle, and managed mTLS certificate issuance.
+- `src/PlatformSecurity/ExternalIdentity/` Microsoft, Google, Apple, and Telegram identity normalization into platform actors.
 - `src/PlatformSecurity/PlatformClientAuth/` mTLS identity parsing, platform role recognition, internal role checks, and operation-level authorization policy.
 - `src/PlatformSecurity/SecurityHardening/` registry security policy hooks and hardening extension points.
-- `src/PlatformCloud/PackageRegistry/` package registry mirror helpers and registry v2 tooling.
+- `src/PlatformCloud/PackageRegistry/` package registry mirror helpers, release-channel management, and registry v2 tooling.
 - `src/PlatformCloud/DeveloperWorkspace/` cloud job queue semantics, worker runtime factories, compile-container/workspace factories, and workspace compile stress harnesses.
-- `manifests/` business capability boundaries for platform foundation, package registry, and developer workspace extraction planning.
+- `src/PlatformCloud/DocumentationGovernance/` documentation collection model, owner mapping, and docs change planning.
+- `src/PlatformCloud/EcosystemManagement/` Styio ecosystem repository manifest and release-train planning.
+- `src/PlatformService/PlatformOps/` rate-limit and metrics helpers used by service routes.
+- `manifests/` business capability boundaries for platform foundation, package registry, developer workspace, documentation governance, and ecosystem extraction planning.
 - `contracts/platform-control-plane/` payload shape in coordination with Control Plane.
 - `docs/governance/Platform-Workspace-Compile-Model.md`
 - `tests/native/` platform kernel tests.
@@ -62,6 +67,8 @@ consistent. Container-aware claims must filter by tenant/user binding before
 switching workspace state.
 Cache layout changes must keep resolver offline behavior, registry materialization,
 source-build roots, and project `.spio` state payloads aligned.
+Source-fetch changes must keep public workspace Git URLs, trusted dependency
+Git sources, and source-build compiler checkouts behind the shared fetcher.
 Storage changes must keep the memory-backed state fallback, Postgres-backed
 state, object-store behavior, migrations, and persisted record serializers
 aligned.
@@ -72,6 +79,18 @@ cloud workflow code.
 Compile container and worker workspace creation changes must go through the
 factory classes so registration payloads, stable container checkout paths, and
 artifact roots stay consistent.
+Production operation changes must keep recovery snapshots outside the registry
+root, keep storage-status paths redacted, treat audit query and metrics as
+operator/control-plane surfaces, and keep release-channel rollout separate from
+immutable publication generation.
+External identity changes must normalize provider-specific claims into internal
+actor ids without leaking provider SDK behavior into registry or workspace
+business logic.
+Ecosystem management changes must keep the stable-only branch policy, per-repo
+runtime adapters, and release artifact plan explicit without triggering source
+clones or builds in the control-plane route.
+Documentation governance changes must keep collection ownership, required
+runbooks, and docs gate planning deterministic from repository-relative paths.
 
 ## Change Classes
 
@@ -96,6 +115,14 @@ OS adapter changes include the interface in `PlatformCore/System`, the default
 POSIX implementation, and call sites that need injectable system behavior.
 Worker factory changes include compile-container specs, registration payload
 creation, and workspace checkout/artifact path creation.
+Recovery kernel changes include snapshot manifest shape, restore verification,
+and filesystem copy behavior. Operations kernel changes include rate-limit
+buckets, request metrics, and redacted storage status. External identity kernel
+changes include provider allowlists and actor id mapping. Release-management
+kernel changes include channel rollout validation and channel state files.
+Documentation-governance kernel changes include collection inventory,
+repository path classification, required gate calculation, and manifest/source
+tree ownership.
 
 ## Required Gates
 
@@ -113,6 +140,11 @@ For tool-release helper changes, include
 `python3 -m unittest tests/unit/test_tool_release.py`.
 For compile container changes, include native service tests and platform
 control-plane contract gates in addition to the full CTest run.
+For production-readiness modules, include
+`ctest --test-dir build-codex -R 'PlatformRecoveryTests|PlatformOpsTests|PlatformExternalIdentityTests|PlatformProductionOpsTests' --output-on-failure`
+plus the platform and registry control-plane contract gates.
+For documentation governance changes, include the platform control-plane
+contract gate, docs gate, and native documentation governance test.
 
 ## Cross-Team Dependencies
 

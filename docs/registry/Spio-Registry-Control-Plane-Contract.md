@@ -15,7 +15,7 @@ Human-readable docs explain those files. They do not replace them.
 
 ## Scope
 
-`v1` currently freezes these control-plane operations:
+`v1` freezes these control-plane operations:
 
 1. `GET /api/spio-registry-control/v1/status`
 2. `GET /api/spio-registry-control/v1/descriptor`
@@ -33,7 +33,7 @@ This contract does not own:
 
 - the immutable read-plane object layout itself
 - browser-facing frontend deployment flows
-- future hosted auth and tenancy policy
+- hosted auth and tenancy policy outside this route family
 
 Those remain in:
 
@@ -49,9 +49,9 @@ the shared status, publish, and verify envelopes while keeping mirror
 freshness/replay in platform mirror docs and offline cache behavior in
 `styio-spio` client docs.
 
-## Current Implementation Status
+## Executable Reference
 
-The tracked open-source repository now ships a local HTTP implementation:
+The local executable reference for this contract is:
 
 - [`../../scripts/registry-v2-control-plane-server.py`](../../scripts/registry-v2-control-plane-server.py)
 
@@ -60,8 +60,6 @@ That server binds:
 - one local registry root
 - one role-key directory
 - one `spio` binary for dry-run publish preparation
-
-It is the current executable reference for the contract package. It does not yet represent the final hosted multi-tenant service shape.
 
 The descriptor response is the platform-owned trust handoff to `styio-spio`.
 It names the registry read root, the control-plane base URL, and the SHA-256 of

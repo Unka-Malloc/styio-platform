@@ -179,6 +179,22 @@
       "request_shape": "EmptyObject",
       "success_shape": "GenericEnvelope",
       "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listReleaseChannels",
+      "method": "GET",
+      "path": "/release-channels",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "rolloutReleaseChannel",
+      "method": "POST",
+      "path": "/release-channels/{channel}/rollout",
+      "request_shape": "GenericObjectRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
     }
   ],
   "shapes": {

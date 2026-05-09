@@ -17,7 +17,8 @@ modules:
   cpp:
     - src/PlatformCloud/DeveloperWorkspace
   service_routes:
-    - src/PlatformService/Router.cpp::BuildPlatformControlPlaneRoutes
+    - src/PlatformCloud/DeveloperWorkspace/WorkspaceControlPlane.cpp
+    - src/PlatformCloud/DeveloperWorkspace/WorkspaceControlPlaneSupport.hpp
   stress_harness:
     - src/PlatformCloud/DeveloperWorkspace/workspace_compile_stress
   scripts:
@@ -72,6 +73,7 @@ runtime:
     - WorkerWorkspaceFactory
   adapters:
     - PlatformCore/System/OperatingSystemAdapter
+    - PlatformCore/SourceFetch/GitSourceFetcher
   container_runtime_policy:
     interface: planned
     current_adapter: os_process_and_workspace_paths

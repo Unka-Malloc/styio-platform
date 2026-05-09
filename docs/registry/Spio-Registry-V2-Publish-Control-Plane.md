@@ -66,7 +66,7 @@ Required release-state actions:
 Rules:
 
 - original artifacts remain immutable
-- package history is never silently rewritten
+- release records are never silently rewritten
 - repeated publish of the same version with a different payload must be rejected
 
 ## 5. Namespace Governance
@@ -91,9 +91,9 @@ A production publish service should provide at least:
 - signing-key isolation from general request handlers
 - audit logs for publish/yank/deprecate operations
 
-## 7. Tracked Open-Source Status
+## 7. Executable Surfaces
 
-The tracked repository now implements:
+The tracked executable surfaces are:
 
 - `v2` static contract pack
 - local role-key generation

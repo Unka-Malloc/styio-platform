@@ -68,6 +68,24 @@ bool IsAuthorizedForOperation(std::string_view operation_id, const MtlsIdentity 
   {
     return RoleIn(identity, {"operator"});
   }
+  if (operation_id == "listReleaseChannels")
+  {
+    return RoleIn(identity, {"operator", "registry-writer", "mirror"});
+  }
+  if (operation_id == "rolloutReleaseChannel")
+  {
+    return RoleIn(identity, {"operator"});
+  }
+  if (operation_id == "createRecoverySnapshot" || operation_id == "restoreRecoverySnapshot" ||
+      operation_id == "listAuditEvents" || operation_id == "platformMetrics" ||
+      operation_id == "storageStatus")
+  {
+    return RoleIn(identity, {"operator", "control-plane"});
+  }
+  if (operation_id == "listRecoverySnapshots")
+  {
+    return RoleIn(identity, {"operator", "control-plane", "mirror"});
+  }
   if (operation_id == "verifyPublication")
   {
     return RoleIn(identity, {"operator", "mirror", "registry-writer"});
@@ -75,6 +93,14 @@ bool IsAuthorizedForOperation(std::string_view operation_id, const MtlsIdentity 
   if (operation_id == "mirrorStatus")
   {
     return RoleIn(identity, {"control-plane", "registry-writer", "mirror", "operator"});
+  }
+  if (operation_id == "listDocumentationGovernance" || operation_id == "planDocumentationChange")
+  {
+    return RoleIn(identity, {"control-plane", "operator"});
+  }
+  if (operation_id == "listEcosystemRepositories" || operation_id == "planEcosystemRelease")
+  {
+    return RoleIn(identity, {"control-plane", "operator"});
   }
   if (operation_id == "registerWorkgroupCluster")
   {

@@ -23,12 +23,14 @@ Business capability boundaries are declared under `manifests/`. The current
 split keeps the shared base in `platform-foundation`, separates cloud package
 distribution into `package-registry`, and separates user-bound cloud development
 environments into `developer-workspace`.
+Agent-facing maintenance rules live in `AGENTS.md`; keep design details in
+code, contracts, tests, and manifests before adding prose.
 
-The first migrated kernel intentionally keeps the imported C++ namespace and
-contract names stable while the repo boundary settles. New platform services
-should live here first. `styio-spio` should only retain local package-manager
-client code, offline package workflows, local import/export paths, and
-compatibility shims that users need without connecting to the platform.
+The platform kernel keeps imported C++ namespace and contract names stable
+across repository boundaries. New platform services live here first.
+`styio-spio` retains local package-manager client code, offline package
+workflows, local import/export paths, and compatibility shims that users need
+without connecting to the platform.
 
 The V1 cloud service plan is a native platform kernel, not a generated API
 toolchain. Its executable contract source is the repo-native JSON package under

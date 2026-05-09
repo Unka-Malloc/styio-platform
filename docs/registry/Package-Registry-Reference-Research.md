@@ -154,12 +154,11 @@ PackageRegistry
     isolate mirrors from write-side outages
 ```
 
-## Implemented PackageRegistry Shape
+## PackageRegistry Shape
 
-The in-repo implementation now keeps the registry as a modular monolith with
-four explicit package-registry layers:
+The registry is a modular monolith with four explicit package-registry layers:
 
-| Layer | Current implementation point |
+| Layer | Implementation point |
 |---|---|
 | `ControlPlane` | `PlatformService/Router.cpp` exposes registry APIs for publish, package/release query, yank/unyank, owners, tokens, repositories, publications, and distributions. |
 | `PublicationBuilder` | C++ publish path and Python `package_registry_v2.publisher` both generate immutable `_publications/{publication_id}` snapshots and `_distributions/default/current.json`. |

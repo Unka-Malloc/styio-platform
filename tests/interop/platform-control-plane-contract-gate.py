@@ -33,6 +33,17 @@ EXPECTED_OPERATION_SNAPSHOT = [
     ("registerWorkgroupCluster", "POST", "/workgroups/{workgroup_id}/clusters/register"),
     ("listWorkgroupClusters", "GET", "/workgroups/{workgroup_id}/clusters"),
     ("mirrorStatus", "GET", "/mirrors/{mirror_id}/status"),
+    ("listDocumentationGovernance", "GET", "/docs/governance"),
+    ("planDocumentationChange", "POST", "/docs/change-plan"),
+    ("listEcosystemRepositories", "GET", "/ecosystem/repositories"),
+    ("planEcosystemRelease", "POST", "/ecosystem/releases/plan"),
+    ("createRecoverySnapshot", "POST", "/ops/recovery/snapshots"),
+    ("listRecoverySnapshots", "GET", "/ops/recovery/snapshots"),
+    ("restoreRecoverySnapshot", "POST", "/ops/recovery/snapshots/{snapshot_id}/restore"),
+    ("listAuditEvents", "GET", "/ops/audit-events"),
+    ("platformMetrics", "GET", "/ops/metrics"),
+    ("storageStatus", "GET", "/storage/status"),
+    ("exchangeExternalIdentity", "POST", "/identity/external/exchange"),
 ]
 FORBIDDEN_NON_NATIVE_TERMS = [
     "open" + "api",

@@ -2,6 +2,7 @@
 
 #include "PlatformCloud/DeveloperWorkspace/WorkerRuntimeFactory.hpp"
 #include "PlatformStorage/PlatformPersistence/ObjectStore.hpp"
+#include "PlatformCore/SourceFetch/SourceFetch.hpp"
 #include "PlatformCore/System/OperatingSystemAdapter.hpp"
 
 #include <nlohmann/json.hpp>
@@ -364,35 +365,46 @@ void ExecuteClaimedJob(
 
   const nlohmann::json &source = job_request.at("source");
   const std::string origin = source.at("origin").get<std::string>();
-  spio::ProcessResult clone = os.RunProcess({
-      .program = "git",
-      .args = {"clone", origin, workspace.checkout_root.string()},
-      .timeout = spio::kExternalProcessStepTimeout,
-      .error_context = "git clone for platform worker",
-  });
-  if (clone.exit_code != 0 || clone.timed_out)
-  {
-    WriteText(os, workspace.stderr_path, clone.stderr_text);
-    Complete(os, control, worker, job_id, "failed", "git clone failed", nlohmann::json::array(), {{"clone", clone.exit_code}});
-    return;
-  }
-
+  std::optional<std::string> requested_revision;
   if (source.contains("requested_revision") && source["requested_revision"].is_string())
   {
-    const std::string revision = source["requested_revision"].get<std::string>();
-    spio::ProcessResult checkout = os.RunProcess({
-        .program = "git",
-        .args = {"checkout", revision},
-        .working_directory = workspace.checkout_root,
-        .timeout = spio::kExternalProcessStepTimeout,
-        .error_context = "git checkout for platform worker",
+    requested_revision = source["requested_revision"].get<std::string>();
+  }
+
+  try
+  {
+    const spio::GitSourceFetcher fetcher(os);
+    (void) fetcher.EnsureWorktree({
+        .origin = origin,
+        .checkout_root = workspace.checkout_root,
+        .revision = requested_revision,
+        .update_existing = true,
+        .shallow = true,
+        .depth = 1,
+        .clone_revision_as_branch = false,
+        .policy = spio::PublicGitSourcePolicy(),
+        .error_context = "git fetch for platform worker",
     });
-    if (checkout.exit_code != 0 || checkout.timed_out)
-    {
-      WriteText(os, workspace.stderr_path, checkout.stderr_text);
-      Complete(os, control, worker, job_id, "failed", "git checkout failed", nlohmann::json::array(), {{"checkout", checkout.exit_code}});
-      return;
-    }
+  }
+  catch (const spio::SourceFetchError &error)
+  {
+    WriteText(os, workspace.stderr_path, error.result().stderr_text.empty() ? error.what() : error.result().stderr_text);
+    Complete(
+        os,
+        control,
+        worker,
+        job_id,
+        "failed",
+        error.operation().empty() ? "source fetch failed" : error.operation() + " failed",
+        nlohmann::json::array(),
+        {{"source_fetch", error.result().exit_code}});
+    return;
+  }
+  catch (const spio::FetchError &error)
+  {
+    WriteText(os, workspace.stderr_path, error.what());
+    Complete(os, control, worker, job_id, "failed", "source fetch failed", nlohmann::json::array(), {{"source_fetch", 1}});
+    return;
   }
 
   Heartbeat(os, control, worker, job_id, "worker starting build");

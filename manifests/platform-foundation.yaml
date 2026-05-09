@@ -21,11 +21,14 @@ modules:
     - src/PlatformCore/Manifest
     - src/PlatformCore/RegistryClient
     - src/PlatformCore/Resolve
+    - src/PlatformCore/SourceFetch
     - src/PlatformCore/Toolchain
   storage:
     - src/PlatformStorage/PlatformCache
     - src/PlatformStorage/PlatformPersistence
+    - src/PlatformStorage/PlatformRecovery
   security:
+    - src/PlatformSecurity/ExternalIdentity
     - src/PlatformSecurity/PlatformCA
     - src/PlatformSecurity/PlatformClientAuth
     - src/PlatformSecurity/SecurityHardening
@@ -33,6 +36,9 @@ modules:
     - src/SpioPlatformProtocols
   service_base:
     - src/PlatformService
+    - src/PlatformService/RouteCatalog.*
+    - src/PlatformService/RouterSupport.hpp
+    - src/PlatformService/PlatformOps
 contracts:
   service_runtime:
     - health
@@ -46,11 +52,23 @@ storage:
     - object_store
   cache:
     - local_cache_paths
+  recovery:
+    - filesystem_snapshot
+    - snapshot_restore
 security:
   primitives:
+    - external_identity_mapping
     - local_ca_lifecycle
     - mtls_client_identity
     - operation_authorization
+operations:
+  production_readiness:
+    - recovery_snapshot
+    - recovery_restore
+    - rate_limit
+    - audit_query
+    - metrics
+    - storage_status
 runtime_adapters:
   operating_system:
     - filesystem

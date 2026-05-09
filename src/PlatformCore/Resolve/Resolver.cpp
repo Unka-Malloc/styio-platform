@@ -3,18 +3,15 @@
 #include "PlatformStorage/PlatformCache/CachePaths.hpp"
 #include "PlatformCore/Core/Errors.hpp"
 #include "PlatformCore/Core/Paths.hpp"
-#include "PlatformCore/Core/Process.hpp"
 #include "PlatformCore/Core/Version.hpp"
 #include "PlatformCore/Manifest/Manifest.hpp"
 #include "PlatformCore/RegistryClient/Client.hpp"
+#include "PlatformCore/SourceFetch/SourceFetch.hpp"
 
 #include <algorithm>
-#include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <optional>
 #include <set>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -60,29 +57,6 @@ std::string PathKey(const fs::path &path)
   return CanonicalAbsolutePath(path).generic_string();
 }
 
-uint64_t Fnv1a64(const std::string &value)
-{
-  uint64_t hash = 1469598103934665603ULL;
-  for (const unsigned char ch : value)
-  {
-    hash ^= ch;
-    hash *= 1099511628211ULL;
-  }
-  return hash;
-}
-
-std::string Hex64(uint64_t value)
-{
-  std::ostringstream out;
-  out << std::hex << value;
-  return out.str();
-}
-
-bool LooksLikeRemoteGitSource(const std::string &source)
-{
-  return source.find("://") != std::string::npos || source.starts_with("git@");
-}
-
 bool PathIsWithin(const fs::path &candidate, const fs::path &root)
 {
   const fs::path relative = CanonicalAbsolutePath(candidate).lexically_relative(CanonicalAbsolutePath(root));
@@ -92,21 +66,6 @@ bool PathIsWithin(const fs::path &candidate, const fs::path &root)
   }
   const std::string text = relative.generic_string();
   return text != ".." && !text.starts_with("../");
-}
-
-std::string NormalizeGitSource(const std::string &source, const fs::path &package_dir)
-{
-  if (LooksLikeRemoteGitSource(source))
-  {
-    return source;
-  }
-
-  const fs::path source_path(source);
-  if (source_path.is_absolute())
-  {
-    return CanonicalAbsolutePath(source_path).generic_string();
-  }
-  return CanonicalAbsolutePath(package_dir / source_path).generic_string();
 }
 
 std::string SourceKindString(SourceKind kind)
@@ -175,202 +134,13 @@ std::vector<spio::Dependency> CollectDependencies(const spio::PackageConfig &pac
   return dependencies;
 }
 
-class GitSourceCache
-{
-public:
-  explicit GitSourceCache(const fs::path &spio_home, const bool offline, std::optional<fs::path> vendor_root)
-      : spio_home_(CanonicalAbsolutePath(spio_home)),
-        offline_(offline)
-  {
-    if (vendor_root.has_value())
-    {
-      vendor_root_ = CanonicalAbsolutePath(*vendor_root);
-    }
-    fs::create_directories(spio_home_ / "git" / "repos");
-    fs::create_directories(spio_home_ / "git" / "checkouts");
-  }
-
-  SourceOrigin Materialize(const std::string &normalized_source, const std::string &rev)
-  {
-    const std::string repo_hash = Hex64(Fnv1a64(normalized_source));
-    if (const std::optional<fs::path> vendored_snapshot = FindVendoredSnapshot(repo_hash, rev); vendored_snapshot.has_value())
-    {
-      return SourceOrigin{
-          .kind = SourceKind::kGit,
-          .git_source = normalized_source,
-          .git_rev = rev,
-          .repo_hash = repo_hash,
-          .snapshot_root = *vendored_snapshot,
-      };
-    }
-
-    const fs::path repo_dir = spio_home_ / "git" / "repos" / (repo_hash + ".git");
-    if (!fs::exists(repo_dir))
-    {
-      if (offline_)
-      {
-        throw spio::FetchError(
-            "offline mode requires a vendored snapshot or cached git mirror for '" + normalized_source + "'");
-      }
-      EnsureMirror(normalized_source, repo_dir);
-    }
-    if (!HasRevision(repo_dir, rev))
-    {
-      if (offline_)
-      {
-        throw spio::FetchError(
-            "offline mode is missing git rev '" + rev + "' in the local cache for '" + normalized_source + "'");
-      }
-      FetchOrigin(repo_dir);
-      if (!HasRevision(repo_dir, rev))
-      {
-        throw spio::FetchError("git source does not contain requested rev '" + rev + "': " + normalized_source);
-      }
-    }
-
-    const fs::path snapshot_root = spio_home_ / "git" / "checkouts" / repo_hash / rev;
-    EnsureSnapshot(repo_dir, snapshot_root, rev);
-    return SourceOrigin{
-        .kind = SourceKind::kGit,
-        .git_source = normalized_source,
-        .git_rev = rev,
-        .repo_hash = repo_hash,
-        .snapshot_root = snapshot_root,
-    };
-  }
-
-private:
-  std::optional<fs::path> FindVendoredSnapshot(const std::string &repo_hash, const std::string &rev) const
-  {
-    if (!vendor_root_.has_value())
-    {
-      return std::nullopt;
-    }
-
-    const fs::path snapshot_root = *vendor_root_ / "git" / repo_hash / rev;
-    if (!fs::exists(snapshot_root))
-    {
-      return std::nullopt;
-    }
-
-    const fs::path ready_marker = snapshot_root / ".spio-snapshot-ready";
-    if (fs::exists(ready_marker) || fs::exists(snapshot_root / "spio.toml"))
-    {
-      return CanonicalAbsolutePath(snapshot_root);
-    }
-    return std::nullopt;
-  }
-
-  void EnsureMirror(const std::string &normalized_source, const fs::path &repo_dir) const
-  {
-    if (fs::exists(repo_dir))
-    {
-      return;
-    }
-
-    fs::create_directories(repo_dir.parent_path());
-    const spio::ProcessResult result = spio::RunProcess<spio::CacheError>({
-        .program = "git",
-        .args = {"clone", "--mirror", normalized_source, repo_dir.string()},
-        .timeout = spio::kExternalProcessStepTimeout,
-        .error_context = "resolver process",
-    });
-    if (result.exit_code != 0)
-    {
-      throw spio::FetchError(
-          "failed to clone git source '" + normalized_source + "': " +
-          spio::DescribeProcessFailure(result));
-    }
-  }
-
-  bool HasRevision(const fs::path &repo_dir, const std::string &rev) const
-  {
-    const spio::ProcessResult result = spio::RunProcess<spio::CacheError>({
-        .program = "git",
-        .args = {"--git-dir", repo_dir.string(), "cat-file", "-e", rev + "^{commit}"},
-        .timeout = spio::kExternalProcessProbeTimeout,
-        .error_context = "resolver process",
-    });
-    if (result.timed_out)
-    {
-      throw spio::FetchError("failed to check git rev '" + rev + "': " + spio::DescribeProcessFailure(result));
-    }
-    return result.exit_code == 0;
-  }
-
-  void FetchOrigin(const fs::path &repo_dir) const
-  {
-    const spio::ProcessResult result = spio::RunProcess<spio::CacheError>({
-        .program = "git",
-        .args = {"--git-dir", repo_dir.string(), "fetch", "--prune", "origin"},
-        .timeout = spio::kExternalProcessStepTimeout,
-        .error_context = "resolver process",
-    });
-    if (result.exit_code != 0)
-    {
-      throw spio::FetchError(
-          "failed to fetch git source cache '" + repo_dir.string() + "': " +
-          spio::DescribeProcessFailure(result));
-    }
-  }
-
-  void EnsureSnapshot(const fs::path &repo_dir, const fs::path &snapshot_root, const std::string &rev) const
-  {
-    const fs::path ready_marker = snapshot_root / ".spio-snapshot-ready";
-    if (fs::exists(ready_marker))
-    {
-      return;
-    }
-
-    fs::remove_all(snapshot_root);
-    fs::create_directories(snapshot_root);
-    const fs::path archive_path = snapshot_root.parent_path() / (Hex64(Fnv1a64(rev)) + ".tar");
-    const spio::ProcessResult archive = spio::RunProcess<spio::CacheError>({
-        .program = "git",
-        .args = {"--git-dir", repo_dir.string(), "archive", "--format=tar", "--output", archive_path.string(), rev},
-        .timeout = spio::kExternalProcessStepTimeout,
-        .error_context = "resolver process",
-    });
-    if (archive.exit_code != 0)
-    {
-      std::error_code ignored;
-      fs::remove(archive_path, ignored);
-      throw spio::FetchError(
-          "failed to archive git rev '" + rev + "': " +
-          spio::DescribeProcessFailure(archive));
-    }
-
-    const spio::ProcessResult extract = spio::RunProcess<spio::CacheError>({
-        .program = "tar",
-        .args = {"-xf", archive_path.string(), "-C", snapshot_root.string()},
-        .timeout = spio::kExternalProcessStepTimeout,
-        .error_context = "resolver process",
-    });
-    fs::remove(archive_path);
-    if (extract.exit_code != 0)
-    {
-      throw spio::CacheError(
-          "failed to extract git snapshot '" + snapshot_root.string() + "': " +
-          spio::DescribeProcessFailure(extract));
-    }
-
-    std::ofstream marker(ready_marker);
-    marker << "ready\n";
-  }
-
-  fs::path spio_home_;
-  bool offline_ = false;
-  std::optional<fs::path> vendor_root_;
-};
-
 class SingleVersionResolver
 {
 public:
   explicit SingleVersionResolver(const fs::path &manifest_path, const spio::ResolveOptions &options)
       : root_manifest_path_(CanonicalAbsolutePath(manifest_path)),
         root_manifest_(spio::LoadManifest(root_manifest_path_)),
-        options_(NormalizeOptions(root_manifest_path_, options)),
-        git_cache_(spio::ResolveSpioHome(), options_.offline, options_.vendor_root)
+        options_(NormalizeOptions(root_manifest_path_, options))
   {
     BuildRootSeeds();
   }
@@ -643,8 +413,23 @@ private:
 
   ManifestSelection ResolveGitDependency(const Node &parent, const spio::Dependency &dependency)
   {
-    const std::string normalized_source = NormalizeGitSource(dependency.source, parent.package_dir);
-    const SourceOrigin git_origin = git_cache_.Materialize(normalized_source, dependency.rev.value());
+    const std::string normalized_source = spio::NormalizeGitSource(dependency.source, parent.package_dir);
+    const spio::GitSnapshotResult snapshot = git_fetcher_.MaterializeSnapshot({
+        .spio_home = spio::ResolveSpioHome(),
+        .vendor_root = options_.vendor_root,
+        .origin = normalized_source,
+        .revision = dependency.rev.value(),
+        .offline = options_.offline,
+        .policy = spio::TrustedGitSourcePolicy(),
+        .error_context = "resolver process",
+    });
+    const SourceOrigin git_origin{
+        .kind = SourceKind::kGit,
+        .git_source = normalized_source,
+        .git_rev = dependency.rev.value(),
+        .repo_hash = snapshot.repo_hash,
+        .snapshot_root = snapshot.snapshot_root,
+    };
     const fs::path root_manifest = git_origin.snapshot_root.value() / "spio.toml";
     if (!fs::exists(root_manifest))
     {
@@ -790,7 +575,7 @@ private:
   fs::path root_manifest_path_;
   spio::ManifestDocument root_manifest_;
   spio::ResolveOptions options_;
-  GitSourceCache git_cache_;
+  spio::GitSourceFetcher git_fetcher_;
   std::vector<ManifestSelection> root_seeds_;
   std::set<std::string> top_level_workspace_dirs_;
   std::unordered_map<std::string, size_t> node_by_source_fingerprint_;

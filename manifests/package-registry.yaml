@@ -14,8 +14,17 @@ cmake_targets:
 modules:
   control_plane:
     - src/PlatformCloud/PackageRegistry/ControlPlane
-    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.cpp
-    - src/PlatformService/Router.cpp::registry-handler-dispatch
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.*
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryControlPlane.cpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryPackageHandlers.cpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryOwnerTokenHandlers.cpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryRepositoryHandlers.cpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/Registry*Support.hpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryIdentifiers.hpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryIndexStore.hpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryTrustMetadata.hpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryPublishWorkflow.hpp
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryObjectStoreSync.hpp
   publication_builder:
     - src/PlatformCloud/PackageRegistry/PublicationBuilder
     - src/PlatformCloud/PackageRegistry/package_registry_v2
@@ -24,6 +33,8 @@ modules:
     - scripts/registry-v2-static-read-server.py
   mirror_sync:
     - src/PlatformCloud/PackageRegistry/MirrorSync
+  release_management:
+    - src/PlatformCloud/PackageRegistry/ReleaseManagement
   scripts:
     - scripts/package-registry-server.sh
     - scripts/deploy-registry-vm.sh
@@ -63,6 +74,8 @@ apis:
     - listDistributions
     - promoteDistribution
     - rollbackDistribution
+    - listReleaseChannels
+    - rolloutReleaseChannel
 storage:
   persistence:
     - platform_packages
@@ -81,6 +94,7 @@ storage:
     - registry_trust_metadata
     - registry_publications
     - registry_distribution_pointers
+    - registry_release_channels
   cache:
     - registry_read_cache
 security:
@@ -101,7 +115,7 @@ runtime:
   deployment_modes:
     - embedded_platformd
     - vm_bundle
-    - future_standalone_registry_service
+    - standalone_registry_service
 observability:
   health:
     - registry_root_verified

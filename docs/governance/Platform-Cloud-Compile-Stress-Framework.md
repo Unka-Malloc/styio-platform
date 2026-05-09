@@ -1,6 +1,6 @@
 # Platform Cloud Compile Stress Framework
 
-**Purpose:** Define the public stress-test framework for future multi-tenant platform compile-cloud service deployments without pretending the tracked tree already ships the production scheduler, container runtime, or tenant control plane.
+**Purpose:** Define the public stress-test framework for multi-tenant platform compile-cloud service deployments.
 
 **Last updated:** 2026-04-22
 
@@ -16,22 +16,22 @@ This document owns the tracked public rules for:
 
 It does not own:
 
-- production container runtime implementation
+- production container runtime internals
 - tenant billing, account, auth, or quota policy
 - cloud-vendor deployment manifests
 - private security-module behavior
 
-Those must stay in service-specific or private documents until the public hosted control plane is ready to expose them.
+Those belong in service-specific or private documents until they become public control-plane contracts.
 
-## Baseline Position
+## Framework
 
-The tracked open-source repository now ships a deterministic synthetic stress framework:
+The deterministic synthetic stress entrypoint is:
 
 ```text
 ./scripts/cloud-compile-stress.py
 ```
 
-The framework models the pressure surface that a future compile-cloud deployment must survive:
+The framework models the pressure surface that compile-cloud deployments must survive:
 
 1. multiple tenants submit compile jobs concurrently
 2. each tenant owns a logical container pool
@@ -41,7 +41,9 @@ The framework models the pressure surface that a future compile-cloud deployment
 6. draining containers may finish already accepted jobs but must not receive new jobs
 7. replacement containers must warm before they can accept jobs
 
-This is intentionally a synthetic harness. It is allowed in CI because it does not require Docker, Kubernetes, credentials, or a deployed control plane. A future real-service adapter must preserve the same summary schema and gate semantics so historical stress thresholds remain comparable.
+This synthetic harness is allowed in CI because it does not require Docker,
+Kubernetes, credentials, or a deployed control plane. Production adapters must
+preserve the same summary schema and gate semantics.
 
 ## Tenant Model
 
@@ -61,7 +63,9 @@ Rules:
 4. Tenant-level job counts, failure counts, max in-flight counts, container creations, and hot replacements must be reported separately.
 5. A stress run fails its gate if any tenant completes zero jobs.
 
-The public harness deliberately uses hard tenant/container affinity. Later shared worker pools may optimize physical placement, but they must still prove equivalent logical isolation.
+The public harness deliberately uses hard tenant/container affinity. Shared
+worker pools may optimize physical placement, but they must still prove
+equivalent logical isolation.
 
 ## Container Lifecycle
 

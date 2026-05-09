@@ -29,11 +29,13 @@ set(STYIO_PLATFORM_CORE_SOURCES
     PlatformCore/Manifest/Manifest.cpp
     PlatformCore/RegistryClient/Client.cpp
     PlatformCore/Resolve/Resolver.cpp
+    PlatformCore/SourceFetch/SourceFetch.cpp
     PlatformCore/Toolchain/SourceBuild.cpp
     PlatformCore/Toolchain/State.cpp
 )
 
 set(STYIO_PLATFORM_SECURITY_SOURCES
+    PlatformSecurity/ExternalIdentity/ExternalIdentity.cpp
     PlatformSecurity/PlatformCA/CertificateAuthority.cpp
     PlatformSecurity/PlatformClientAuth/Authorization.cpp
     PlatformSecurity/PlatformClientAuth/Identity.cpp
@@ -53,11 +55,13 @@ set(STYIO_PLATFORM_STORAGE_SOURCES
     PlatformStorage/PlatformPersistence/MemoryStateStore.cpp
     PlatformStorage/PlatformPersistence/ObjectStore.cpp
     PlatformStorage/PlatformPersistence/PostgresStore.cpp
+    PlatformStorage/PlatformRecovery/RecoveryManager.cpp
 )
 
 set(STYIO_PLATFORM_PACKAGE_REGISTRY_SOURCES
     PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.cpp
     PlatformCloud/PackageRegistry/MirrorSync/MirrorSync.cpp
+    PlatformCloud/PackageRegistry/ReleaseManagement/ReleaseManager.cpp
 )
 
 set(STYIO_PLATFORM_DEVELOPER_WORKSPACE_SOURCES
@@ -66,9 +70,26 @@ set(STYIO_PLATFORM_DEVELOPER_WORKSPACE_SOURCES
     PlatformCloud/DeveloperWorkspace/WorkerRuntimeFactory.cpp
 )
 
+set(STYIO_PLATFORM_DOCUMENTATION_GOVERNANCE_SOURCES
+    PlatformCloud/DocumentationGovernance/DocumentationGovernance.cpp
+)
+
+set(STYIO_PLATFORM_ECOSYSTEM_MANAGEMENT_SOURCES
+    PlatformCloud/EcosystemManagement/EcosystemManager.cpp
+)
+
 set(STYIO_PLATFORM_SERVICE_SOURCES
+    PlatformCloud/DeveloperWorkspace/WorkspaceControlPlane.cpp
+    PlatformCloud/DocumentationGovernance/DocumentationGovernanceRoutes.cpp
+    PlatformCloud/PackageRegistry/ControlPlane/RegistryControlPlane.cpp
+    PlatformCloud/PackageRegistry/ControlPlane/RegistryOwnerTokenHandlers.cpp
+    PlatformCloud/PackageRegistry/ControlPlane/RegistryPackageHandlers.cpp
+    PlatformCloud/PackageRegistry/ControlPlane/RegistryRepositoryHandlers.cpp
     PlatformService/BeastServer.cpp
     PlatformService/Http.cpp
+    PlatformService/PlatformOps/OpsRoutes.cpp
+    PlatformService/PlatformOps/OpsManager.cpp
+    PlatformService/RouteCatalog.cpp
     PlatformService/Router.cpp
 )
 
@@ -100,10 +121,18 @@ target_link_libraries(styio_platform_package_registry PUBLIC styio_platform_core
 styio_platform_add_static_library(styio_platform_developer_workspace ${STYIO_PLATFORM_DEVELOPER_WORKSPACE_SOURCES})
 target_link_libraries(styio_platform_developer_workspace PUBLIC styio_platform_core styio_platform_protocols styio_platform_storage Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
 
+styio_platform_add_static_library(styio_platform_documentation_governance ${STYIO_PLATFORM_DOCUMENTATION_GOVERNANCE_SOURCES})
+target_link_libraries(styio_platform_documentation_governance PUBLIC styio_platform_core)
+
+styio_platform_add_static_library(styio_platform_ecosystem_management ${STYIO_PLATFORM_ECOSYSTEM_MANAGEMENT_SOURCES})
+target_link_libraries(styio_platform_ecosystem_management PUBLIC styio_platform_core)
+
 add_library(styio_platform_cloud INTERFACE)
 target_link_libraries(styio_platform_cloud INTERFACE
   styio_platform_package_registry
   styio_platform_developer_workspace
+  styio_platform_documentation_governance
+  styio_platform_ecosystem_management
 )
 
 styio_platform_add_static_library(styio_platform_service ${STYIO_PLATFORM_SERVICE_SOURCES})

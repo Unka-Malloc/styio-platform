@@ -17,6 +17,7 @@ mirror synchronization.
 - `contracts/platform-control-plane/`
 - `contracts/registry-control-plane/`
 - `contracts/registry-v2/`
+- `docs/governance/Platform-Documentation-Governance.md`
 - `docs/governance/Platform-Global-Service-Model.md`
 - `docs/governance/Platform-Workspace-Compile-Model.md`
 - `docs/governance/Platform-Cloud-Control-Plane-Contract.md`
@@ -57,6 +58,16 @@ User-bound compile container changes must keep
 `contracts/platform-control-plane/v1/`, `tests/interop/platform-control-plane-contract-gate.py`,
 the HTTP smoke job payload, and workspace compile governance aligned so
 container-aware claims cannot drift from the public route contract.
+Production-ops route changes must keep recovery snapshots, audit event queries,
+metrics, storage status, and external identity exchange aligned across
+`contracts/platform-control-plane/v1/`, route tests, and service handlers.
+Registry release-channel changes must keep
+`contracts/registry-control-plane/v1/`, `PackageRegistry/ReleaseManagement`,
+and distribution promote/rollback semantics aligned so gray rollout state does
+not become a second source of package truth.
+Documentation-governance route changes must keep
+`contracts/platform-control-plane/v1/`, the governance manifest, generated docs
+indexes, and team runbook gate behavior aligned.
 
 ## Change Classes
 
@@ -70,6 +81,12 @@ trust boundaries.
 Compile container registration, status lookup, workspace hot-switching, and
 container-aware job claim semantics are also control-plane changes because they
 define how hosted work is assigned to user-bound warm environments.
+Snapshot/restore, rate-limit, audit-query, metrics, storage-status, external
+identity exchange, and registry release-channel rollout are control-plane
+changes because they affect production operations and externally callable API
+shape.
+Documentation-governance planning is also a control-plane change when it adds
+routes, contract examples, or review policy that downstream tools will consume.
 
 The V1 cloud-service implementation boundary is pure C++ with Boost.Beast and
 Boost.Asio, Postgres for durable state, provider-neutral object storage with S3
@@ -94,6 +111,12 @@ For tool-release namespace changes, include
 For compile container route changes, include
 `python3 tests/interop/platform-control-plane-contract-gate.py --mode fuzz`
 and the native job queue tests covering user binding and workspace switching.
+For production-ops route changes, include the platform control-plane contract
+gate, registry-control-plane contract gate when release channels change, and
+the native production ops tests covering recovery, storage status, metrics,
+audit query, release rollout, and external identity exchange.
+For documentation-governance route changes, include the platform control-plane
+contract gate, docs gate, and native documentation governance tests.
 
 ## Cross-Team Dependencies
 

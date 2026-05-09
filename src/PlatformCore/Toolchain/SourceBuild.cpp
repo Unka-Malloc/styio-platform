@@ -4,15 +4,14 @@
 #include "PlatformCore/Core/Errors.hpp"
 #include "PlatformCore/Core/Paths.hpp"
 #include "PlatformCore/Core/Process.hpp"
+#include "PlatformCore/SourceFetch/SourceFetch.hpp"
 #include "PlatformCore/Toolchain/Vocabulary.hpp"
 
 #include <chrono>
-#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -22,47 +21,6 @@ namespace fs = std::filesystem;
 
 namespace
 {
-
-uint64_t Fnv1a64(const std::string &text)
-{
-  uint64_t hash = 1469598103934665603ULL;
-  for (const unsigned char ch : text)
-  {
-    hash ^= static_cast<uint64_t>(ch);
-    hash *= 1099511628211ULL;
-  }
-  return hash;
-}
-
-std::string Hex64(const uint64_t value)
-{
-  std::ostringstream out;
-  out << std::hex;
-  out.width(16);
-  out.fill('0');
-  out << value;
-  return out.str();
-}
-
-std::string Slugify(const std::string &text)
-{
-  std::string slug;
-  slug.reserve(text.size() + 17U);
-  for (const unsigned char ch : text)
-  {
-    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '.' || ch == '_' || ch == '-')
-    {
-      slug.push_back(static_cast<char>(ch));
-    }
-    else
-    {
-      slug.push_back('_');
-    }
-  }
-  slug += "-";
-  slug += Hex64(Fnv1a64(text));
-  return slug;
-}
 
 std::string Trim(std::string text)
 {
@@ -219,7 +177,8 @@ SourceBuildResult EnsureSourceBuiltStyio(const SourceBuildRequest &request)
   }
   else
   {
-    const std::string cache_identity = Slugify(OfficialSourceOrigin() + "#" + requested_ref);
+    const std::string source_origin = OfficialSourceOrigin();
+    const std::string cache_identity = spio::SourceFetchSlug(source_origin + "#" + requested_ref);
     source_root = SourceCheckoutRoot(spio_home, request.channel, cache_identity);
 
     if (!fs::exists(source_root))
@@ -228,39 +187,40 @@ SourceBuildResult EnsureSourceBuiltStyio(const SourceBuildRequest &request)
       {
         throw ToolError("styio source tree not available locally and fetch was declined");
       }
-      fs::create_directories(source_root.parent_path());
-      if (request.source_revision.has_value())
-      {
-        RunChecked("git", {"clone", "--no-checkout", OfficialSourceOrigin(), source_root.string()}, std::nullopt, "git clone");
-        RunChecked("git", {"fetch", "--depth", "1", "origin", requested_ref}, source_root, "git fetch");
-        RunChecked("git", {"checkout", "--force", "FETCH_HEAD"}, source_root, "git checkout");
-      }
-      else
-      {
-        RunChecked(
-            "git",
-            {"clone", "--depth", "1", "--branch", request.channel, OfficialSourceOrigin(), source_root.string()},
-            std::nullopt,
-            "git clone");
-      }
-      fetched = true;
     }
-    else
+
+    if (fs::exists(source_root))
     {
       EnsureDirectorySourceRoot(source_root);
       if (fs::exists(source_root / ".git") && !request.offline)
       {
-        if (request.source_revision.has_value())
-        {
-          RunChecked("git", {"fetch", "--depth", "1", "origin", requested_ref}, source_root, "git fetch");
-          RunChecked("git", {"checkout", "--force", "FETCH_HEAD"}, source_root, "git checkout");
-        }
-        else
-        {
-          RunChecked("git", {"fetch", "--depth", "1", "origin", request.channel}, source_root, "git fetch");
-          RunChecked("git", {"checkout", "--force", "FETCH_HEAD"}, source_root, "git checkout");
-        }
+        spio::GitSourceFetcher().EnsureWorktree({
+            .origin = source_origin,
+            .checkout_root = source_root,
+            .revision = requested_ref,
+            .update_existing = true,
+            .shallow = true,
+            .depth = 1,
+            .clone_revision_as_branch = !request.source_revision.has_value(),
+            .policy = spio::TrustedGitSourcePolicy(),
+            .error_context = "source-toolchain process",
+        });
       }
+    }
+    else
+    {
+      const spio::GitWorktreeResult checkout = spio::GitSourceFetcher().EnsureWorktree({
+          .origin = source_origin,
+          .checkout_root = source_root,
+          .revision = requested_ref,
+          .update_existing = true,
+          .shallow = true,
+          .depth = 1,
+          .clone_revision_as_branch = !request.source_revision.has_value(),
+          .policy = spio::TrustedGitSourcePolicy(),
+          .error_context = "source-toolchain process",
+      });
+      fetched = checkout.cloned || checkout.fetched;
     }
 
     source_revision = TryResolveGitRevision(source_root);
@@ -268,10 +228,10 @@ SourceBuildResult EnsureSourceBuiltStyio(const SourceBuildRequest &request)
 
   if (source_revision.empty())
   {
-    source_revision = request.source_revision.value_or(Slugify(source_root.string()));
+    source_revision = request.source_revision.value_or(SourceFetchSlug(source_root.string()));
   }
 
-  const std::string build_identity = Slugify(source_revision);
+  const std::string build_identity = SourceFetchSlug(source_revision);
   const fs::path build_root = SourceToolchainBuildRoot(spio_home, request.channel, build_identity, request.build_mode);
   const fs::path compiler_binary = CanonicalAbsolutePath(build_root / "bin" / "styio");
 

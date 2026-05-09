@@ -1,0 +1,52 @@
+id: ecosystem-management
+kind: business-capability
+owner: platform-ecosystem
+description: Unified governance for Styio ecosystem repositories while preserving heterogeneous build and runtime adapters.
+depends_on:
+  - platform-foundation
+integrates_with:
+  - package-registry
+  - developer-workspace
+split_policy:
+  extractable: true
+  extraction_shape: ecosystem-manifest-control-plane + release-train-planner
+  base_must_remain_shared:
+    - platform-foundation
+cmake_targets:
+  - styio_platform_ecosystem_management
+modules:
+  control_plane:
+    - src/PlatformCloud/EcosystemManagement
+    - src/PlatformCloud/DocumentationGovernance/DocumentationGovernanceRoutes.cpp::ecosystem-management-routes
+repositories:
+  managed:
+    - styio
+    - styio-spio
+    - styio-view
+    - styio-platform
+    - styio-community
+  branch_policy:
+    long_lived_branch: stable
+    release_refs: tags-or-stable-ref
+runtime_adapters:
+  - cmake-native
+  - cmake-server
+  - node-web
+  - static-docs
+apis:
+  control_plane_base_path: /api/styio-platform/v1
+  operations:
+    - listEcosystemRepositories
+    - planEcosystemRelease
+security:
+  required_roles:
+    - operator
+    - control-plane
+observability:
+  health:
+    - ecosystem_manifest_loaded
+tests:
+  native:
+    - tests/native/PlatformKernelTests.cpp
+  contract:
+    - tests/interop/platform-control-plane-contract-gate.py

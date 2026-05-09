@@ -149,6 +149,104 @@
       "request_shape": "NoRequestBody",
       "success_shape": "MirrorEnvelope",
       "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listDocumentationGovernance",
+      "method": "GET",
+      "path": "/docs/governance",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "planDocumentationChange",
+      "method": "POST",
+      "path": "/docs/change-plan",
+      "internal": true,
+      "request_shape": "DocumentationChangePlanRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listEcosystemRepositories",
+      "method": "GET",
+      "path": "/ecosystem/repositories",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "planEcosystemRelease",
+      "method": "POST",
+      "path": "/ecosystem/releases/plan",
+      "internal": true,
+      "request_shape": "EcosystemReleasePlanRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "createRecoverySnapshot",
+      "method": "POST",
+      "path": "/ops/recovery/snapshots",
+      "internal": true,
+      "request_shape": "RecoverySnapshotRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listRecoverySnapshots",
+      "method": "GET",
+      "path": "/ops/recovery/snapshots",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "restoreRecoverySnapshot",
+      "method": "POST",
+      "path": "/ops/recovery/snapshots/{snapshot_id}/restore",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listAuditEvents",
+      "method": "GET",
+      "path": "/ops/audit-events",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "platformMetrics",
+      "method": "GET",
+      "path": "/ops/metrics",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "storageStatus",
+      "method": "GET",
+      "path": "/storage/status",
+      "internal": true,
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "exchangeExternalIdentity",
+      "method": "POST",
+      "path": "/identity/external/exchange",
+      "request_shape": "ExternalIdentityExchangeRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
     }
   ],
   "shapes": {
@@ -1157,6 +1255,111 @@
         }
       },
       "optional": {}
+    },
+    "GenericEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "optional": {}
+    },
+    "DocumentationChangePlanRequest": {
+      "kind": "object",
+      "required": {
+        "changed_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        }
+      },
+      "optional": {
+        "repository_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "change_kind": {
+          "type": "string",
+          "min_length": 1
+        }
+      }
+    },
+    "EcosystemReleasePlanRequest": {
+      "kind": "object",
+      "required": {},
+      "optional": {
+        "release_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "version": {
+          "type": "string",
+          "min_length": 1
+        },
+        "components": {
+          "type": "object"
+        }
+      }
+    },
+    "RecoverySnapshotRequest": {
+      "kind": "object",
+      "required": {},
+      "optional": {
+        "snapshot_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "label": {
+          "type": "string",
+          "min_length": 1
+        }
+      }
+    },
+    "ExternalIdentityExchangeRequest": {
+      "kind": "object",
+      "required": {
+        "provider": {
+          "type": "enum",
+          "values": [
+            "microsoft",
+            "google",
+            "apple",
+            "telegram"
+          ]
+        },
+        "claims": {
+          "type": "object"
+        }
+      },
+      "optional": {
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min_length": 1
+          }
+        }
+      }
     }
   }
 }

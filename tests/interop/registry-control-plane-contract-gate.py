@@ -35,6 +35,8 @@ EXPECTED_OPERATION_SNAPSHOT = [
     ("listDistributions", "GET", "/distributions"),
     ("promoteDistribution", "POST", "/distributions/{distribution_id}/promote"),
     ("rollbackDistribution", "POST", "/distributions/{distribution_id}/rollback"),
+    ("listReleaseChannels", "GET", "/release-channels"),
+    ("rolloutReleaseChannel", "POST", "/release-channels/{channel}/rollout"),
 ]
 
 

@@ -12,6 +12,7 @@ Keep documentation governance aligned with the Styio ecosystem while making
 ## Owned Surface
 
 - `README.md`
+- `AGENTS.md`
 - `LICENSE`
 - `LICENSE-POLICY.md`
 - `DEPENDENCY-USAGE.md`
@@ -48,6 +49,8 @@ the generated date to drift without a source-document change.
 When platform README or governance docs describe compile container behavior,
 keep user binding, workspace hot-switch semantics, and worker environment
 variables consistent with the native JSON contract examples.
+Agent guidance changes must keep `AGENTS.md` short and aligned with source
+ownership, manifests, contracts, tests, and required gates.
 
 ## Change Classes
 
@@ -61,7 +64,12 @@ alter tracked install commands, values, secret names, generated indexes, or
 audit-gate discovery.
 Compile container documentation changes are docs-delivery changes when they
 alter README setup guidance, governance rules, security boundaries, generated
-indexes, or team runbook ownership.
+indexes, source-fetch protocol guidance, or team runbook ownership.
+Documentation-governance changes are docs-delivery changes when they alter
+collections, owner mapping, ecosystem documentation boundaries, gate names, or
+runbook/DOC-STATS requirements.
+Agent guidance changes are docs-delivery changes when they alter source maps,
+source-of-truth rules, or required local gates.
 
 ## Required Gates
 
@@ -72,6 +80,8 @@ For Helm-facing docs changes, also render `helm template` with default values
 and with TLS/mTLS values enabled.
 For control-plane documentation changes, also rerun the relevant native JSON
 contract gate when examples or route terminology changed.
+For documentation-governance API changes, also run the platform control-plane
+contract gate and native documentation governance tests.
 
 ## Cross-Team Dependencies
 

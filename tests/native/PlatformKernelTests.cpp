@@ -7,8 +7,15 @@
 #include "SpioPlatformProtocols/CompilePlan.hpp"
 #include "PlatformCloud/DeveloperWorkspace/WorkerRuntimeFactory.hpp"
 #include "PlatformCloud/PackageRegistry/MirrorSync/MirrorSync.hpp"
+#include "PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.hpp"
+#include "PlatformCloud/PackageRegistry/ReleaseManagement/ReleaseManager.hpp"
+#include "PlatformCore/SourceFetch/SourceFetch.hpp"
 #include "PlatformService/Http.hpp"
+#include "PlatformService/PlatformOps/OpsManager.hpp"
+#include "PlatformService/RouteCatalog.hpp"
+#include "PlatformStorage/PlatformRecovery/RecoveryManager.hpp"
 #include "PlatformSecurity/PlatformCA/CertificateAuthority.hpp"
+#include "PlatformSecurity/ExternalIdentity/ExternalIdentity.hpp"
 #include "PlatformSecurity/PlatformClientAuth/Authorization.hpp"
 #include "PlatformSecurity/PlatformClientAuth/Identity.hpp"
 #include "PlatformStorage/PlatformPersistence/ObjectStore.hpp"
@@ -17,9 +24,14 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 using json = nlohmann::json;
 
@@ -187,6 +199,49 @@ TEST(PlatformCloudJobTests, RejectsSourceBuildOverridesWhenProjectUsesBinaryMode
 namespace
 {
 
+class RecordingOperatingSystemAdapter final : public spio::platform::OperatingSystemAdapter
+{
+public:
+  mutable std::vector<spio::ProcessRequest> requests;
+
+  std::optional<std::string> GetEnv(std::string_view) const override
+  {
+    return std::nullopt;
+  }
+
+  void CreateDirectories(const fs::path &path) const override
+  {
+    fs::create_directories(path);
+  }
+
+  void RemoveAll(const fs::path &path) const override
+  {
+    fs::remove_all(path);
+  }
+
+  void WriteTextFile(const fs::path &path, std::string_view text) const override
+  {
+    WriteFile(path, std::string(text));
+  }
+
+  spio::ProcessResult RunProcess(const spio::ProcessRequest &request) const override
+  {
+    requests.push_back(request);
+    if (request.args.size() >= 2 && request.args[0] == "rev-parse" && request.args[1] == "HEAD")
+    {
+      return {.stdout_text = "abc123\n"};
+    }
+    return {};
+  }
+
+  std::string SendTcpRequest(const spio::platform::TcpRequest &) const override
+  {
+    return {};
+  }
+
+  void SleepFor(std::chrono::milliseconds) const override {}
+};
+
 spio::platform::MtlsIdentity WorkerIdentity()
 {
   return {
@@ -306,6 +361,59 @@ spio::platform::PlatformConfig TestPlatformConfig(const fs::path &root)
 
 }  // namespace
 
+TEST(PlatformSourceFetchTests, AllowsStandardGitTransports)
+{
+  const spio::GitSourcePolicy policy = spio::PublicGitSourcePolicy();
+
+  EXPECT_FALSE(spio::GitSourcePolicyViolation("https://github.com/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(spio::GitSourcePolicyViolation("http://git.local/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(spio::GitSourcePolicyViolation("git@github.com:acme/demo.git", policy).has_value());
+  EXPECT_FALSE(spio::GitSourcePolicyViolation("ssh://github.com/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(spio::GitSourcePolicyViolation("git://github.com/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(spio::GitSourcePolicyViolation("file:///tmp/demo.git", policy).has_value());
+  EXPECT_FALSE(spio::GitSourcePolicyViolation("../demo.git", policy).has_value());
+  EXPECT_TRUE(spio::GitSourcePolicyViolation("ftp://example.test/demo.git", policy).has_value());
+  EXPECT_TRUE(spio::GitSourcePolicyViolation("https://github.com/acme/demo.git\n", policy).has_value());
+}
+
+TEST(PlatformSourceFetchTests, ClonesPublicWorktreeThroughSharedFetcher)
+{
+  const fs::path root = MakeTempDir("platform-source-fetch-worktree");
+  RecordingOperatingSystemAdapter os;
+  const spio::GitSourceFetcher fetcher(os);
+
+  const spio::GitWorktreeResult result = fetcher.EnsureWorktree({
+      .origin = "https://github.com/acme/demo.git",
+      .checkout_root = root / "checkout",
+      .revision = std::string("main"),
+      .update_existing = true,
+      .shallow = true,
+      .depth = 1,
+      .clone_revision_as_branch = false,
+      .policy = spio::PublicGitSourcePolicy(),
+      .error_context = "test source fetch",
+  });
+
+  ASSERT_EQ(os.requests.size(), 4U);
+  EXPECT_EQ(os.requests[0].program, "git");
+  EXPECT_EQ(os.requests[0].args, std::vector<std::string>({
+                                    "clone",
+                                    "--depth",
+                                    "1",
+                                    "--no-checkout",
+                                    "https://github.com/acme/demo.git",
+                                    (root / "checkout").string(),
+                                }));
+  EXPECT_EQ(os.requests[1].args, std::vector<std::string>({"fetch", "--depth", "1", "origin", "main"}));
+  EXPECT_EQ(os.requests[1].working_directory.value(), root / "checkout");
+  EXPECT_EQ(os.requests[2].args, std::vector<std::string>({"checkout", "--force", "FETCH_HEAD"}));
+  EXPECT_EQ(os.requests[3].args, std::vector<std::string>({"rev-parse", "HEAD"}));
+  EXPECT_TRUE(result.cloned);
+  EXPECT_TRUE(result.fetched);
+  EXPECT_TRUE(result.checked_out);
+  EXPECT_EQ(result.resolved_revision, "abc123");
+}
+
 TEST(PlatformClientAuthTests, ParsesMtlsUriSanIntoRoleTenantAndNode)
 {
   const std::optional<spio::platform::MtlsIdentity> identity =
@@ -348,6 +456,29 @@ TEST(PlatformClientAuthTests, AppliesOperationAuthorizationPolicy)
   EXPECT_FALSE(spio::platform::IsAuthorizedForOperation("publishRelease", worker));
   EXPECT_FALSE(spio::platform::IsAuthorizedForOperation("registerWorkgroupCluster", registry_writer));
   EXPECT_TRUE(spio::platform::IsAuthorizedForOperation("claimJob", worker));
+}
+
+TEST(PlatformExternalIdentityTests, NormalizesSupportedProviders)
+{
+  const spio::platform::ExternalIdentityRecord google = spio::platform::NormalizeExternalIdentity({
+      {"provider", "google"},
+      {"tenant_id", "tenant-acme"},
+      {"roles", json::array({"developer"})},
+      {"claims", {{"sub", "google-subject-01"}, {"email", "alice@example.test"}}},
+  });
+  EXPECT_EQ(google.actor_id, "external:google:google-subject-01");
+  EXPECT_EQ(google.email, "alice@example.test");
+
+  const spio::platform::ExternalIdentityRecord telegram = spio::platform::NormalizeExternalIdentity({
+      {"provider", "telegram"},
+      {"claims", {{"id", 100200300}, {"username", "alice_dev"}}},
+  });
+  EXPECT_EQ(telegram.actor_id, "external:telegram:100200300");
+  EXPECT_EQ(telegram.email, "alice_dev");
+
+  EXPECT_THROW(
+      spio::platform::NormalizeExternalIdentity({{"provider", "unknown"}, {"claims", {{"sub", "x"}}}}),
+      std::runtime_error);
 }
 
 TEST(PlatformCATests, InitializesLocalCaAndIssuesMtlsCertificate)
@@ -397,6 +528,30 @@ TEST(PlatformServiceRouterTests, MatchesRouteParametersForJobsAndMirrors)
   EXPECT_EQ(mirror->route.operation_id, "mirrorStatus");
   EXPECT_EQ(mirror->parameters.at("mirror_id"), "registry-primary");
 
+  const std::optional<spio::platform::RouteMatch> docs_governance =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/docs/governance");
+  ASSERT_TRUE(docs_governance.has_value());
+  EXPECT_EQ(docs_governance->route.operation_id, "listDocumentationGovernance");
+  EXPECT_TRUE(docs_governance->route.internal);
+
+  const std::optional<spio::platform::RouteMatch> docs_plan =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/docs/change-plan");
+  ASSERT_TRUE(docs_plan.has_value());
+  EXPECT_EQ(docs_plan->route.operation_id, "planDocumentationChange");
+  EXPECT_TRUE(docs_plan->route.internal);
+
+  const std::optional<spio::platform::RouteMatch> ecosystem =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/ecosystem/repositories");
+  ASSERT_TRUE(ecosystem.has_value());
+  EXPECT_EQ(ecosystem->route.operation_id, "listEcosystemRepositories");
+  EXPECT_TRUE(ecosystem->route.internal);
+
+  const std::optional<spio::platform::RouteMatch> release_plan =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/ecosystem/releases/plan");
+  ASSERT_TRUE(release_plan.has_value());
+  EXPECT_EQ(release_plan->route.operation_id, "planEcosystemRelease");
+  EXPECT_TRUE(release_plan->route.internal);
+
   const std::optional<spio::platform::RouteMatch> register_cluster =
       spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/workgroups/local-dev/clusters/register");
   ASSERT_TRUE(register_cluster.has_value());
@@ -420,6 +575,23 @@ TEST(PlatformServiceRouterTests, MatchesRouteParametersForJobsAndMirrors)
   ASSERT_TRUE(switch_container.has_value());
   EXPECT_EQ(switch_container->route.operation_id, "switchCompileContainerWorkspace");
   EXPECT_EQ(switch_container->parameters.at("container_id"), "container-01");
+
+  const std::optional<spio::platform::RouteMatch> snapshot =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/ops/recovery/snapshots");
+  ASSERT_TRUE(snapshot.has_value());
+  EXPECT_EQ(snapshot->route.operation_id, "createRecoverySnapshot");
+
+  const std::optional<spio::platform::RouteMatch> restore =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/ops/recovery/snapshots/snap-000001/restore");
+  ASSERT_TRUE(restore.has_value());
+  EXPECT_EQ(restore->route.operation_id, "restoreRecoverySnapshot");
+  EXPECT_EQ(restore->parameters.at("snapshot_id"), "snap-000001");
+
+  const std::optional<spio::platform::RouteMatch> external_identity =
+      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/identity/external/exchange");
+  ASSERT_TRUE(external_identity.has_value());
+  EXPECT_EQ(external_identity->route.operation_id, "exchangeExternalIdentity");
+  EXPECT_FALSE(external_identity->route.internal);
 
   EXPECT_FALSE(spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/jobs/job-abc/events").has_value());
 }
@@ -468,6 +640,15 @@ TEST(PlatformServiceRouterTests, MatchesRegistryControlPlaneRoutesWithContractBa
           "/api/spio-registry-control/v1/packages/demo/app/owners/user-bob");
   ASSERT_TRUE(remove_owner.has_value());
   EXPECT_EQ(remove_owner->route.operation_id, "removePackageOwner");
+
+  const std::optional<spio::platform::RouteMatch> rollout =
+      spio::platform::MatchRoute(
+          routes,
+          spio::platform::HttpMethod::Post,
+          "/api/spio-registry-control/v1/release-channels/canary/rollout");
+  ASSERT_TRUE(rollout.has_value());
+  EXPECT_EQ(rollout->route.operation_id, "rolloutReleaseChannel");
+  EXPECT_EQ(rollout->parameters.at("channel"), "canary");
 }
 
 TEST(PlatformPersistenceObjectStoreTests, SanitizesArtifactObjectKeyParts)
@@ -492,6 +673,49 @@ TEST(PlatformPersistenceObjectStoreTests, NormalizesObjectKeysAsCanonicalRelativ
   EXPECT_THROW(spio::platform::NormalizeObjectKey("index/../root.json"), std::runtime_error);
   EXPECT_THROW(spio::platform::NormalizeObjectKey("index//root.json"), std::runtime_error);
   EXPECT_THROW(spio::platform::NormalizeObjectKey("index\\root.json"), std::runtime_error);
+}
+
+TEST(PlatformRecoveryTests, CreatesAndRestoresFilesystemSnapshots)
+{
+  const fs::path root = MakeTempDir("platform-recovery");
+  WriteFile(root / "registry/config.json", "{\"registry\":\"test\"}\n");
+  WriteFile(root / "registry/index/demo/app.jsonl", "{\"version\":\"0.1.0\"}\n");
+
+  const json snapshot = spio::platform::CreateFilesystemSnapshot({
+      .source_root = root / "registry",
+      .snapshots_root = root / "snapshots",
+      .snapshot_id = "snap-000001",
+      .label = "before-change",
+      .created_at = "2026-05-09T00:00:00Z",
+  });
+  EXPECT_EQ(snapshot.at("snapshot_id").get<std::string>(), "snap-000001");
+  EXPECT_EQ(snapshot.at("file_count").get<int>(), 2);
+
+  WriteFile(root / "registry/config.json", "{\"registry\":\"changed\"}\n");
+  const json restored = spio::platform::RestoreFilesystemSnapshot(
+      root / "snapshots",
+      "snap-000001",
+      root / "registry",
+      "2026-05-09T00:01:00Z");
+  EXPECT_TRUE(restored.at("verified").get<bool>());
+  EXPECT_NE(ReadFile(root / "registry/config.json").find("\"test\""), std::string::npos);
+}
+
+TEST(PlatformOpsTests, RateLimiterAndMetricsTrackRequests)
+{
+  spio::platform::PlatformRateLimiter limiter;
+  EXPECT_TRUE(limiter.Allow("actor", "publishRelease", 2, 60, 10));
+  EXPECT_TRUE(limiter.Allow("actor", "publishRelease", 2, 60, 11));
+  EXPECT_FALSE(limiter.Allow("actor", "publishRelease", 2, 60, 12));
+  EXPECT_TRUE(limiter.Allow("actor", "publishRelease", 2, 60, 75));
+
+  spio::platform::PlatformRequestMetrics metrics;
+  metrics.Record("publishRelease", 200);
+  metrics.Record("publishRelease", 409);
+  const json snapshot = metrics.Snapshot();
+  EXPECT_EQ(snapshot.at("total_requests").get<int>(), 2);
+  EXPECT_EQ(snapshot.at("by_operation").at("publishRelease").get<int>(), 2);
+  EXPECT_EQ(snapshot.at("by_status").at("409").get<int>(), 1);
 }
 
 TEST(PlatformPersistencePostgresTests, DefinesCloudKernelMigrationAndClaimSql)
@@ -990,6 +1214,172 @@ TEST(PlatformServiceWorkgroupTests, RejectsUnauthorizedOrInvalidClusterRegistrat
       registration));
   ASSERT_EQ(token_denied.status_code, 403);
   EXPECT_EQ(token_denied.body.at("error_payload").at("detail").get<std::string>(), "registration token is invalid");
+}
+
+TEST(PlatformEcosystemManagementTests, ListsRepositoriesAndPlansStableRelease)
+{
+  const fs::path root = MakeTempDir("platform-ecosystem-management");
+  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  spio::platform::PlatformRouter router(config);
+
+  const spio::platform::HttpResponse list = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Get,
+      "/ecosystem/repositories",
+      OperatorIdentity()));
+  ASSERT_EQ(list.status_code, 200);
+  const json repositories = list.body.at("payload").at("repositories");
+  ASSERT_EQ(repositories.size(), 5U);
+  EXPECT_EQ(repositories.at(0).at("id").get<std::string>(), "styio");
+  EXPECT_EQ(repositories.at(3).at("id").get<std::string>(), "styio-platform");
+  EXPECT_EQ(repositories.at(3).at("branch").get<std::string>(), "stable");
+  EXPECT_EQ(repositories.at(3).at("runtime").at("adapter").get<std::string>(), "cmake-server");
+
+  const spio::platform::HttpResponse plan = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/ecosystem/releases/plan",
+      OperatorIdentity(),
+      {
+          {"release_id", "v0.1.0"},
+          {"version", "v0.1.0"},
+          {"components", {{"styio-view", "v0.1.1-view"}}},
+      }));
+  ASSERT_EQ(plan.status_code, 200);
+  EXPECT_EQ(plan.body.at("payload").at("branch").get<std::string>(), "stable");
+  ASSERT_EQ(plan.body.at("payload").at("execution_plan").size(), 5U);
+  EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(2).at("repository_id").get<std::string>(), "styio-view");
+  EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(2).at("fetch").at("ref").get<std::string>(), "v0.1.1-view");
+  EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(3).at("fetch").at("ref").get<std::string>(), "v0.1.0");
+
+  const spio::platform::HttpResponse invalid = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/ecosystem/releases/plan",
+      OperatorIdentity(),
+      {{"components", {{"unknown", "v0.1.0"}}}}));
+  ASSERT_EQ(invalid.status_code, 400);
+  EXPECT_EQ(invalid.body.at("error_payload").at("operation_id").get<std::string>(), "planEcosystemRelease");
+}
+
+TEST(PlatformDocumentationGovernanceTests, ListsGovernanceAndPlansDocumentationChange)
+{
+  const fs::path root = MakeTempDir("platform-documentation-governance");
+  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  spio::platform::PlatformRouter router(config);
+
+  const spio::platform::HttpResponse list = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Get,
+      "/docs/governance",
+      OperatorIdentity()));
+  ASSERT_EQ(list.status_code, 200);
+  const json payload = list.body.at("payload");
+  EXPECT_EQ(payload.at("governance_id").get<std::string>(), "styio-docs");
+  ASSERT_GE(payload.at("collections").size(), 5U);
+  EXPECT_EQ(payload.at("branch_policy").at("single_branch").get<std::string>(), "stable");
+
+  const spio::platform::HttpResponse plan = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/docs/change-plan",
+      OperatorIdentity(),
+      {
+          {"repository_id", "styio-platform"},
+          {"change_kind", "control-plane-contract"},
+          {"changed_paths",
+           {
+               "contracts/platform-control-plane/v1/platform-control-plane.contract.json",
+               "docs/governance/Platform-Documentation-Governance.md",
+               "src/PlatformCloud/DocumentationGovernance/DocumentationGovernance.cpp",
+           }},
+      }));
+  ASSERT_EQ(plan.status_code, 200);
+  const json required_gates = plan.body.at("payload").at("required_gates");
+  EXPECT_NE(std::find(required_gates.begin(), required_gates.end(), "contract-gate"), required_gates.end());
+  EXPECT_NE(std::find(required_gates.begin(), required_gates.end(), "team-docs-gate"), required_gates.end());
+  const json required_runbooks = plan.body.at("payload").at("required_runbooks");
+  EXPECT_NE(
+      std::find(required_runbooks.begin(), required_runbooks.end(), "docs/teams/CONTROL-PLANE-RUNBOOK.md"),
+      required_runbooks.end());
+  EXPECT_NE(
+      std::find(required_runbooks.begin(), required_runbooks.end(), "docs/teams/PLATFORM-KERNEL-RUNBOOK.md"),
+      required_runbooks.end());
+  EXPECT_NE(
+      std::find(required_runbooks.begin(), required_runbooks.end(), "docs/teams/DOC-STATS.md"),
+      required_runbooks.end());
+
+  const spio::platform::HttpResponse invalid = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/docs/change-plan",
+      OperatorIdentity(),
+      {{"changed_paths", {"/absolute/path"}}}));
+  ASSERT_EQ(invalid.status_code, 400);
+  EXPECT_EQ(invalid.body.at("error_payload").at("operation_id").get<std::string>(), "planDocumentationChange");
+}
+
+TEST(PlatformProductionOpsTests, RecoveryOpsReleaseChannelsStorageAndExternalIdentityApisWork)
+{
+  const fs::path root = MakeTempDir("platform-production-ops");
+  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  WriteFile(fs::path(config.registry.root) / "config.json", "{\"registry\":\"test\"}\n");
+  WriteFile(fs::path(config.registry.root) / "_publications/pub-000001/publication.json", "{\"publication_id\":\"pub-000001\"}\n");
+
+  spio::platform::PlatformRouter router(config);
+  const spio::platform::HttpResponse snapshot = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/ops/recovery/snapshots",
+      OperatorIdentity(),
+      {{"snapshot_id", "snap-000001"}, {"label", "before-rollout"}}));
+  ASSERT_EQ(snapshot.status_code, 200);
+  EXPECT_EQ(snapshot.body.at("payload").at("snapshot_id").get<std::string>(), "snap-000001");
+
+  WriteFile(fs::path(config.registry.root) / "config.json", "{\"registry\":\"changed\"}\n");
+  const spio::platform::HttpResponse restore = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/ops/recovery/snapshots/snap-000001/restore",
+      OperatorIdentity()));
+  ASSERT_EQ(restore.status_code, 200);
+  EXPECT_TRUE(restore.body.at("payload").at("verified").get<bool>());
+  EXPECT_NE(ReadFile(fs::path(config.registry.root) / "config.json").find("\"test\""), std::string::npos);
+
+  const spio::platform::HttpResponse rollout = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Post,
+      "/api/spio-registry-control/v1/release-channels/canary/rollout",
+      OperatorIdentity(),
+      {{"publication_id", "pub-000001"}, {"percentage", 10}, {"ring", "internal"}}));
+  ASSERT_EQ(rollout.status_code, 200);
+  EXPECT_EQ(rollout.body.at("payload").at("channel").get<std::string>(), "canary");
+  EXPECT_EQ(rollout.body.at("payload").at("percentage").get<int>(), 10);
+
+  const spio::platform::HttpResponse storage = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Get,
+      "/storage/status",
+      OperatorIdentity()));
+  ASSERT_EQ(storage.status_code, 200);
+  EXPECT_EQ(storage.body.at("payload").at("object_store_provider").get<std::string>(), "memory");
+
+  const spio::platform::HttpResponse audit = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Get,
+      "/ops/audit-events",
+      OperatorIdentity()));
+  ASSERT_EQ(audit.status_code, 200);
+  EXPECT_GE(audit.body.at("payload").at("events").size(), 2U);
+
+  const spio::platform::HttpResponse metrics = router.Dispatch(RequestWithIdentity(
+      spio::platform::HttpMethod::Get,
+      "/ops/metrics",
+      OperatorIdentity()));
+  ASSERT_EQ(metrics.status_code, 200);
+  EXPECT_GE(metrics.body.at("payload").at("requests").at("total_requests").get<int>(), 4);
+
+  const spio::platform::HttpResponse external = router.Dispatch({
+      .method = spio::platform::HttpMethod::Post,
+      .path = "/identity/external/exchange",
+      .body = {
+          {"provider", "microsoft"},
+          {"tenant_id", "tenant-acme"},
+          {"roles", json::array({"developer"})},
+          {"claims", {{"sub", "aad-user-01"}, {"email", "alice@example.test"}}},
+      },
+  });
+  ASSERT_EQ(external.status_code, 200);
+  EXPECT_EQ(external.body.at("payload").at("actor_id").get<std::string>(), "external:microsoft:aad-user-01");
 }
 
 TEST(PlatformRegistryControlPlaneTests, StatusUsesRedactedPathsAndFilesystemReadiness)

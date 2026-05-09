@@ -1,16 +1,18 @@
 #pragma once
 
-#include "PlatformCore/Core/Process.hpp"
-
 #include <chrono>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
 
+#include "PlatformCore/Core/Process.hpp"
+
 namespace spio::platform
 {
 
+// Raw TCP request used by workers and test adapters. Callers provide a complete
+// protocol payload so the adapter can stay transport-only.
 struct TcpRequest
 {
   std::string host;
@@ -19,6 +21,8 @@ struct TcpRequest
   std::string context = "tcp request";
 };
 
+// Centralizes operating-system effects behind a narrow interface so workspace,
+// source-fetch, and worker code can be tested without shelling out directly.
 class OperatingSystemAdapter
 {
 public:

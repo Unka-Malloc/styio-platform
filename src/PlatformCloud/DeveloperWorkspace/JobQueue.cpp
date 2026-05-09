@@ -1,5 +1,7 @@
 #include "PlatformCloud/DeveloperWorkspace/JobQueue.hpp"
 
+#include "PlatformCore/SourceFetch/SourceFetch.hpp"
+
 #include <string_view>
 #include <utility>
 
@@ -54,6 +56,12 @@ std::optional<std::string> ValidateCloudBuildRequest(const nlohmann::json &job_r
   if (!source.contains("origin") || !source["origin"].is_string() || source["origin"].get<std::string>().empty())
   {
     return "job_request.source.origin is required";
+  }
+  if (const std::optional<std::string> violation =
+          spio::GitSourcePolicyViolation(source["origin"].get<std::string>(), spio::PublicGitSourcePolicy());
+      violation.has_value())
+  {
+    return "job_request.source.origin " + *violation;
   }
   if (source.contains("requested_revision") &&
       (!source["requested_revision"].is_string() || source["requested_revision"].get<std::string>().empty()))

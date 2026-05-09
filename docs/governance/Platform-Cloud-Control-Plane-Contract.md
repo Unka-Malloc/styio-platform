@@ -1,6 +1,6 @@
 # Platform Cloud Control-Plane Contract
 
-**Purpose:** Define the baseline machine contract for platform cloud execution policy, worker-pool routing keys, and project-local execution preferences without pretending the tracked open-source tree already ships the full remote control plane.
+**Purpose:** Define the machine contract for platform cloud execution policy, worker-pool routing keys, and project-local execution preferences.
 
 **Last updated:** 2026-05-09
 
@@ -13,20 +13,20 @@ This document owns:
 - the JSON shape exposed through `spio cloud status --json`
 - the JSON shape exposed through `spio cloud plan --json`
 - the machine-readable cloud policy payload embedded in workflow success JSON
-- the worker-pool key dimensions that future remote execution must preserve
+- the worker-pool key dimensions that remote execution must preserve
 
 This document does not own:
 
 - registry repository layout
 - publish/fetch path contracts
 - external `styio` binary compatibility
-- full remote API routes for a future cloud control plane
+- remote API routes outside the native JSON control-plane packages
 
 Those remain in the existing governance, registry, and `styio` contract documents.
 
 ## Route Ownership
 
-The route-level HTTP contract for hosted workspace and deployment operations is now owned by native JSON packages:
+The route-level HTTP contract for hosted workspace and deployment operations is owned by native JSON packages:
 
 - [`./Platform-Hosted-Control-Plane-Contract.md`](./Platform-Hosted-Control-Plane-Contract.md)
 - [`../../contracts/hosted-control-plane/v1/hosted-control-plane.contract.json`](../../contracts/hosted-control-plane/v1/hosted-control-plane.contract.json)
@@ -49,35 +49,17 @@ for health, node introspection, hosted job lifecycle, worker lifecycle, and
 mirror freshness/replay status. This document owns the cloud execution policy
 semantics those routes expose.
 
-## Baseline Position
-
-The tracked open-source native core currently exposes a **local cloud-execution baseline**. It does **not** yet implement a production multi-service control plane, queue, worker pool, or remote scheduler.
-
-What is implemented today:
-
-- project-local persistence of cloud execution preferences in `spio-toolchain.lock`
-- deterministic policy resolution from toolchain mode, channel, build mode, risk class, preferred execution lane, and security profile
-- machine-readable introspection through `spio machine-info --json` and `spio cloud status --json`
-- machine-readable build-job request rendering through `spio cloud plan --json`
-- workflow success payloads that surface the resolved cloud execution policy
-- user-bound compile container registration, status lookup, workspace
-  hot-switching, and container-aware job claiming through the native platform
-  control-plane contract
-- deterministic synthetic stress testing for multi-tenant compile-cloud scheduling, container hot replacement, and worker lifecycle gates through `./scripts/cloud-compile-stress.py`
-
-The purpose of this baseline is to freeze the terminology and policy surface before remote execution is introduced.
-
-Implementation rules for the open-source native core:
+## Implementation Rules
 
 - `CloudBuildJobRequest` is created only through the domain factory that validates workflow invariants.
-- `spio cloud plan --json` and future workflow success payloads must serialize cloud policy and build-job payloads through shared contract serializers, not ad-hoc CLI JSON builders.
+- `spio cloud plan --json` and workflow success payloads must serialize cloud policy and build-job payloads through shared contract serializers, not ad-hoc CLI JSON builders.
 - compile-cloud stress validation must use the public framework described in [Platform Cloud Compile Stress Framework](./Platform-Cloud-Compile-Stress-Framework.md), not a page-local or service-local ad hoc benchmark.
 
 ## Terms
 
 ### Execution Lane
 
-`ExecutionLane` currently accepts:
+`ExecutionLane` accepts:
 
 - `isolated`
 - `warm-shared`
@@ -90,7 +72,7 @@ Normative rules:
 
 ### Risk Class
 
-`RiskClass` currently accepts:
+`RiskClass` accepts:
 
 - `trusted-internal`
 - `partner-controlled`
@@ -100,12 +82,12 @@ Normative rules:
 
 - `untrusted-user` is the default
 - `untrusted-user` must resolve to `isolated`
-- `partner-controlled` may request `warm-shared`, but the open-source baseline resolves it back to `isolated`
-- only `trusted-internal` may currently keep `warm-shared`
+- `partner-controlled` may request `warm-shared`, but policy may downgrade it to `isolated`
+- only `trusted-internal` may keep `warm-shared` by default
 
 ### Security Profile
 
-`SecurityProfile` currently accepts:
+`SecurityProfile` accepts:
 
 - `sandbox-default`
 - `partner-restricted`
@@ -151,7 +133,7 @@ The self-description endpoint must advertise:
 - `supported_contracts.worker_pool_keys = [1]`
 - `supported_contracts.build_job_request = [1]`
 
-This only indicates that the local native core understands the cloud policy contract. It does **not** imply that a remote scheduler or distributed worker system is active.
+This only indicates contract support. It does not imply that a remote scheduler or distributed worker system is active.
 
 ### `spio cloud status --json`
 
@@ -209,7 +191,7 @@ The resolved `cloud` object must include:
 
 ### Cache Policy
 
-`cache_policy` currently reports:
+`cache_policy` reports:
 
 - `shared_toolchain_read_only`
 - `shared_source_read_only`
@@ -222,7 +204,7 @@ Normative baseline:
 
 - shared toolchain, source, and registry cache mounts are always read-only
 - worker-local reuse is allowed only for `warm-shared`
-- shared-cache promotion eligibility is currently true only for `trusted-internal`
+- shared-cache promotion eligibility is true only for `trusted-internal`
 
 ### Worker Pool Key
 
@@ -236,11 +218,11 @@ The worker-pool key dimensions are:
 - `compiler_fingerprint`
 - `base_image_revision`
 
-These dimensions are frozen now so future remote worker pools do not invent incompatible routing keys later.
+These dimensions are stable contract keys. Remote worker pools may add keys, but must not redefine them.
 
 ## Command Grammar Ownership
 
-The cloud preference surface currently uses the same public grammar family as the rest of the project-local toolchain state:
+The cloud preference surface uses the same public grammar family as the rest of the project-local toolchain state:
 
 - `spio use <binary|build>`
 - `spio set channel as <stable|nightly>`
@@ -251,9 +233,9 @@ The cloud preference surface currently uses the same public grammar family as th
 
 The parser may accept compact compatibility forms without `as`, but normative docs and help output must keep the `as` spelling.
 
-## Relationship To Future Remote Execution
+## Extension Rules
 
-When the enterprise async control plane is introduced, it must preserve this document's:
+Remote execution extensions must preserve this document's:
 
 - execution-lane vocabulary
 - risk-class vocabulary

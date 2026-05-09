@@ -83,7 +83,7 @@ WorkerWorkspace WorkerWorkspaceFactory::Create(const WorkerRuntimeConfig &worker
   const fs::path manifest_path(job_request.at("manifest_path").get<std::string>());
   if (!IsSafeRelativePath(manifest_path))
   {
-    throw std::runtime_error("manifest_path must be relative for git clone jobs");
+    throw std::runtime_error("manifest_path must be relative for source fetch jobs");
   }
 
   const fs::path checkout_root = worker.compile_container_id.empty()

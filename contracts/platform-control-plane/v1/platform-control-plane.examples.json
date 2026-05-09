@@ -693,5 +693,476 @@
         "operation_id": "mirrorStatus"
       }
     }
+  },
+  "listDocumentationGovernance": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded documentation governance",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "governance_id": "styio-docs",
+        "branch_policy": {
+          "single_branch": "stable",
+          "docs_changes_follow_code_changes": true
+        },
+        "single_sources_of_truth": [
+          "native JSON contracts",
+          "business manifests",
+          "generated docs indexes",
+          "team runbooks"
+        ],
+        "collections": [
+          {
+            "id": "governance",
+            "path": "docs/governance",
+            "owner": "control-plane",
+            "classification": "normative",
+            "purposes": [
+              "service-boundary policy",
+              "control-plane rules",
+              "workspace compile model"
+            ],
+            "required_gates": [
+              "docs-index",
+              "docs-audit",
+              "team-docs-gate",
+              "contract-gate"
+            ]
+          }
+        ],
+        "ecosystem_boundaries": [
+          {
+            "repository_id": "styio-platform",
+            "documentation_owner": "platform-foundation",
+            "primary_topics": [
+              "control-plane contracts",
+              "package registry",
+              "cloud workspaces",
+              "operations"
+            ]
+          }
+        ],
+        "invariants": [
+          "every public behavior change has a contract, governance doc, or runbook owner",
+          "generated INDEX.md files are derived artifacts and never own policy",
+          "team runbooks record ownership while DOC-STATS records their review footprint",
+          "documentation gates run before claiming release or audit closure"
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "documentation governance unavailable",
+      "stdout": "",
+      "stderr": "documentation governance manifest is not configured",
+      "error_payload": {
+        "category": "ConfigError",
+        "detail": "documentation governance manifest is not configured",
+        "operation_id": "listDocumentationGovernance"
+      }
+    }
+  },
+  "planDocumentationChange": {
+    "request": {
+      "repository_id": "styio-platform",
+      "change_kind": "control-plane-contract",
+      "changed_paths": [
+        "contracts/platform-control-plane/v1/platform-control-plane.contract.json",
+        "docs/governance/Platform-Documentation-Governance.md",
+        "src/PlatformCloud/DocumentationGovernance/DocumentationGovernance.cpp"
+      ]
+    },
+    "success": {
+      "returncode": 0,
+      "message": "planned documentation change",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "governance_id": "styio-docs",
+        "repository_id": "styio-platform",
+        "change_kind": "control-plane-contract",
+        "branch": "stable",
+        "path_impacts": [
+          {
+            "path": "docs/governance/Platform-Documentation-Governance.md",
+            "collection_id": "governance",
+            "required_gates": [
+              "docs-index",
+              "docs-audit",
+              "team-docs-gate",
+              "contract-gate"
+            ],
+            "required_runbooks": [
+              "docs/teams/CONTROL-PLANE-RUNBOOK.md",
+              "docs/teams/DOCS-DELIVERY-RUNBOOK.md"
+            ]
+          }
+        ],
+        "touched_collections": [
+          "contracts",
+          "governance"
+        ],
+        "required_runbooks": [
+          "docs/teams/CONTROL-PLANE-RUNBOOK.md",
+          "docs/teams/DOC-STATS.md",
+          "docs/teams/DOCS-DELIVERY-RUNBOOK.md",
+          "docs/teams/PLATFORM-KERNEL-RUNBOOK.md"
+        ],
+        "required_gates": [
+          "contract-gate",
+          "docs-audit",
+          "docs-index",
+          "git-diff-check",
+          "team-docs-gate"
+        ],
+        "review_policy": {
+          "generated_indexes": "refresh with python3 scripts/docs-index.py --write",
+          "runbook_stats": "refresh docs/teams/DOC-STATS.md when team runbooks change",
+          "contracts": "update native JSON contract examples before route docs claim closure"
+        }
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "documentation change planning failed",
+      "stdout": "",
+      "stderr": "changed_paths must be an array",
+      "error_payload": {
+        "category": "ValidationError",
+        "detail": "changed_paths must be an array",
+        "operation_id": "planDocumentationChange"
+      }
+    }
+  },
+  "listEcosystemRepositories": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded ecosystem repositories",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "ecosystem_id": "styio",
+        "branch_policy": {
+          "single_branch": "stable",
+          "release_refs": "tags-or-stable-ref"
+        },
+        "repositories": [
+          {
+            "id": "styio",
+            "branch": "stable",
+            "origin": "https://github.com/eBioRing/Styio.git",
+            "runtime": {
+              "kind": "native-toolchain",
+              "adapter": "cmake-native"
+            },
+            "artifacts": [
+              "styio-compiler",
+              "styio-stdlib"
+            ],
+            "contracts": [
+              "compile-plan/v1"
+            ],
+            "required_gates": [
+              "build",
+              "native-test",
+              "compiler-smoke"
+            ]
+          }
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "ecosystem repositories unavailable",
+      "stdout": "",
+      "stderr": "ecosystem manifest is not configured",
+      "error_payload": {
+        "category": "ConfigError",
+        "detail": "ecosystem manifest is not configured",
+        "operation_id": "listEcosystemRepositories"
+      }
+    }
+  },
+  "planEcosystemRelease": {
+    "request": {
+      "release_id": "v0.1.0",
+      "version": "v0.1.0",
+      "components": {
+        "styio-view": "v0.1.1-view"
+      }
+    },
+    "success": {
+      "returncode": 0,
+      "message": "planned ecosystem release",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "ecosystem_id": "styio",
+        "release_id": "v0.1.0",
+        "branch": "stable",
+        "components": [
+          {
+            "repository_id": "styio",
+            "origin": "https://github.com/eBioRing/Styio.git",
+            "branch": "stable",
+            "ref": "v0.1.0",
+            "adapter": "cmake-native",
+            "artifacts": [
+              "styio-compiler",
+              "styio-stdlib"
+            ]
+          }
+        ],
+        "execution_plan": [
+          {
+            "step": 1,
+            "repository_id": "styio",
+            "adapter": "cmake-native",
+            "fetch": {
+              "origin": "https://github.com/eBioRing/Styio.git",
+              "ref": "v0.1.0"
+            },
+            "gates": [
+              "build",
+              "native-test",
+              "compiler-smoke"
+            ],
+            "publish_artifacts": [
+              "styio-compiler",
+              "styio-stdlib"
+            ]
+          }
+        ],
+        "invariants": [
+          "all repositories use stable as the only long-lived branch",
+          "release refs are immutable tags or the stable ref for unreleased integration",
+          "runtime adapters are selected per repository and never force one shared runtime"
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "ecosystem release planning failed",
+      "stdout": "",
+      "stderr": "unknown ecosystem repository: unknown",
+      "error_payload": {
+        "category": "ValidationError",
+        "detail": "unknown ecosystem repository: unknown",
+        "operation_id": "planEcosystemRelease"
+      }
+    }
+  },
+  "createRecoverySnapshot": {
+    "request": {
+      "snapshot_id": "snap-000001",
+      "label": "before-release"
+    },
+    "success": {
+      "returncode": 0,
+      "message": "created recovery snapshot",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "snapshot_id": "snap-000001",
+        "label": "before-release",
+        "created_at": "2026-05-09T00:00:00Z",
+        "file_count": 1
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "recovery snapshot failed",
+      "stdout": "",
+      "stderr": "not authorized",
+      "error_payload": {
+        "category": "AuthError",
+        "detail": "not authorized",
+        "operation_id": "createRecoverySnapshot"
+      }
+    }
+  },
+  "listRecoverySnapshots": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded recovery snapshots",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "snapshots": [
+          {
+            "snapshot_id": "snap-000001",
+            "label": "before-release"
+          }
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "operation rejected",
+      "stdout": "",
+      "stderr": "not authorized",
+      "error_payload": {
+        "category": "AuthError",
+        "detail": "not authorized",
+        "operation_id": "listRecoverySnapshots"
+      }
+    }
+  },
+  "restoreRecoverySnapshot": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "restored recovery snapshot",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "snapshot_id": "snap-000001",
+        "verified": true,
+        "file_count": 1
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "recovery restore failed",
+      "stdout": "",
+      "stderr": "not authorized",
+      "error_payload": {
+        "category": "AuthError",
+        "detail": "not authorized",
+        "operation_id": "restoreRecoverySnapshot"
+      }
+    }
+  },
+  "listAuditEvents": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded audit events",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "events": [
+          {
+            "event_id": "audit-000000000001",
+            "operation": "publishRelease",
+            "result": "success"
+          }
+        ]
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "operation rejected",
+      "stdout": "",
+      "stderr": "not authorized",
+      "error_payload": {
+        "category": "AuthError",
+        "detail": "not authorized",
+        "operation_id": "listAuditEvents"
+      }
+    }
+  },
+  "platformMetrics": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded platform metrics",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "requests": {
+          "total_requests": 1
+        },
+        "rate_limiter": {
+          "buckets": {}
+        }
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "operation rejected",
+      "stdout": "",
+      "stderr": "not authorized",
+      "error_payload": {
+        "category": "AuthError",
+        "detail": "not authorized",
+        "operation_id": "platformMetrics"
+      }
+    }
+  },
+  "storageStatus": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded storage status",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "state_backend": "memory",
+        "object_store_provider": "memory",
+        "registry_root_present": true,
+        "snapshots_root_present": true
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "operation rejected",
+      "stdout": "",
+      "stderr": "not authorized",
+      "error_payload": {
+        "category": "AuthError",
+        "detail": "not authorized",
+        "operation_id": "storageStatus"
+      }
+    }
+  },
+  "exchangeExternalIdentity": {
+    "request": {
+      "provider": "google",
+      "tenant_id": "tenant-demo",
+      "roles": [
+        "developer"
+      ],
+      "claims": {
+        "sub": "google-subject-01",
+        "email": "dev@example.test"
+      }
+    },
+    "success": {
+      "returncode": 0,
+      "message": "exchanged external identity",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "provider": "google",
+        "subject": "google-subject-01",
+        "email": "dev@example.test",
+        "tenant_id": "tenant-demo",
+        "actor_id": "external:google:google-subject-01",
+        "roles": [
+          "developer"
+        ],
+        "claims": {
+          "sub": "google-subject-01",
+          "email": "dev@example.test"
+        },
+        "verification_mode": "claims-normalized"
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "external identity exchange failed",
+      "stdout": "",
+      "stderr": "unsupported external identity provider",
+      "error_payload": {
+        "category": "ExternalIdentityError",
+        "detail": "unsupported external identity provider",
+        "operation_id": "exchangeExternalIdentity"
+      }
+    }
   }
 }
