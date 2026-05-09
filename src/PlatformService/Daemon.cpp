@@ -1,11 +1,11 @@
-#include "PlatformService/Config.hpp"
+#include "PlatformCore/Config.hpp"
 #include "PlatformService/BeastServer.hpp"
 #include "PlatformService/Http.hpp"
-#include "PlatformService/Identity.hpp"
-#include "PlatformService/MirrorSync.hpp"
-#include "PlatformService/PostgresStore.hpp"
+#include "PlatformSecurity/PlatformClientAuth/Identity.hpp"
+#include "PlatformCloud/PackageRegistry/MirrorSync/MirrorSync.hpp"
+#include "PlatformStorage/PlatformPersistence/PostgresStore.hpp"
 #include "PlatformService/Router.hpp"
-#include "PlatformService/Worker.hpp"
+#include "PlatformCloud/DeveloperWorkspace/Worker.hpp"
 
 #include <iostream>
 #include <string>
@@ -119,6 +119,7 @@ int main(int argc, char **argv)
         .path = "/jobs",
         .body = {
             {"tenant_id", "tenant-demo"},
+            {"user_id", "user-demo"},
             {"workspace_id", "workspace-demo"},
             {"action", "build"},
             {"preferred_worker_pool", "linux/x86_64/build/nightly/minimal"},

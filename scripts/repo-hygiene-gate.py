@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -86,12 +87,32 @@ REQUIRED_DOC_REFERENCES = {
         "scripts/delivery-gate.sh",
     ],
 }
+REQUIRED_PUBLICATION_FILES = [
+    Path("LICENSE"),
+    Path("LICENSE-POLICY.md"),
+    Path("README.md"),
+    Path("SECURITY.md"),
+    Path("CONTRIBUTING.md"),
+    Path("CODE_OF_CONDUCT.md"),
+]
 
 FORBIDDEN_CONTRACT_TERMS = [
     "open" + "api",
     "ara" + "zzo",
     "redo" + "cly",
 ]
+SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("private-key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |)?PRIVATE KEY-----")),
+    ("aws-access-key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("aws-secret-access-key", re.compile(r"\baws_secret_access_key\s*=\s*['\"]?[A-Za-z0-9/+=]{40}['\"]?", re.IGNORECASE)),
+    ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{36,}\b")),
+    ("styio-pat", re.compile(r"\bstyio_pat_[A-Za-z0-9][A-Za-z0-9_-]{8,}_[A-Za-z0-9_-]{24,}\b")),
+    ("bearer-token", re.compile(r"\bauthorization:\s*bearer\s+[A-Za-z0-9._~+/=-]{20,}", re.IGNORECASE)),
+)
+LOCAL_PATH_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("macos-home-path", re.compile(r"/Users/[A-Za-z0-9._-]+/")),
+    ("linux-home-path", re.compile(r"/home/(?!runner/|actions/|vscode/|codespace/)[A-Za-z0-9._-]+/")),
+)
 
 
 def run_git(*args: str, check: bool = True) -> str:
@@ -105,6 +126,14 @@ def staged_files() -> list[str]:
 
 def tracked_files() -> list[str]:
     return [line for line in run_git("ls-files").splitlines() if line]
+
+
+def untracked_files() -> list[str]:
+    return [line for line in run_git("ls-files", "--others", "--exclude-standard").splitlines() if line]
+
+
+def working_files() -> list[str]:
+    return sorted(set(tracked_files()).union(untracked_files()))
 
 
 def match_forbidden(path: str) -> str | None:
@@ -182,6 +211,30 @@ def contract_reference_violations(files: list[str], source: str) -> list[str]:
     return problems
 
 
+def line_number(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def pattern_violations(files: list[str], source: str, patterns: tuple[tuple[str, re.Pattern[str]], ...], label: str) -> list[str]:
+    problems: list[str] = []
+    for rel in files:
+        text = staged_file_text(rel) if source == "staged" else working_file_text(rel)
+        if text is None:
+            continue
+        for name, pattern in patterns:
+            for match in pattern.finditer(text):
+                problems.append(f"{rel}:{line_number(text, match.start())}: matches {label} pattern {name}")
+    return problems
+
+
+def release_file_violations() -> list[str]:
+    return [
+        f"required publication file is missing: {relative_path.as_posix()}"
+        for relative_path in REQUIRED_PUBLICATION_FILES
+        if not (REPO_ROOT / relative_path).is_file()
+    ]
+
+
 def size_violations(files: list[str], max_bytes: int) -> list[str]:
     problems: list[str] = []
     for rel in files:
@@ -205,6 +258,54 @@ def binary_violations(files: list[str]) -> list[str]:
         if is_binary_file(path):
             problems.append(f"{rel}: binary-looking file detected")
     return problems
+
+
+def secret_history_violations(rev_range: str) -> list[str]:
+    rev_list = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "rev-list", "--objects", rev_range],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    if not rev_list.stdout.strip():
+        return []
+    batch = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(REPO_ROOT),
+            "cat-file",
+            "--batch-check=%(objecttype) %(objectname) %(objectsize) %(rest)",
+        ],
+        input=rev_list.stdout,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    problems: list[str] = []
+    seen_objects: set[str] = set()
+    for line in batch.stdout.splitlines():
+        parts = line.split(" ", 3)
+        if len(parts) != 4:
+            continue
+        object_type, oid, _, path = parts
+        if object_type != "blob" or not path or oid in seen_objects:
+            continue
+        seen_objects.add(oid)
+        blob = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "cat-file", "blob", oid],
+            text=False,
+            capture_output=True,
+        )
+        if blob.returncode != 0:
+            continue
+        text = decode_text(blob.stdout)
+        if text is None:
+            continue
+        for name, pattern in SECRET_PATTERNS:
+            for match in pattern.finditer(text):
+                problems.append(f"{path}:{line_number(text, match.start())}: history blob {oid[:12]} matches secret pattern {name}")
+    return sorted(set(problems))
 
 
 def history_violations(rev_range: str, max_bytes: int) -> list[str]:
@@ -267,6 +368,12 @@ def history_violations(rev_range: str, max_bytes: int) -> list[str]:
         for term in FORBIDDEN_CONTRACT_TERMS:
             if term in lowered:
                 problems.append(f"{path}: appears in pushed history range {rev_range} with forbidden non-native contract text reference")
+        for name, pattern in SECRET_PATTERNS:
+            for match in pattern.finditer(text):
+                problems.append(f"{path}:{line_number(text, match.start())}: appears in pushed history range {rev_range} with secret pattern {name}")
+        for name, pattern in LOCAL_PATH_PATTERNS:
+            for match in pattern.finditer(text):
+                problems.append(f"{path}:{line_number(text, match.start())}: appears in pushed history range {rev_range} with local path pattern {name}")
     return sorted(set(problems))
 
 
@@ -317,7 +424,7 @@ def print_report(header: str, problems: list[str]) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="styio-platform repository hygiene gate")
-    parser.add_argument("--mode", choices=("staged", "tracked", "push"), default="staged")
+    parser.add_argument("--mode", choices=("staged", "tracked", "working", "push", "secrets-history"), default="staged")
     parser.add_argument("--range", dest="rev_range")
     parser.add_argument("--max-file-bytes", type=int, default=DEFAULT_MAX_FILE_BYTES)
     args = parser.parse_args()
@@ -327,19 +434,27 @@ def main() -> int:
         problems = history_violations(rev_range, args.max_file_bytes)
         problems.extend(gitignore_pattern_violations())
         problems.extend(doc_reference_violations())
+        problems.extend(release_file_violations())
         return print_report(f"push range {rev_range}", sorted(set(problems)))
+    if args.mode == "secrets-history":
+        rev_range = args.rev_range or "--all"
+        problems = secret_history_violations(rev_range)
+        return print_report(f"secret history {rev_range}", sorted(set(problems)))
 
-    files = staged_files() if args.mode == "staged" else tracked_files()
+    files = staged_files() if args.mode == "staged" else working_files() if args.mode == "working" else tracked_files()
     if not files:
         print(f"[repo-hygiene] {args.mode}: nothing to check")
         return 0
     problems = []
     problems.extend(path_violations(files))
     problems.extend(contract_reference_violations(files, args.mode))
+    problems.extend(pattern_violations(files, args.mode, SECRET_PATTERNS, "secret"))
+    problems.extend(pattern_violations(files, args.mode, LOCAL_PATH_PATTERNS, "local path"))
     problems.extend(size_violations(files, args.max_file_bytes))
     problems.extend(binary_violations(files))
     problems.extend(gitignore_pattern_violations())
     problems.extend(doc_reference_violations())
+    problems.extend(release_file_violations())
     return print_report(args.mode, sorted(set(problems)))
 
 

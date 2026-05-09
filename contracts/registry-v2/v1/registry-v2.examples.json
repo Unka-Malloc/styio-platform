@@ -247,5 +247,23 @@
     "index_record_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
     "source_artifact_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "source_artifact_path": "artifacts/source/sha256/01/23/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.spio.src.tar"
+  },
+  "publication": {
+    "publication_id": "pub-000001",
+    "repository_id": "default",
+    "repository_version_id": "rv-000001",
+    "layout_version": 2,
+    "generated_at": "2026-04-21T00:00:00Z",
+    "tree_size": 1,
+    "index_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "trust_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "artifact_count": 1,
+    "verified": true
+  },
+  "distribution_current": {
+    "distribution_id": "default",
+    "publication_id": "pub-000001",
+    "repository_version_id": "rv-000001",
+    "updated_at": "2026-04-21T00:00:00Z"
   }
 }

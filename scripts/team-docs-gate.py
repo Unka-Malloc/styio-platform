@@ -29,6 +29,7 @@ TEAM_RULES: tuple[TeamRule, ...] = (
         (
             "src/",
             "tests/",
+            "manifests/",
             "CMakeLists.txt",
         ),
     ),
@@ -47,7 +48,7 @@ TEAM_RULES: tuple[TeamRule, ...] = (
             "scripts/registry-v2-control-plane-server.py",
             "scripts/registry-v2-static-read-server.py",
             "scripts/registry-v2-vm-smoke.py",
-            "src/spio_cloud_stress/",
+            "src/PlatformCloud/DeveloperWorkspace/workspace_compile_stress/",
             "tests/interop/",
             "tests/unit/",
         ),

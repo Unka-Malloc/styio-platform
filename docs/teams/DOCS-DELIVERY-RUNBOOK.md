@@ -2,7 +2,7 @@
 
 **Purpose:** Own platform documentation structure, generated indexes, and docs gate automation.
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-09
 
 ## Mission
 
@@ -45,6 +45,9 @@ separation, VM one-command deployment, and security boundaries before
 docs/audit closure is claimed. When docs index behavior changes, keep empty
 collections anchored to their README `Last updated` value instead of allowing
 the generated date to drift without a source-document change.
+When platform README or governance docs describe compile container behavior,
+keep user binding, workspace hot-switch semantics, and worker environment
+variables consistent with the native JSON contract examples.
 
 ## Change Classes
 
@@ -56,6 +59,9 @@ registry-management audit coverage.
 S3 registry, mTLS, and Helm deployment docs are docs-delivery changes when they
 alter tracked install commands, values, secret names, generated indexes, or
 audit-gate discovery.
+Compile container documentation changes are docs-delivery changes when they
+alter README setup guidance, governance rules, security boundaries, generated
+indexes, or team runbook ownership.
 
 ## Required Gates
 
@@ -64,6 +70,8 @@ Run `python3 scripts/docs-index.py --write`, `python3 scripts/docs-audit.py`,
 tracked`.
 For Helm-facing docs changes, also render `helm template` with default values
 and with TLS/mTLS values enabled.
+For control-plane documentation changes, also rerun the relevant native JSON
+contract gate when examples or route terminology changed.
 
 ## Cross-Team Dependencies
 

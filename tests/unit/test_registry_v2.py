@@ -12,16 +12,16 @@ import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+PACKAGE_REGISTRY = ROOT / "src" / "PlatformCloud" / "PackageRegistry"
+if str(PACKAGE_REGISTRY) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_REGISTRY))
 
-import spio_registry_v2.common as common  # noqa: E402
-import spio_registry_v2.publisher as publisher  # noqa: E402
-from spio_registry_v2 import generate_key_directory, publish_to_registry_v2, verify_registry_root  # noqa: E402
-from spio_registry_v2.common import RegistryV2Error, sha256_file  # noqa: E402
-from spio_registry_v2 import validator  # noqa: E402
-from spio_registry_v2.validator import RootReader  # noqa: E402
+import package_registry_v2.common as common  # noqa: E402
+import package_registry_v2.publisher as publisher  # noqa: E402
+from package_registry_v2 import generate_key_directory, publish_to_registry_v2, verify_registry_root  # noqa: E402
+from package_registry_v2.common import RegistryV2Error, sha256_file  # noqa: E402
+from package_registry_v2 import validator  # noqa: E402
+from package_registry_v2.validator import RootReader  # noqa: E402
 
 
 CONTRACT_DIR = ROOT / "contracts" / "registry-v2" / "v1"
@@ -429,6 +429,12 @@ class RegistryV2Tests(unittest.TestCase):
             self.assertTrue(first["created_root"])
             self.assertEqual(first["package"], "acme/util")
             self.assertEqual(first["version"], "1.0.0")
+            self.assertEqual(first["publication_id"], "pub-000001")
+            first_publication = json.loads((dest_root / "_publications" / "pub-000001" / "publication.json").read_text(encoding="utf-8"))
+            self.assertEqual(first_publication["repository_version_id"], "rv-000001")
+            self.assertTrue(first_publication["verified"])
+            first_current = json.loads((dest_root / "_distributions" / "default" / "current.json").read_text(encoding="utf-8"))
+            self.assertEqual(first_current["publication_id"], "pub-000001")
 
             second = publish_to_registry_v2(
                 str(dest_root),
@@ -440,6 +446,10 @@ class RegistryV2Tests(unittest.TestCase):
             self.assertFalse(second["created_root"])
             self.assertEqual(second["version"], "1.3.0")
             self.assertEqual(second["sequence"], 2)
+            self.assertEqual(second["publication_id"], "pub-000002")
+            second_current = json.loads((dest_root / "_distributions" / "default" / "current.json").read_text(encoding="utf-8"))
+            self.assertEqual(second_current["publication_id"], "pub-000002")
+            self.assertEqual(second_current["previous_publication_id"], "pub-000001")
 
             verified = verify_registry_root(str(dest_root))
             self.assertTrue(verified["ok"])

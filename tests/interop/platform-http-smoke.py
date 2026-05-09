@@ -107,6 +107,7 @@ def main() -> int:
         method="POST",
         body={
             "tenant_id": "tenant-smoke",
+            "user_id": "user-smoke",
             "workspace_id": "workspace-smoke",
             "action": "build",
             "preferred_worker_pool": "linux/x86_64/build/nightly/minimal",

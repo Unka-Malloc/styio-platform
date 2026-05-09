@@ -39,8 +39,6 @@ if [[ -z "$AUDIT_BIN" ]]; then
     AUDIT_BIN="$ROOT/../styio-audit/bin/styio-audit"
   elif [[ -x "$HOME/eBioRing/styio-audit/bin/styio-audit" ]]; then
     AUDIT_BIN="$HOME/eBioRing/styio-audit/bin/styio-audit"
-  elif [[ -x "/home/unka/styio-audit/bin/styio-audit" ]]; then
-    AUDIT_BIN="/home/unka/styio-audit/bin/styio-audit"
   elif command -v styio-audit >/dev/null 2>&1; then
     AUDIT_BIN="$(command -v styio-audit)"
   fi

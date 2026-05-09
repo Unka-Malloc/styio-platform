@@ -9,11 +9,11 @@ import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+DEVELOPER_WORKSPACE = ROOT / "src" / "PlatformCloud" / "DeveloperWorkspace"
+if str(DEVELOPER_WORKSPACE) not in sys.path:
+    sys.path.insert(0, str(DEVELOPER_WORKSPACE))
 
-from spio_cloud_stress import StressConfig, run_stress  # noqa: E402
+from workspace_compile_stress import StressConfig, run_stress  # noqa: E402
 
 
 class CloudCompileStressTests(unittest.TestCase):

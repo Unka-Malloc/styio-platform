@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PlatformService/Config.hpp"
+#include "PlatformCore/Config.hpp"
 
 #include <nlohmann/json.hpp>
 

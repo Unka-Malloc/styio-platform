@@ -22,6 +22,8 @@ EXPECTED_SCHEMA_MAP = {
     "package_index_record": "package-index-record.schema.json",
     "log_checkpoint": "signed-checkpoint.schema.json",
     "log_leaf": "transparency-log-leaf.schema.json",
+    "publication": "publication.schema.json",
+    "distribution_current": "distribution-current.schema.json",
 }
 
 EXPECTED_EXAMPLES = {
@@ -33,6 +35,8 @@ EXPECTED_EXAMPLES = {
     "package_index_record",
     "checkpoint",
     "transparency_log_leaf",
+    "publication",
+    "distribution_current",
 }
 
 
@@ -115,6 +119,15 @@ def validate_examples(examples: dict[str, Any], errors: list[str]) -> None:
     leaf = require_object(examples.get("transparency_log_leaf"), "examples.transparency_log_leaf", errors)
     require(leaf.get("sequence") == 1, "examples.transparency_log_leaf.sequence must equal 1", errors)
     require(leaf.get("package") == "acme/util", "examples.transparency_log_leaf.package drift detected", errors)
+
+    publication = require_object(examples.get("publication"), "examples.publication", errors)
+    require(publication.get("publication_id") == "pub-000001", "examples.publication.publication_id drift detected", errors)
+    require(publication.get("repository_version_id") == "rv-000001", "examples.publication.repository_version_id drift detected", errors)
+    require(publication.get("verified") is True, "examples.publication.verified must equal true", errors)
+
+    current = require_object(examples.get("distribution_current"), "examples.distribution_current", errors)
+    require(current.get("distribution_id") == "default", "examples.distribution_current.distribution_id drift detected", errors)
+    require(current.get("publication_id") == "pub-000001", "examples.distribution_current.publication_id drift detected", errors)
 
 
 def main() -> int:

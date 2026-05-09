@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "spio registry v2 immutable publication",
+  "type": "object",
+  "required": [
+    "publication_id",
+    "repository_id",
+    "repository_version_id",
+    "layout_version",
+    "generated_at",
+    "tree_size",
+    "index_digest",
+    "trust_digest",
+    "artifact_count",
+    "verified"
+  ],
+  "properties": {
+    "publication_id": {"type": "string", "minLength": 1},
+    "repository_id": {"type": "string", "minLength": 1},
+    "repository_version_id": {"type": "string", "minLength": 1},
+    "layout_version": {"type": "integer", "const": 2},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "tree_size": {"type": "integer", "minimum": 0},
+    "index_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "trust_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact_count": {"type": "integer", "minimum": 0},
+    "verified": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

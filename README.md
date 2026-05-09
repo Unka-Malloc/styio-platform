@@ -6,6 +6,10 @@ nodes, package repository distribution, mirror synchronization, registry
 control-plane server surfaces, and extensible cloud-service validation tooling
 that previously lived inside `styio-spio`.
 
+**Project status:** developer preview. The repository is suitable for open
+development and early integration, but APIs and deployment defaults can still
+change before a stable production release.
+
 This repository is downstream of `styio` and `styio-spio`:
 
 - `styio` remains the compiler and language implementation source of truth.
@@ -14,6 +18,11 @@ This repository is downstream of `styio` and `styio-spio`:
 - `styio-platform` consumes those contracts to run hosted workspaces, compile
   jobs, registry server control planes, cross-network deployment nodes, mirror
   sites, and cloud stress gates.
+
+Business capability boundaries are declared under `manifests/`. The current
+split keeps the shared base in `platform-foundation`, separates cloud package
+distribution into `package-registry`, and separates user-bound cloud development
+environments into `developer-workspace`.
 
 The first migrated kernel intentionally keeps the imported C++ namespace and
 contract names stable while the repo boundary settles. New platform services
@@ -55,11 +64,14 @@ status from the native JSON platform-control-plane contract.
 The first network adapter is available through `styio-platformd --serve`. It
 binds the native `PlatformRouter` to a local HTTP listener, preferring
 Boost.Beast/Asio when those headers are available and using a synchronous POSIX
-fallback otherwise. Set `STYIO_PLATFORM_TLS_ENABLED=1` with
+fallback otherwise. Set `STYIO_PLATFORM_TLS_ENABLED=1` with externally mounted
 `STYIO_PLATFORM_MTLS_CA`, `STYIO_PLATFORM_MTLS_CERT`, and
 `STYIO_PLATFORM_MTLS_KEY` to terminate TLS in-process and derive service
-identity from the client certificate URI SAN. Proxied identity headers remain
-available only when `STYIO_PLATFORM_TRUST_PROXY_IDENTITY_HEADERS=1`.
+identity from the client certificate URI SAN. For local managed material, set
+`STYIO_PLATFORM_MTLS_AUTO_PROVISION=1`; the platform initializes a local CA
+under `STYIO_PLATFORM_MTLS_CA_ROOT` and issues a node certificate before the
+TLS listener starts. Proxied identity headers remain available only when
+`STYIO_PLATFORM_TRUST_PROXY_IDENTITY_HEADERS=1`.
 
 The first multi-node deployment target is Kubernetes through
 `deploy/helm/styio-platform`. The chart deploys a primary control plane, a
@@ -72,6 +84,15 @@ mirror caches. Production S3 publication remains opt-in through Helm
 `spio build`, and `styio-platformd --sync-mirror-once` copies the registry v2
 filesystem layout from the primary PVC into the mirror PVC and records
 freshness in Postgres.
+
+Compile workers can optionally register a user-bound compile container by
+setting `STYIO_PLATFORM_COMPILE_CONTAINER_ID`,
+`STYIO_PLATFORM_COMPILE_CONTAINER_TENANT_ID`,
+`STYIO_PLATFORM_COMPILE_CONTAINER_USER_ID`, and
+`STYIO_PLATFORM_COMPILE_CONTAINER_WORKSPACE_ID`. When enabled, job claims carry
+the container id, the control plane schedules only jobs for that tenant/user
+binding, and the container's current workspace is hot-switched before the job is
+returned to the worker.
 
 ## One-Command Development Environment
 
@@ -133,7 +154,9 @@ ctest --test-dir build-codex --output-on-failure
 ctest --test-dir build-codex -R styio_platform_http_smoke --output-on-failure
 python3 -m unittest tests/unit/test_cloud_compile_stress.py
 python3 scripts/docs-audit.py
-python3 scripts/repo-hygiene-gate.py --mode tracked
+python3 scripts/repo-hygiene-gate.py --mode working
+python3 scripts/repo-hygiene-gate.py --mode secrets-history
+git diff --check
 ```
 
 The Kubernetes smoke uses open OCI tooling. It requires Podman, kind, kubectl,

@@ -1,18 +1,34 @@
 # styio-platform Source
 
 This source tree contains the first migrated platform kernel. It keeps imported
-`spio::` namespaces and file names stable while the repo split settles.
+`spio::` namespaces stable while the repo split settles, but source ownership is
+now grouped by platform capability.
 
-- `SpioPlan/` renders compile-plan v1 payloads.
-- `SpioCloud/` renders cloud execution policy and build job requests.
-- `PlatformService/` owns the native platform-control-plane router, the
-  Boost.Beast/Asio HTTP adapter with POSIX fallback, optional Postgres store,
-  workgroup cluster registry, worker runtime, mirror sync runtime, and daemon
-  entrypoint.
-- `SpioCore/`, `SpioManifest/`, `SpioResolve/`, `SpioRegistryClient/`,
-  `SpioSecurity/`, and `SpioToolchain/` are the package-manager client
-  dependencies needed to validate the platform payloads.
-- `spio_cloud_stress/` owns the deterministic cloud compile stress harness.
+- `PlatformCore/` owns core ability: manifest and lockfile support, dependency
+  resolution, registry client access, and toolchain/source-build behavior.
+- `PlatformCore/System/` owns the system layer: config loading,
+  filesystem/process helpers, and centralized operating-system adapters.
+- `PlatformStorage/` owns the storage layer:
+  `PlatformCache/` contains cache and local state layout, and
+  `PlatformPersistence/` contains persisted state records, the memory-backed
+  development state store, Postgres migrations/state access, and object storage
+  access for S3, filesystem, or memory-backed object stores.
+- `PlatformSecurity/` owns security ability:
+  `PlatformCA/` contains certificate authority, trust-anchor lifecycle, and
+  managed mTLS certificate issuance, `PlatformClientAuth/` contains mTLS
+  identity parsing and operation-level authorization policy, and
+  `SecurityHardening/` contains registry read/write security hooks and
+  hardening extension points.
+- `PlatformCloud/` owns cloud business capabilities:
+  `PackageRegistry/` is split into `ControlPlane/`, `PublicationBuilder/`,
+  `StaticReadPlane/`, and `MirrorSync/`, while `DeveloperWorkspace/` contains
+  job queue request semantics, worker runtime, compile-container/workspace
+  factories, and the deterministic workspace compile stress harness.
+- `PlatformService/` owns external service entrypoints: HTTP adapters, routing,
+  and the platform daemon.
+- `SpioPlatformProtocols/` owns all Spio-to-Platform interaction payloads and
+  serializers, including compile-plan v1, project-graph payloads, cloud
+  execution policy, and cloud build job requests.
 
-New service implementation should prefer platform-owned names and APIs; the
-imported names here are compatibility scaffolding.
+`CMakeLists.txt` and this README stay at the `src/` root as source-tree
+metadata instead of runtime capability code.

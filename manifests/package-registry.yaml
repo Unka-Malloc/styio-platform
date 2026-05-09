@@ -1,0 +1,115 @@
+id: package-registry
+kind: business-capability
+owner: platform-registry
+description: Cloud package registry for developer clients that resolve, publish, mirror, and download Styio packages.
+depends_on:
+  - platform-foundation
+split_policy:
+  extractable: true
+  extraction_shape: registry-control-plane + static-read-plane + mirror-worker
+  base_must_remain_shared:
+    - platform-foundation
+cmake_targets:
+  - styio_platform_package_registry
+modules:
+  control_plane:
+    - src/PlatformCloud/PackageRegistry/ControlPlane
+    - src/PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.cpp
+    - src/PlatformService/Router.cpp::registry-handler-dispatch
+  publication_builder:
+    - src/PlatformCloud/PackageRegistry/PublicationBuilder
+    - src/PlatformCloud/PackageRegistry/package_registry_v2
+  static_read_plane:
+    - src/PlatformCloud/PackageRegistry/StaticReadPlane
+    - scripts/registry-v2-static-read-server.py
+  mirror_sync:
+    - src/PlatformCloud/PackageRegistry/MirrorSync
+  scripts:
+    - scripts/package-registry-server.sh
+    - scripts/deploy-registry-vm.sh
+    - scripts/registry-v2-control-plane-server.py
+    - scripts/registry-v2-static-read-server.py
+    - scripts/registry-v2-vm-smoke.py
+protocols:
+  owned:
+    - contracts/registry-v2/v1
+    - contracts/registry-control-plane/v1
+  spio_platform_protocols:
+    - registry_descriptor
+    - publish_release
+    - verify_registry
+apis:
+  control_plane_base_path: /api/spio-registry-control/v1
+  operations:
+    - registryStatus
+    - registryDescriptor
+    - publishRelease
+    - verifyRegistry
+    - getPackage
+    - listPackageReleases
+    - getPackageRelease
+    - yankPackageRelease
+    - unyankPackageRelease
+    - listPackageOwners
+    - addPackageOwner
+    - removePackageOwner
+    - createPublishToken
+    - listPublishTokens
+    - revokePublishToken
+    - listRepositories
+    - listRepositoryVersions
+    - getPublication
+    - verifyPublication
+    - listDistributions
+    - promoteDistribution
+    - rollbackDistribution
+storage:
+  persistence:
+    - platform_packages
+    - platform_package_releases
+    - platform_package_owners
+    - platform_publish_tokens
+    - platform_repositories
+    - platform_repository_versions
+    - platform_publications
+    - platform_distributions
+    - platform_registry_audit_events
+    - mirror_freshness_state
+  object_store:
+    - registry_artifacts
+    - registry_indexes
+    - registry_trust_metadata
+    - registry_publications
+    - registry_distribution_pointers
+  cache:
+    - registry_read_cache
+security:
+  required_roles:
+    - registry-writer
+    - mirror
+    - operator
+  scopes:
+    - package:read
+    - package:publish
+    - package:yank
+    - package:owner
+    - repository:promote
+    - registry:mirror
+runtime:
+  requires_object_store: true
+  requires_postgres_for_mirror_state: true
+  deployment_modes:
+    - embedded_platformd
+    - vm_bundle
+    - future_standalone_registry_service
+observability:
+  health:
+    - registry_root_verified
+    - mirror_freshness
+tests:
+  unit:
+    - tests/unit/test_registry_v2.py
+    - tests/unit/test_registry_vm_deploy.py
+  contract:
+    - tests/interop/registry-v2-contract-gate.py
+    - tests/interop/registry-control-plane-contract-gate.py

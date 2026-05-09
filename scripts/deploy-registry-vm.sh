@@ -49,7 +49,7 @@ shell_quote() {
 }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -d "$script_dir/src/spio_registry_v2" && -f "$script_dir/scripts/registry-v2-control-plane-server.py" ]]; then
+if [[ -d "$script_dir/src/PlatformCloud/PackageRegistry" && -f "$script_dir/scripts/registry-v2-control-plane-server.py" ]]; then
   bundle_root="$script_dir"
 else
   bundle_root="$(cd "$script_dir/.." && pwd)"
@@ -171,9 +171,11 @@ fi
 
 [[ -f "$bundle_root/scripts/registry-v2-control-plane-server.py" ]] || fail "bundle is missing scripts/registry-v2-control-plane-server.py"
 [[ -f "$bundle_root/scripts/registry-v2-static-read-server.py" ]] || fail "bundle is missing scripts/registry-v2-static-read-server.py"
-[[ -d "$bundle_root/src/spio_registry_v2" ]] || fail "bundle is missing src/spio_registry_v2"
+[[ -d "$bundle_root/src/PlatformCloud/PackageRegistry/package_registry_v2" ]] || fail "bundle is missing src/PlatformCloud/PackageRegistry/package_registry_v2"
+[[ -d "$bundle_root/src/PlatformCloud/PackageRegistry/PublicationBuilder" ]] || fail "bundle is missing src/PlatformCloud/PackageRegistry/PublicationBuilder"
+[[ -d "$bundle_root/src/PlatformCloud/PackageRegistry/StaticReadPlane" ]] || fail "bundle is missing src/PlatformCloud/PackageRegistry/StaticReadPlane"
 
-if [[ "$FORCE" -ne 1 && -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR/src/spio_registry_v2" ]]; then
+if [[ "$FORCE" -ne 1 && -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR/src/PlatformCloud/PackageRegistry/package_registry_v2" ]]; then
   fail "$INSTALL_DIR exists but does not look like a styio registry install; pass --force to replace managed files"
 fi
 
@@ -187,9 +189,9 @@ if ! id "$SERVICE_USER" >/dev/null 2>&1; then
 fi
 
 log "installing runtime files into $INSTALL_DIR"
-install -d -m 0755 "$INSTALL_DIR/scripts" "$INSTALL_DIR/src" "$CONFIG_DIR" "$REGISTRY_ROOT" "$KEY_DIR"
-rm -rf "$INSTALL_DIR/src/spio_registry_v2"
-cp -R "$bundle_root/src/spio_registry_v2" "$INSTALL_DIR/src/spio_registry_v2"
+install -d -m 0755 "$INSTALL_DIR/scripts" "$INSTALL_DIR/src/PlatformCloud" "$CONFIG_DIR" "$REGISTRY_ROOT" "$KEY_DIR"
+rm -rf "$INSTALL_DIR/src/PlatformCloud/PackageRegistry"
+cp -R "$bundle_root/src/PlatformCloud/PackageRegistry" "$INSTALL_DIR/src/PlatformCloud/PackageRegistry"
 install -m 0755 "$bundle_root/scripts/registry-v2-control-plane-server.py" "$INSTALL_DIR/scripts/registry-v2-control-plane-server.py"
 install -m 0755 "$bundle_root/scripts/registry-v2-static-read-server.py" "$INSTALL_DIR/scripts/registry-v2-static-read-server.py"
 install -m 0755 "$bundle_root/scripts/registry-v2-vm-smoke.py" "$INSTALL_DIR/scripts/registry-v2-vm-smoke.py"
@@ -210,10 +212,10 @@ chmod 0640 "$ENV_FILE"
 chown root:"$SERVICE_GROUP" "$ENV_FILE"
 
 log "initializing registry root and signing keys"
-PYTHONPATH="$INSTALL_DIR/src" "$PYTHON_BIN" - "$REGISTRY_ROOT" "$KEY_DIR" "$REGISTRY_NAME" <<'PY'
+PYTHONPATH="$INSTALL_DIR/src/PlatformCloud/PackageRegistry" "$PYTHON_BIN" - "$REGISTRY_ROOT" "$KEY_DIR" "$REGISTRY_NAME" <<'PY'
 import pathlib
 import sys
-from spio_registry_v2 import initialize_registry_v2_root
+from package_registry_v2 import initialize_registry_v2_root
 
 registry_root = pathlib.Path(sys.argv[1])
 key_dir = pathlib.Path(sys.argv[2])

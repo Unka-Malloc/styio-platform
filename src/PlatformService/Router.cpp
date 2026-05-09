@@ -1,25 +1,30 @@
 #include "PlatformService/Router.hpp"
 
-#include "PlatformService/ObjectStore.hpp"
-#include "PlatformService/PostgresStore.hpp"
-#include "SpioCore/Errors.hpp"
-#include "SpioCore/Process.hpp"
-#include "SpioCore/Sha256.hpp"
-#include "SpioManifest/Manifest.hpp"
+#include "PlatformStorage/PlatformPersistence/ObjectStore.hpp"
+#include "PlatformStorage/PlatformPersistence/PostgresStore.hpp"
+#include "PlatformCore/Core/Errors.hpp"
+#include "PlatformCore/Core/Process.hpp"
+#include "PlatformCore/Core/Sha256.hpp"
+#include "PlatformCore/Manifest/Manifest.hpp"
+#include "PlatformSecurity/PlatformClientAuth/Authorization.hpp"
 
 #include <array>
+#include <algorithm>
 #include <chrono>
 #include <cctype>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
-#include <initializer_list>
+#include <map>
+#include <optional>
 #include <sstream>
 #include <system_error>
 #include <tuple>
+#include <vector>
 
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 #include <openssl/sha.h>
 
 namespace fs = std::filesystem;
@@ -30,66 +35,66 @@ namespace spio::platform
 namespace
 {
 
-bool IsInternalRole(const MtlsIdentity &identity)
-{
-  return identity.role == "control-plane" || identity.role == "worker" || identity.role == "mirror" ||
-         identity.role == "registry-writer" || identity.role == "operator" || identity.role == "cluster-registrar";
-}
-
 bool IsRegistryOperation(std::string_view operation_id)
 {
-  return operation_id == "registryStatus" || operation_id == "registryDescriptor" ||
-         operation_id == "publishRelease" || operation_id == "verifyRegistry";
+  static constexpr std::array<std::string_view, 23> kRegistryOperations = {
+      "registryStatus",
+      "registryDescriptor",
+      "publishRelease",
+      "verifyRegistry",
+      "getPackage",
+      "listPackageReleases",
+      "getPackageRelease",
+      "yankPackageRelease",
+      "unyankPackageRelease",
+      "listPackageOwners",
+      "addPackageOwner",
+      "removePackageOwner",
+      "createPublishToken",
+      "listPublishTokens",
+      "revokePublishToken",
+      "listRepositories",
+      "listRepositoryVersions",
+      "getPublication",
+      "verifyPublication",
+      "listDistributions",
+      "promoteDistribution",
+      "rollbackDistribution",
+      "mirrorStatus",
+  };
+  return std::find(kRegistryOperations.begin(), kRegistryOperations.end(), operation_id) != kRegistryOperations.end();
+}
+
+bool IsTokenCapableRegistryOperation(std::string_view operation_id)
+{
+  return operation_id == "publishRelease" || operation_id == "yankPackageRelease" ||
+         operation_id == "unyankPackageRelease" || operation_id == "addPackageOwner" ||
+         operation_id == "removePackageOwner" || operation_id == "promoteDistribution" ||
+         operation_id == "rollbackDistribution";
+}
+
+std::optional<std::string> RegistryTokenFromHeaders(const std::map<std::string, std::string> &headers)
+{
+  if (const auto direct = headers.find("x-styio-registry-token"); direct != headers.end() && !direct->second.empty())
+  {
+    return direct->second;
+  }
+  const auto authorization = headers.find("authorization");
+  if (authorization == headers.end())
+  {
+    return std::nullopt;
+  }
+  constexpr std::string_view prefix = "Bearer ";
+  if (!authorization->second.starts_with(prefix))
+  {
+    return std::nullopt;
+  }
+  return authorization->second.substr(prefix.size());
 }
 
 bool UsesPostgresState(const PlatformConfig &config)
 {
   return config.state_backend == "postgres";
-}
-
-bool RoleIn(const MtlsIdentity &identity, std::initializer_list<std::string_view> allowed)
-{
-  for (const std::string_view role : allowed)
-  {
-    if (identity.role == role)
-    {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool IsAuthorizedForOperation(std::string_view operation_id, const MtlsIdentity &identity)
-{
-  if (operation_id == "registryStatus")
-  {
-    return RoleIn(identity, {"control-plane", "registry-writer", "mirror", "operator"});
-  }
-  if (operation_id == "registryDescriptor")
-  {
-    return RoleIn(identity, {"control-plane", "registry-writer", "mirror", "operator"});
-  }
-  if (operation_id == "publishRelease")
-  {
-    return RoleIn(identity, {"registry-writer", "operator"});
-  }
-  if (operation_id == "verifyRegistry")
-  {
-    return RoleIn(identity, {"registry-writer", "mirror", "operator"});
-  }
-  if (operation_id == "mirrorStatus")
-  {
-    return RoleIn(identity, {"control-plane", "registry-writer", "mirror", "operator"});
-  }
-  if (operation_id == "registerWorkgroupCluster")
-  {
-    return RoleIn(identity, {"control-plane", "operator", "cluster-registrar"});
-  }
-  if (operation_id == "listWorkgroupClusters")
-  {
-    return IsInternalRole(identity);
-  }
-  return true;
 }
 
 HttpResponse JsonResponse(int status, nlohmann::json body)
@@ -410,6 +415,51 @@ nlohmann::json BuildWorkgroupClusterRecord(
   return record;
 }
 
+std::optional<std::string> ValidateCompileContainerRegistration(const nlohmann::json &body)
+{
+  if (!body.is_object())
+  {
+    return "request body must be an object";
+  }
+  for (const std::string field : {"container_id", "worker_id", "tenant_id", "user_id", "workspace_id", "region", "worker_pool_key"})
+  {
+    if (!HasNonEmptyString(body, field))
+    {
+      return field + " is required";
+    }
+  }
+  const int capacity = body.value("capacity", 0);
+  if (capacity < 1)
+  {
+    return "capacity must be positive";
+  }
+  if (body.contains("status") && body["status"] != "active" && body["status"] != "draining")
+  {
+    return "status must be active or draining when present";
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> ValidateCompileContainerSwitch(const nlohmann::json &body)
+{
+  if (!body.is_object())
+  {
+    return "request body must be an object";
+  }
+  for (const std::string field : {"worker_id", "workspace_id"})
+  {
+    if (!HasNonEmptyString(body, field))
+    {
+      return field + " is required";
+    }
+  }
+  if (const std::optional<std::string> error = ValidateOptionalStringFields(body, {"tenant_id", "user_id", "reason"}); error.has_value())
+  {
+    return error;
+  }
+  return std::nullopt;
+}
+
 std::string RegistryIndexPathForPackage(std::string_view package)
 {
   const std::vector<std::string> parts = SplitPackageName(package);
@@ -419,6 +469,78 @@ std::string RegistryIndexPathForPackage(std::string_view package)
 std::string RegistryReleaseKey(const std::string &package, const std::string &version)
 {
   return package + "@" + version;
+}
+
+bool VersionLess(const std::string &left, const std::string &right);
+std::string CanonicalJson(const nlohmann::json &payload);
+std::string Sha256Bytes(std::string_view payload);
+
+std::string RegistryPackageId(std::string_view package)
+{
+  return std::string(package);
+}
+
+std::string RegistryPackageFromRoute(const RouteMatch &match)
+{
+  return match.parameters.at("namespace") + "/" + match.parameters.at("name");
+}
+
+std::string RegistryActorId(const HttpRequest &request)
+{
+  if (request.identity.has_value())
+  {
+    return request.identity->node_id;
+  }
+  if (const std::optional<std::string> token = RegistryTokenFromHeaders(request.headers); token.has_value())
+  {
+    const std::string hash = Sha256Bytes(*token);
+    return "token:" + hash.substr(0, 12);
+  }
+  return "anonymous";
+}
+
+std::vector<std::string> JsonStringArray(const nlohmann::json &body, const std::string &field, std::vector<std::string> fallback)
+{
+  if (!body.contains(field))
+  {
+    return fallback;
+  }
+  std::vector<std::string> values;
+  for (const nlohmann::json &entry : body.at(field))
+  {
+    values.push_back(entry.get<std::string>());
+  }
+  return values;
+}
+
+bool PackagePatternMatches(std::string_view pattern, std::string_view package)
+{
+  if (pattern == "*")
+  {
+    return true;
+  }
+  if (pattern.ends_with("/*"))
+  {
+    const std::string_view prefix = pattern.substr(0, pattern.size() - 1);
+    return package.starts_with(prefix);
+  }
+  return pattern == package;
+}
+
+bool TokenHasScope(const RegistryPublishTokenRecord &token, std::string_view scope)
+{
+  return std::find(token.scopes.begin(), token.scopes.end(), scope) != token.scopes.end();
+}
+
+bool TokenMatchesPackage(const RegistryPublishTokenRecord &token, const std::string &package)
+{
+  if (package.empty())
+  {
+    return true;
+  }
+  return std::any_of(token.package_patterns.begin(), token.package_patterns.end(), [&](const std::string &pattern) {
+    return PackagePatternMatches(pattern, package);
+  });
 }
 
 bool JsonLineHasRelease(const std::string &line, const std::string &package, const std::string &version)
@@ -451,6 +573,90 @@ bool ReleaseExistsOnDisk(const fs::path &registry_root, const std::string &packa
     }
   }
   return false;
+}
+
+std::vector<nlohmann::json> ReadPackageIndexRecords(const fs::path &registry_root, const std::string &package)
+{
+  const fs::path index_path = registry_root / RegistryIndexPathForPackage(package);
+  std::vector<nlohmann::json> records;
+  std::ifstream in(index_path);
+  if (!in)
+  {
+    return records;
+  }
+  std::string line;
+  while (std::getline(in, line))
+  {
+    if (line.empty())
+    {
+      continue;
+    }
+    records.push_back(nlohmann::json::parse(line));
+  }
+  return records;
+}
+
+void WritePackageIndexRecords(
+    const fs::path &registry_root,
+    const std::string &package,
+    const std::vector<nlohmann::json> &records)
+{
+  const fs::path index_path = registry_root / RegistryIndexPathForPackage(package);
+  fs::create_directories(index_path.parent_path());
+  std::ofstream out(index_path, std::ios::binary | std::ios::trunc);
+  for (const nlohmann::json &record : records)
+  {
+    out << record.dump() << "\n";
+  }
+}
+
+nlohmann::json PackagePayloadFromIndex(const fs::path &registry_root, const std::string &package)
+{
+  const std::vector<nlohmann::json> records = ReadPackageIndexRecords(registry_root, package);
+  if (records.empty())
+  {
+    throw std::runtime_error("package is not found");
+  }
+  const size_t slash = package.find('/');
+  std::vector<std::string> versions;
+  nlohmann::json releases = nlohmann::json::array();
+  for (const nlohmann::json &record : records)
+  {
+    versions.push_back(record.at("version").get<std::string>());
+    releases.push_back({
+        {"version", record.at("version").get<std::string>()},
+        {"publisher_id", record.value("publisher_id", "")},
+        {"published_at", record.value("published_at", "")},
+        {"yanked", record.value("yanked", false)},
+        {"source_artifact_sha256", record.at("source_artifact").at("sha256").get<std::string>()},
+        {"source_artifact_path", record.at("source_artifact").at("path").get<std::string>()},
+    });
+  }
+  std::sort(versions.begin(), versions.end(), VersionLess);
+  return {
+      {"package_id", package},
+      {"namespace", package.substr(0, slash)},
+      {"name", package.substr(slash + 1)},
+      {"visibility", "public"},
+      {"latest_version", versions.back()},
+      {"release_count", static_cast<int64_t>(records.size())},
+      {"releases", releases},
+  };
+}
+
+std::optional<nlohmann::json> PackageReleasePayloadFromIndex(
+    const fs::path &registry_root,
+    const std::string &package,
+    const std::string &version)
+{
+  for (const nlohmann::json &record : ReadPackageIndexRecords(registry_root, package))
+  {
+    if (record.value("version", "") == version)
+    {
+      return record;
+    }
+  }
+  return std::nullopt;
 }
 
 size_t CountRegularFiles(const fs::path &root)
@@ -546,6 +752,107 @@ std::string ReadFileBytes(const fs::path &path)
   return out.str();
 }
 
+std::string DirectoryDigest(const fs::path &root)
+{
+  std::error_code ec;
+  nlohmann::json files = nlohmann::json::array();
+  if (!fs::exists(root, ec))
+  {
+    return "sha256:" + Sha256Bytes(CanonicalJson(files));
+  }
+  std::vector<fs::path> paths;
+  for (const fs::directory_entry &entry : fs::recursive_directory_iterator(root, ec))
+  {
+    if (entry.is_regular_file(ec))
+    {
+      paths.push_back(entry.path());
+    }
+  }
+  std::sort(paths.begin(), paths.end());
+  for (const fs::path &path : paths)
+  {
+    files.push_back({
+        {"path", fs::relative(path, root).generic_string()},
+        {"sha256", spio::Sha256File(path)},
+    });
+  }
+  return "sha256:" + Sha256Bytes(CanonicalJson(files));
+}
+
+size_t NextPublicationSequenceOnDisk(const fs::path &registry_root)
+{
+  const fs::path publications_root = registry_root / "_publications";
+  std::error_code ec;
+  size_t sequence = 1;
+  if (!fs::exists(publications_root, ec))
+  {
+    return sequence;
+  }
+  for (const fs::directory_entry &entry : fs::directory_iterator(publications_root, ec))
+  {
+    if (!entry.is_directory(ec))
+    {
+      continue;
+    }
+    const std::string name = entry.path().filename().string();
+    if (name.starts_with("pub-"))
+    {
+      try
+      {
+        sequence = std::max(sequence, static_cast<size_t>(std::stoul(name.substr(4)) + 1U));
+      }
+      catch (...)
+      {
+      }
+    }
+  }
+  return sequence;
+}
+
+void CopyRegistryReadPlaneTo(const fs::path &registry_root, const fs::path &dest)
+{
+  fs::create_directories(dest);
+  std::error_code ec;
+  for (const std::string entry : {"index", "artifacts", "trust", "log"})
+  {
+    const fs::path source = registry_root / entry;
+    if (fs::exists(source, ec))
+    {
+      fs::copy(source, dest / entry, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
+      if (ec)
+      {
+        throw std::runtime_error("failed to copy registry publication tree: " + ec.message());
+      }
+    }
+  }
+  fs::copy_file(registry_root / "config.json", dest / "config.json", fs::copy_options::overwrite_existing, ec);
+  if (ec)
+  {
+    throw std::runtime_error("failed to copy registry publication config: " + ec.message());
+  }
+}
+
+void MaterializePublicationToRoot(const fs::path &registry_root, const fs::path &publication_root)
+{
+  std::error_code ec;
+  fs::remove(registry_root / "config.json", ec);
+  for (const std::string entry : {"index", "artifacts", "trust", "log"})
+  {
+    fs::remove_all(registry_root / entry, ec);
+  }
+  CopyRegistryReadPlaneTo(publication_root, registry_root);
+}
+
+std::optional<nlohmann::json> CurrentDistributionPointer(const fs::path &registry_root, const std::string &distribution_id)
+{
+  const fs::path pointer = registry_root / "_distributions" / distribution_id / "current.json";
+  if (!fs::exists(pointer))
+  {
+    return std::nullopt;
+  }
+  return nlohmann::json::parse(ReadFileBytes(pointer));
+}
+
 void WriteTextFile(const fs::path &path, const std::string &payload)
 {
   fs::create_directories(path.parent_path());
@@ -579,6 +886,16 @@ std::string Sha256Bytes(std::string_view payload)
   unsigned char digest[SHA256_DIGEST_LENGTH];
   SHA256(reinterpret_cast<const unsigned char *>(payload.data()), payload.size(), digest);
   return HexBytes(digest, SHA256_DIGEST_LENGTH);
+}
+
+std::string SecureRandomHex(const size_t bytes)
+{
+  std::vector<unsigned char> random(bytes);
+  if (RAND_bytes(random.data(), static_cast<int>(random.size())) != 1)
+  {
+    throw std::runtime_error("secure random generation failed");
+  }
+  return HexBytes(random.data(), random.size());
 }
 
 std::string Base64Encode(std::string_view payload)
@@ -806,6 +1123,25 @@ nlohmann::json RegistryConfigPayload(const PlatformConfig &config, const std::st
                     {"transparency_leaves_prefix", "log/leaves/"},
                 }},
   };
+}
+
+nlohmann::json RegistryConfigPayload(
+    const PlatformConfig &config,
+    const std::string &generated_at,
+    const std::string &publication_id,
+    const std::string &repository_version_id)
+{
+  nlohmann::json payload = RegistryConfigPayload(config, generated_at);
+  payload["repository_id"] = "default";
+  payload["distribution_id"] = "default";
+  payload["publication"] = {
+      {"publication_id", publication_id},
+      {"repository_version_id", repository_version_id},
+      {"layout_version", 2},
+      {"publication_path", "_publications/" + publication_id + "/publication.json"},
+      {"current_pointer", "_distributions/default/current.json"},
+  };
+  return payload;
 }
 
 nlohmann::json SignedFileMeta(const fs::path &path, const int version)
@@ -1329,11 +1665,11 @@ void SyncS3RegistryStateToLocal(const PlatformConfig &config)
   {
     WriteTextFile(root / "config.json", *config_text);
   }
-  for (const std::string &prefix : {"trust/", "index/", "log/"})
+  for (const std::string &prefix : {"trust/", "index/", "log/", "artifacts/", "_publications/", "_distributions/"})
   {
     for (const std::string &key : ListObjectKeys(config.object_store, prefix))
     {
-      if (key.starts_with("artifacts/") || key.starts_with("_"))
+      if (key.starts_with("_staging/") || key.starts_with("_tmp/"))
       {
         continue;
       }
@@ -1393,6 +1729,9 @@ std::vector<RouteSpec> BuildPlatformControlPlaneRoutes()
       {.operation_id = "getJobEvents", .method = HttpMethod::Get, .path = "/jobs/{job_id}/events"},
       {.operation_id = "cancelJob", .method = HttpMethod::Post, .path = "/jobs/{job_id}/cancel"},
       {.operation_id = "registerWorker", .method = HttpMethod::Post, .path = "/workers/register", .internal = true},
+      {.operation_id = "registerCompileContainer", .method = HttpMethod::Post, .path = "/compile-containers/register", .internal = true},
+      {.operation_id = "getCompileContainer", .method = HttpMethod::Get, .path = "/compile-containers/{container_id}", .internal = true},
+      {.operation_id = "switchCompileContainerWorkspace", .method = HttpMethod::Post, .path = "/compile-containers/{container_id}/switch-workspace", .internal = true},
       {.operation_id = "claimJob", .method = HttpMethod::Post, .path = "/jobs/claim", .internal = true},
       {.operation_id = "heartbeatJob", .method = HttpMethod::Post, .path = "/jobs/{job_id}/heartbeat", .internal = true},
       {.operation_id = "completeJob", .method = HttpMethod::Post, .path = "/jobs/{job_id}/complete", .internal = true},
@@ -1402,47 +1741,17 @@ std::vector<RouteSpec> BuildPlatformControlPlaneRoutes()
   };
 }
 
-std::vector<RouteSpec> BuildRegistryControlPlaneRoutes()
-{
-  return {
-      {
-          .operation_id = "registryStatus",
-          .method = HttpMethod::Get,
-          .path = "/api/spio-registry-control/v1/status",
-          .internal = true,
-      },
-      {
-          .operation_id = "registryDescriptor",
-          .method = HttpMethod::Get,
-          .path = "/api/spio-registry-control/v1/descriptor",
-          .internal = true,
-      },
-      {
-          .operation_id = "publishRelease",
-          .method = HttpMethod::Post,
-          .path = "/api/spio-registry-control/v1/publish",
-          .internal = true,
-      },
-      {
-          .operation_id = "verifyRegistry",
-          .method = HttpMethod::Post,
-          .path = "/api/spio-registry-control/v1/verify",
-          .internal = true,
-      },
-  };
-}
-
 PlatformRouter::PlatformRouter(PlatformConfig config)
     : config_(std::move(config)), routes_(BuildPlatformControlPlaneRoutes())
 {
   const std::vector<RouteSpec> registry_routes = BuildRegistryControlPlaneRoutes();
   routes_.insert(routes_.end(), registry_routes.begin(), registry_routes.end());
-  mirrors_[config_.registry.mirror_id] = RegistryMirrorState{
-      .mirror_id = config_.registry.mirror_id,
-      .origin = config_.registry.mirror_origin,
-      .freshness = "lagging",
-      .replay_cursor = "checkpoint-0000",
-  };
+  memory_.RecordMirrorState(
+      config_.registry.mirror_id,
+      config_.region,
+      config_.registry.mirror_origin,
+      "lagging",
+      "checkpoint-0000");
   if (UsesPostgresState(config_))
   {
     postgres_ = std::make_unique<PostgresStore>(config_.postgres_dsn);
@@ -1490,6 +1799,18 @@ HttpResponse PlatformRouter::Dispatch(const HttpRequest &request)
   {
     return HandleRegisterWorker(request);
   }
+  if (operation == "registerCompileContainer")
+  {
+    return HandleRegisterCompileContainer(request);
+  }
+  if (operation == "getCompileContainer")
+  {
+    return HandleGetCompileContainer(*match);
+  }
+  if (operation == "switchCompileContainerWorkspace")
+  {
+    return HandleSwitchCompileContainerWorkspace(*match, request);
+  }
   if (operation == "claimJob")
   {
     return HandleClaimJob(request);
@@ -1530,12 +1851,90 @@ HttpResponse PlatformRouter::Dispatch(const HttpRequest &request)
   {
     return HandleVerifyRegistry(request);
   }
+  if (operation == "getPackage")
+  {
+    return HandleGetPackage(*match);
+  }
+  if (operation == "listPackageReleases")
+  {
+    return HandleListPackageReleases(*match);
+  }
+  if (operation == "getPackageRelease")
+  {
+    return HandleGetPackageRelease(*match);
+  }
+  if (operation == "yankPackageRelease")
+  {
+    return HandleSetPackageReleaseYanked(*match, request, true);
+  }
+  if (operation == "unyankPackageRelease")
+  {
+    return HandleSetPackageReleaseYanked(*match, request, false);
+  }
+  if (operation == "listPackageOwners")
+  {
+    return HandleListPackageOwners(*match);
+  }
+  if (operation == "addPackageOwner")
+  {
+    return HandleAddPackageOwner(*match, request);
+  }
+  if (operation == "removePackageOwner")
+  {
+    return HandleRemovePackageOwner(*match, request);
+  }
+  if (operation == "createPublishToken")
+  {
+    return HandleCreatePublishToken(request);
+  }
+  if (operation == "listPublishTokens")
+  {
+    return HandleListPublishTokens(request);
+  }
+  if (operation == "revokePublishToken")
+  {
+    return HandleRevokePublishToken(*match, request);
+  }
+  if (operation == "listRepositories")
+  {
+    return HandleListRepositories();
+  }
+  if (operation == "listRepositoryVersions")
+  {
+    return HandleListRepositoryVersions(*match);
+  }
+  if (operation == "getPublication")
+  {
+    return HandleGetPublication(*match);
+  }
+  if (operation == "verifyPublication")
+  {
+    return HandleVerifyPublication(*match, request);
+  }
+  if (operation == "listDistributions")
+  {
+    return HandleListDistributions();
+  }
+  if (operation == "promoteDistribution")
+  {
+    return HandlePromoteDistribution(*match, request);
+  }
+  if (operation == "rollbackDistribution")
+  {
+    return HandleRollbackDistribution(*match, request);
+  }
   return JsonResponse(500, FailureEnvelope("route handler missing", operation, "InternalError", operation));
 }
 
 HttpResponse PlatformRouter::RequireIdentity(const RouteMatch &match, const HttpRequest &request) const
 {
   if (!config_.mtls.required)
+  {
+    return JsonResponse(200, {});
+  }
+  if (!request.identity.has_value() && match.route.internal &&
+      IsTokenCapableRegistryOperation(match.route.operation_id) &&
+      RegistryTokenFromHeaders(request.headers).has_value())
   {
     return JsonResponse(200, {});
   }
@@ -1625,7 +2024,7 @@ HttpResponse PlatformRouter::HandleSubmitJob(const HttpRequest &request)
   }
   else
   {
-    job_id = NextMemoryJobId();
+    job_id = memory_.NextJobId();
   }
   PlatformJobRecord job = BuildQueuedJobRecord(request.body, config_, std::move(job_id));
   if (postgres_ != nullptr)
@@ -1640,13 +2039,7 @@ HttpResponse PlatformRouter::HandleSubmitJob(const HttpRequest &request)
       return FailureResponse(503, "job submission failed", error.what(), "PostgresError", "submitJob");
     }
   }
-  jobs_[job.job_id] = job;
-  events_[job.job_id].push_back({
-      .event_id = "event-queued",
-      .job_id = job.job_id,
-      .status = "queued",
-      .message = "job queued",
-  });
+  memory_.SubmitJob(job);
   return JsonResponse(200, SuccessEnvelope("queued platform job", SerializeJobRecord(job)));
 }
 
@@ -1668,12 +2061,12 @@ HttpResponse PlatformRouter::HandleGetJob(const RouteMatch &match) const
       return FailureResponse(503, "job lookup failed", error.what(), "PostgresError", "getJob");
     }
   }
-  const auto job = jobs_.find(match.parameters.at("job_id"));
-  if (job == jobs_.end())
+  const std::optional<PlatformJobRecord> job = memory_.GetJob(match.parameters.at("job_id"));
+  if (!job.has_value())
   {
     return JsonResponse(404, FailureEnvelope("job lookup failed", "job not found", "NotFound", "getJob"));
   }
-  return JsonResponse(200, SuccessEnvelope("loaded platform job", SerializeJobRecord(job->second)));
+  return JsonResponse(200, SuccessEnvelope("loaded platform job", SerializeJobRecord(*job)));
 }
 
 HttpResponse PlatformRouter::HandleGetJobEvents(const RouteMatch &match) const
@@ -1699,13 +2092,12 @@ HttpResponse PlatformRouter::HandleGetJobEvents(const RouteMatch &match) const
       return FailureResponse(503, "job event lookup failed", error.what(), "PostgresError", "getJobEvents");
     }
   }
-  const auto found = events_.find(job_id);
-  if (found == events_.end())
+  if (!memory_.GetJob(job_id).has_value())
   {
     return JsonResponse(404, FailureEnvelope("job event lookup failed", "job not found", "NotFound", "getJobEvents"));
   }
   nlohmann::json events = nlohmann::json::array();
-  for (const JobEventRecord &event : found->second)
+  for (const JobEventRecord &event : memory_.GetJobEvents(job_id))
   {
     events.push_back(SerializeJobEvent(event));
   }
@@ -1735,22 +2127,13 @@ HttpResponse PlatformRouter::HandleCancelJob(const RouteMatch &match, const Http
       return FailureResponse(503, "job cancellation failed", error.what(), "PostgresError", "cancelJob");
     }
   }
-  const auto found = jobs_.find(match.parameters.at("job_id"));
-  if (found == jobs_.end())
+  const std::optional<PlatformJobRecord> job =
+      memory_.CancelJob(match.parameters.at("job_id"), request.body["reason"].get<std::string>());
+  if (!job.has_value())
   {
     return JsonResponse(404, FailureEnvelope("job cancellation failed", "job not found", "NotFound", "cancelJob"));
   }
-  PlatformJobRecord &job = found->second;
-  job.status = "cancelled";
-  job.finished_at = "2026-04-24T00:01:00Z";
-  events_[job.job_id].push_back({
-      .event_id = "event-cancelled",
-      .job_id = job.job_id,
-      .status = "cancelled",
-      .message = request.body["reason"].get<std::string>(),
-      .created_at = job.finished_at,
-  });
-  return JsonResponse(200, SuccessEnvelope("cancelled platform job", SerializeJobRecord(job)));
+  return JsonResponse(200, SuccessEnvelope("cancelled platform job", SerializeJobRecord(*job)));
 }
 
 HttpResponse PlatformRouter::HandleRegisterWorker(const HttpRequest &request)
@@ -1785,8 +2168,170 @@ HttpResponse PlatformRouter::HandleRegisterWorker(const HttpRequest &request)
       return FailureResponse(503, "worker registration failed", error.what(), "PostgresError", "registerWorker");
     }
   }
-  workers_[worker["worker_id"].get<std::string>()] = worker;
-  return JsonResponse(200, SuccessEnvelope("registered platform worker", worker));
+  return JsonResponse(200, SuccessEnvelope("registered platform worker", memory_.RegisterWorker(worker)));
+}
+
+HttpResponse PlatformRouter::HandleRegisterCompileContainer(const HttpRequest &request)
+{
+  if (const std::optional<std::string> error = ValidateCompileContainerRegistration(request.body); error.has_value())
+  {
+    return JsonResponse(400, FailureEnvelope("compile container registration rejected", *error, "ValidationError", "registerCompileContainer", 2));
+  }
+  const CompileContainerRecordFactory container_factory;
+  CompileContainerRecord container = container_factory.CreateFromRegistration(request.body);
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      return JsonResponse(200, SuccessEnvelope("registered compile container", SerializeCompileContainerRecord(postgres_->RegisterCompileContainer(container))));
+    }
+    catch (const PostgresStoreError &error)
+    {
+      const std::string detail = error.what();
+      if (detail.find("worker is not registered") != std::string::npos)
+      {
+        return JsonResponse(403, FailureEnvelope("compile container registration rejected", "worker is not registered", "WorkerError", "registerCompileContainer"));
+      }
+      if (detail.find("user binding mismatch") != std::string::npos)
+      {
+        return JsonResponse(409, FailureEnvelope("compile container registration rejected", "compile container user binding mismatch", "BindingError", "registerCompileContainer", 2));
+      }
+      if (detail.find("worker owner mismatch") != std::string::npos)
+      {
+        return JsonResponse(409, FailureEnvelope("compile container registration rejected", "compile container worker owner mismatch", "BindingError", "registerCompileContainer", 2));
+      }
+      return FailureResponse(503, "compile container registration failed", detail, "PostgresError", "registerCompileContainer");
+    }
+  }
+
+  try
+  {
+    return JsonResponse(200, SuccessEnvelope("registered compile container", SerializeCompileContainerRecord(memory_.RegisterCompileContainer(container))));
+  }
+  catch (const MemoryStateStoreError &error)
+  {
+    const std::string detail = error.what();
+    if (detail.find("worker is not registered") != std::string::npos ||
+        detail.find("worker region or pool") != std::string::npos)
+    {
+      return JsonResponse(403, FailureEnvelope("compile container registration rejected", detail, "WorkerError", "registerCompileContainer"));
+    }
+    if (detail.find("user binding mismatch") != std::string::npos)
+    {
+      return JsonResponse(409, FailureEnvelope("compile container registration rejected", "compile container user binding mismatch", "BindingError", "registerCompileContainer", 2));
+    }
+    if (detail.find("worker owner mismatch") != std::string::npos)
+    {
+      return JsonResponse(409, FailureEnvelope("compile container registration rejected", "compile container worker owner mismatch", "BindingError", "registerCompileContainer", 2));
+    }
+    return FailureResponse(503, "compile container registration failed", detail, "MemoryStateError", "registerCompileContainer");
+  }
+}
+
+HttpResponse PlatformRouter::HandleGetCompileContainer(const RouteMatch &match) const
+{
+  const std::string container_id = match.parameters.at("container_id");
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      const std::optional<CompileContainerRecord> container = postgres_->GetCompileContainer(container_id);
+      if (!container.has_value())
+      {
+        return JsonResponse(404, FailureEnvelope("compile container lookup failed", "compile container not found", "NotFound", "getCompileContainer"));
+      }
+      return JsonResponse(200, SuccessEnvelope("loaded compile container", SerializeCompileContainerRecord(*container)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "compile container lookup failed", error.what(), "PostgresError", "getCompileContainer");
+    }
+  }
+  const std::optional<CompileContainerRecord> container = memory_.GetCompileContainer(container_id);
+  if (!container.has_value())
+  {
+    return JsonResponse(404, FailureEnvelope("compile container lookup failed", "compile container not found", "NotFound", "getCompileContainer"));
+  }
+  return JsonResponse(200, SuccessEnvelope("loaded compile container", SerializeCompileContainerRecord(*container)));
+}
+
+HttpResponse PlatformRouter::HandleSwitchCompileContainerWorkspace(const RouteMatch &match, const HttpRequest &request)
+{
+  if (const std::optional<std::string> error = ValidateCompileContainerSwitch(request.body); error.has_value())
+  {
+    return JsonResponse(400, FailureEnvelope("compile container workspace switch rejected", *error, "ValidationError", "switchCompileContainerWorkspace", 2));
+  }
+  const std::string container_id = match.parameters.at("container_id");
+  const std::string worker_id = request.body["worker_id"].get<std::string>();
+  const std::string workspace_id = request.body["workspace_id"].get<std::string>();
+  const std::string reason = request.body.value("reason", "manual switch");
+
+  if (postgres_ != nullptr)
+  {
+    try
+    {
+      const std::optional<CompileContainerRecord> current = postgres_->GetCompileContainer(container_id);
+      if (!current.has_value())
+      {
+        return JsonResponse(404, FailureEnvelope("compile container workspace switch failed", "compile container not found", "NotFound", "switchCompileContainerWorkspace"));
+      }
+      if (current->worker_id != worker_id)
+      {
+        return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "worker does not own compile container", "WorkerError", "switchCompileContainerWorkspace"));
+      }
+      if (request.body.contains("tenant_id") && request.body["tenant_id"].get<std::string>() != current->tenant_id)
+      {
+        return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "tenant binding mismatch", "BindingError", "switchCompileContainerWorkspace", 2));
+      }
+      if (request.body.contains("user_id") && request.body["user_id"].get<std::string>() != current->user_id)
+      {
+        return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "user binding mismatch", "BindingError", "switchCompileContainerWorkspace", 2));
+      }
+      const std::optional<CompileContainerRecord> switched =
+          postgres_->SwitchCompileContainerWorkspace(container_id, worker_id, workspace_id, reason);
+      if (!switched.has_value())
+      {
+        return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "compile container is not active", "StateError", "switchCompileContainerWorkspace"));
+      }
+      return JsonResponse(200, SuccessEnvelope("switched compile container workspace", SerializeCompileContainerRecord(*switched)));
+    }
+    catch (const std::exception &error)
+    {
+      return FailureResponse(503, "compile container workspace switch failed", error.what(), "PostgresError", "switchCompileContainerWorkspace");
+    }
+  }
+
+  const std::optional<CompileContainerRecord> current = memory_.GetCompileContainer(container_id);
+  if (!current.has_value())
+  {
+    return JsonResponse(404, FailureEnvelope("compile container workspace switch failed", "compile container not found", "NotFound", "switchCompileContainerWorkspace"));
+  }
+  if (current->worker_id != worker_id)
+  {
+    return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "worker does not own compile container", "WorkerError", "switchCompileContainerWorkspace"));
+  }
+  if (request.body.contains("tenant_id") && request.body["tenant_id"].get<std::string>() != current->tenant_id)
+  {
+    return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "tenant binding mismatch", "BindingError", "switchCompileContainerWorkspace", 2));
+  }
+  if (request.body.contains("user_id") && request.body["user_id"].get<std::string>() != current->user_id)
+  {
+    return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "user binding mismatch", "BindingError", "switchCompileContainerWorkspace", 2));
+  }
+  try
+  {
+    const std::optional<CompileContainerRecord> switched =
+        memory_.SwitchCompileContainerWorkspace(container_id, worker_id, workspace_id, reason);
+    if (!switched.has_value())
+    {
+      return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", "compile container is not active", "StateError", "switchCompileContainerWorkspace"));
+    }
+    return JsonResponse(200, SuccessEnvelope("switched compile container workspace", SerializeCompileContainerRecord(*switched)));
+  }
+  catch (const MemoryStateStoreError &error)
+  {
+    return JsonResponse(403, FailureEnvelope("compile container workspace switch rejected", error.what(), "WorkerError", "switchCompileContainerWorkspace"));
+  }
 }
 
 HttpResponse PlatformRouter::HandleClaimJob(const HttpRequest &request)
@@ -1801,16 +2346,35 @@ HttpResponse PlatformRouter::HandleClaimJob(const HttpRequest &request)
   const std::string worker_id = request.body["worker_id"].get<std::string>();
   const std::string region = request.body["region"].get<std::string>();
   const std::string worker_pool_key = request.body["worker_pool_key"].get<std::string>();
+  std::optional<std::string> compile_container_id;
+  if (request.body.contains("compile_container_id"))
+  {
+    if (!request.body["compile_container_id"].is_string() || request.body["compile_container_id"].get<std::string>().empty())
+    {
+      return JsonResponse(400, FailureEnvelope("job claim failed", "compile_container_id must be a non-empty string when present", "ValidationError", "claimJob", 2));
+    }
+    compile_container_id = request.body["compile_container_id"].get<std::string>();
+  }
   if (postgres_ != nullptr)
   {
     try
     {
-      const std::optional<PlatformJobRecord> job = postgres_->ClaimJob(worker_id, region, worker_pool_key);
+      const std::optional<PlatformJobRecord> job = compile_container_id.has_value()
+                                                       ? postgres_->ClaimJobForCompileContainer(worker_id, region, worker_pool_key, *compile_container_id)
+                                                       : postgres_->ClaimJob(worker_id, region, worker_pool_key);
       if (!job.has_value())
       {
         return JsonResponse(200, SuccessEnvelope("no platform job available", {{"claimed", false}}));
       }
-      return JsonResponse(200, SuccessEnvelope("claimed platform job", {{"claimed", true}, {"job", SerializeJobRecord(*job)}}));
+      nlohmann::json payload = {{"claimed", true}, {"job", SerializeJobRecord(*job)}};
+      if (compile_container_id.has_value())
+      {
+        if (const std::optional<CompileContainerRecord> container = postgres_->GetCompileContainer(*compile_container_id); container.has_value())
+        {
+          payload["compile_container"] = SerializeCompileContainerRecord(*container);
+        }
+      }
+      return JsonResponse(200, SuccessEnvelope("claimed platform job", std::move(payload)));
     }
     catch (const PostgresStoreError &error)
     {
@@ -1819,29 +2383,49 @@ HttpResponse PlatformRouter::HandleClaimJob(const HttpRequest &request)
       {
         return JsonResponse(403, FailureEnvelope("job claim failed", "worker is not registered", "WorkerError", "claimJob"));
       }
+      if (detail.find("compile container is not registered") != std::string::npos)
+      {
+        return JsonResponse(403, FailureEnvelope("job claim failed", "compile container is not registered", "WorkerError", "claimJob"));
+      }
       return FailureResponse(503, "job claim failed", detail, "PostgresError", "claimJob");
     }
   }
-  if (!workers_.contains(worker_id))
+  try
   {
-    return JsonResponse(403, FailureEnvelope("job claim failed", "worker is not registered", "WorkerError", "claimJob"));
-  }
-  for (auto &[job_id, job] : jobs_)
-  {
-    if (job.status == "queued" && job.region == region && job.worker_pool_key == worker_pool_key)
+    const std::optional<PlatformJobRecord> job = compile_container_id.has_value()
+                                                     ? memory_.ClaimJobForCompileContainer(worker_id, region, worker_pool_key, *compile_container_id)
+                                                     : memory_.ClaimJob(worker_id, region, worker_pool_key);
+    if (!job.has_value())
     {
-      job.status = "running";
-      job.worker_id = worker_id;
-      events_[job_id].push_back({
-          .event_id = "event-running",
-          .job_id = job_id,
-          .status = "running",
-          .message = "job claimed by worker",
-      });
-      return JsonResponse(200, SuccessEnvelope("claimed platform job", {{"claimed", true}, {"job", SerializeJobRecord(job)}}));
+      return JsonResponse(200, SuccessEnvelope("no platform job available", {{"claimed", false}}));
     }
+    nlohmann::json payload = {{"claimed", true}, {"job", SerializeJobRecord(*job)}};
+    if (compile_container_id.has_value())
+    {
+      if (const std::optional<CompileContainerRecord> container = memory_.GetCompileContainer(*compile_container_id); container.has_value())
+      {
+        payload["compile_container"] = SerializeCompileContainerRecord(*container);
+      }
+    }
+    return JsonResponse(200, SuccessEnvelope("claimed platform job", std::move(payload)));
   }
-  return JsonResponse(200, SuccessEnvelope("no platform job available", {{"claimed", false}}));
+  catch (const MemoryStateStoreError &error)
+  {
+    const std::string detail = error.what();
+    if (detail.find("worker is not registered") != std::string::npos)
+    {
+      return JsonResponse(403, FailureEnvelope("job claim failed", "worker is not registered", "WorkerError", "claimJob"));
+    }
+    if (detail.find("compile container is not registered") != std::string::npos)
+    {
+      return JsonResponse(403, FailureEnvelope("job claim failed", "compile container is not registered", "WorkerError", "claimJob"));
+    }
+    if (detail.find("compile container is not available") != std::string::npos)
+    {
+      return JsonResponse(403, FailureEnvelope("job claim failed", "compile container is not available for this worker", "WorkerError", "claimJob"));
+    }
+    return FailureResponse(503, "job claim failed", detail, "MemoryStateError", "claimJob");
+  }
 }
 
 HttpResponse PlatformRouter::HandleHeartbeatJob(const RouteMatch &match, const HttpRequest &request)
@@ -1869,23 +2453,20 @@ HttpResponse PlatformRouter::HandleHeartbeatJob(const RouteMatch &match, const H
       return FailureResponse(503, "job heartbeat failed", error.what(), "PostgresError", "heartbeatJob");
     }
   }
-  const auto found = jobs_.find(match.parameters.at("job_id"));
-  if (found == jobs_.end())
+  const std::optional<PlatformJobRecord> existing = memory_.GetJob(match.parameters.at("job_id"));
+  if (!existing.has_value())
   {
     return JsonResponse(404, FailureEnvelope("job heartbeat failed", "job not found", "NotFound", "heartbeatJob"));
   }
-  PlatformJobRecord &job = found->second;
-  if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
+  if (!request.body.contains("worker_id") || request.body["worker_id"] != existing->worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job heartbeat failed", "worker does not own job", "WorkerError", "heartbeatJob"));
   }
-  events_[job.job_id].push_back({
-      .event_id = "event-heartbeat",
-      .job_id = job.job_id,
-      .status = job.status,
-      .message = request.body.value("message", "worker heartbeat"),
-  });
-  return JsonResponse(200, SuccessEnvelope("recorded platform job heartbeat", SerializeJobRecord(job)));
+  const std::optional<PlatformJobRecord> job = memory_.HeartbeatJob(
+      match.parameters.at("job_id"),
+      request.body["worker_id"].get<std::string>(),
+      request.body.value("message", "worker heartbeat"));
+  return JsonResponse(200, SuccessEnvelope("recorded platform job heartbeat", SerializeJobRecord(*job)));
 }
 
 HttpResponse PlatformRouter::HandleCompleteJob(const RouteMatch &match, const HttpRequest &request)
@@ -1933,13 +2514,12 @@ HttpResponse PlatformRouter::HandleCompleteJob(const RouteMatch &match, const Ht
       return FailureResponse(503, "job completion failed", error.what(), "PostgresError", "completeJob");
     }
   }
-  const auto found = jobs_.find(match.parameters.at("job_id"));
-  if (found == jobs_.end())
+  const std::optional<PlatformJobRecord> existing = memory_.GetJob(match.parameters.at("job_id"));
+  if (!existing.has_value())
   {
     return JsonResponse(404, FailureEnvelope("job completion failed", "job not found", "NotFound", "completeJob"));
   }
-  PlatformJobRecord &job = found->second;
-  if (!request.body.contains("worker_id") || request.body["worker_id"] != job.worker_id)
+  if (!request.body.contains("worker_id") || request.body["worker_id"] != existing->worker_id)
   {
     return JsonResponse(403, FailureEnvelope("job completion failed", "worker does not own job", "WorkerError", "completeJob"));
   }
@@ -1948,27 +2528,26 @@ HttpResponse PlatformRouter::HandleCompleteJob(const RouteMatch &match, const Ht
   {
     return JsonResponse(400, FailureEnvelope("job completion failed", "status must be succeeded, failed, or cancelled", "ValidationError", "completeJob", 2));
   }
-  job.status = status;
-  job.finished_at = "2026-04-24T00:02:00Z";
+  std::vector<ArtifactRecord> artifacts;
   if (request.body.contains("artifacts") && request.body["artifacts"].is_array())
   {
     for (const nlohmann::json &artifact : request.body["artifacts"])
     {
-      job.artifacts.push_back({
+      artifacts.push_back({
           .artifact_id = artifact.value("artifact_id", "artifact"),
           .object_key = artifact.value("object_key", ""),
           .kind = artifact.value("kind", "artifact"),
       });
     }
   }
-  events_[job.job_id].push_back({
-      .event_id = "event-completed",
-      .job_id = job.job_id,
-      .status = job.status,
-      .message = request.body.value("message", "job completed"),
-      .created_at = job.finished_at,
-  });
-  return JsonResponse(200, SuccessEnvelope("completed platform job", SerializeJobRecord(job)));
+  const std::optional<PlatformJobRecord> job = memory_.CompleteJob(
+      match.parameters.at("job_id"),
+      request.body["worker_id"].get<std::string>(),
+      status,
+      request.body.value("message", "job completed"),
+      artifacts,
+      request.body.value("result", nlohmann::json::object()));
+  return JsonResponse(200, SuccessEnvelope("completed platform job", SerializeJobRecord(*job)));
 }
 
 HttpResponse PlatformRouter::HandleRegisterWorkgroupCluster(const RouteMatch &match, const HttpRequest &request)
@@ -2004,8 +2583,7 @@ HttpResponse PlatformRouter::HandleRegisterWorkgroupCluster(const RouteMatch &ma
       return FailureResponse(503, "workgroup registration failed", error.what(), "PostgresError", "registerWorkgroupCluster");
     }
   }
-  workgroups_[workgroup_id][cluster["cluster_id"].get<std::string>()] = cluster;
-  return JsonResponse(200, SuccessEnvelope("registered workgroup cluster", cluster));
+  return JsonResponse(200, SuccessEnvelope("registered workgroup cluster", memory_.RegisterWorkgroupCluster(workgroup_id, cluster)));
 }
 
 HttpResponse PlatformRouter::HandleListWorkgroupClusters(const RouteMatch &match) const
@@ -2027,13 +2605,9 @@ HttpResponse PlatformRouter::HandleListWorkgroupClusters(const RouteMatch &match
       return FailureResponse(503, "workgroup lookup failed", error.what(), "PostgresError", "listWorkgroupClusters");
     }
   }
-  else if (const auto workgroup = workgroups_.find(workgroup_id); workgroup != workgroups_.end())
+  else
   {
-    for (const auto &[cluster_id, cluster] : workgroup->second)
-    {
-      (void) cluster_id;
-      clusters.push_back(cluster);
-    }
+    clusters = memory_.ListWorkgroupClusters(workgroup_id);
   }
   return JsonResponse(
       200,
@@ -2065,23 +2639,15 @@ HttpResponse PlatformRouter::HandleMirrorStatus(const RouteMatch &match) const
       }
       return JsonResponse(
           200,
-          SuccessEnvelope(
-              "loaded mirror freshness",
-              {
-                  {"mirror_id", mirror->mirror_id},
-                  {"region", mirror->region},
-                  {"origin", mirror->origin},
-                  {"freshness", mirror->freshness},
-                  {"replay_cursor", mirror->replay_cursor},
-              }));
+          SuccessEnvelope("loaded mirror freshness", SerializeMirrorCursorRecord(*mirror)));
     }
     catch (const std::exception &error)
     {
       return FailureResponse(503, "mirror freshness unavailable", error.what(), "PostgresError", "mirrorStatus");
     }
   }
-  const auto mirror = mirrors_.find(mirror_id);
-  if (mirror == mirrors_.end())
+  const std::optional<MirrorCursorRecord> mirror = memory_.GetMirrorState(mirror_id);
+  if (!mirror.has_value())
   {
     return FailureResponse(
         404,
@@ -2090,14 +2656,242 @@ HttpResponse PlatformRouter::HandleMirrorStatus(const RouteMatch &match) const
         "MirrorError",
         "mirrorStatus");
   }
-  nlohmann::json payload = {
-      {"mirror_id", mirror->second.mirror_id},
-      {"region", config_.region},
-      {"origin", mirror->second.origin},
-      {"freshness", mirror->second.freshness},
-      {"replay_cursor", mirror->second.replay_cursor},
-  };
+  nlohmann::json payload = SerializeMirrorCursorRecord(*mirror);
   return JsonResponse(200, SuccessEnvelope("loaded mirror freshness", payload));
+}
+
+bool PlatformRouter::RegistryWriteAuthorized(
+    const HttpRequest &request,
+    std::string_view scope,
+    const std::string &package_id) const
+{
+  if (request.identity.has_value())
+  {
+    const MtlsIdentity &identity = *request.identity;
+    if (identity.role == "operator")
+    {
+      return true;
+    }
+    if (scope == "package:publish" && identity.role == "registry-writer")
+    {
+      return true;
+    }
+    if ((scope == "package:publish" || scope == "package:yank" || scope == "package:owner") && !package_id.empty())
+    {
+      if (postgres_ != nullptr && postgres_->HasRegistryPackageOwner(package_id, identity.node_id))
+      {
+        return true;
+      }
+      if (memory_.HasRegistryPackageOwner(package_id, identity.node_id))
+      {
+        return true;
+      }
+    }
+  }
+
+  const std::optional<std::string> clear_token = RegistryTokenFromHeaders(request.headers);
+  if (!clear_token.has_value())
+  {
+    return false;
+  }
+  const std::optional<RegistryPublishTokenRecord> token = postgres_ != nullptr
+      ? postgres_->FindRegistryPublishTokenByHash(Sha256Bytes(*clear_token))
+      : memory_.FindRegistryPublishTokenByHash(Sha256Bytes(*clear_token));
+  if (!token.has_value())
+  {
+    return false;
+  }
+  const std::string now = UtcTimestampNow();
+  if (!token->revoked_at.empty() || (!token->expires_at.empty() && token->expires_at < now))
+  {
+    return false;
+  }
+  return TokenHasScope(*token, scope) && TokenMatchesPackage(*token, package_id);
+}
+
+void PlatformRouter::RecordRegistryAudit(
+    const HttpRequest &request,
+    const std::string &operation,
+    const nlohmann::json &target,
+    const std::string &result)
+{
+  RegistryAuditEventRecord record{
+      .event_id = postgres_ != nullptr ? postgres_->NextRegistryAuditEventId() : memory_.NextRegistryAuditEventId(),
+      .actor_id = RegistryActorId(request),
+      .operation = operation,
+      .target = target,
+      .request_id = request.headers.contains("x-request-id") ? request.headers.at("x-request-id") : "",
+      .result = result,
+      .created_at = UtcTimestampNow(),
+  };
+  if (postgres_ != nullptr)
+  {
+    postgres_->RecordRegistryAuditEvent(record);
+  }
+  memory_.RecordRegistryAuditEvent(record);
+}
+
+nlohmann::json PlatformRouter::CreateRegistryPublication(
+    const std::string &change_kind,
+    const std::string &change_ref,
+    const std::string &generated_at)
+{
+  const fs::path registry_root(config_.registry.root);
+  fs::create_directories(registry_root / "_publications");
+  fs::create_directories(registry_root / "_distributions" / "default");
+
+  const size_t disk_sequence = NextPublicationSequenceOnDisk(registry_root);
+  const int memory_sequence = memory_.NextRepositoryVersionSequence("default");
+  const int persistent_sequence = postgres_ != nullptr ? postgres_->NextRepositoryVersionSequence("default") : memory_sequence;
+  const int sequence = static_cast<int>(std::max(disk_sequence, static_cast<size_t>(memory_sequence)));
+  const int publication_sequence = std::max(sequence, persistent_sequence);
+  const std::string repository_version_id = "rv-" + PaddedNumber(static_cast<size_t>(publication_sequence), 6);
+  const std::string publication_id = "pub-" + PaddedNumber(static_cast<size_t>(publication_sequence), 6);
+
+  const fs::path temp_root = registry_root / "_tmp" / "publications" / publication_id;
+  const fs::path final_root = registry_root / "_publications" / publication_id;
+  std::error_code ec;
+  fs::remove_all(temp_root, ec);
+  fs::create_directories(temp_root.parent_path());
+  CopyRegistryReadPlaneTo(registry_root, temp_root);
+  WriteTextFile(
+      temp_root / "config.json",
+      JsonText(RegistryConfigPayload(config_, generated_at, publication_id, repository_version_id)));
+
+  const size_t tree_size = LeafSequencePaths(temp_root).size();
+  const size_t artifact_count = CountRegularFiles(temp_root / "artifacts");
+  nlohmann::json publication = {
+      {"publication_id", publication_id},
+      {"repository_id", "default"},
+      {"repository_version_id", repository_version_id},
+      {"layout_version", 2},
+      {"generated_at", generated_at},
+      {"tree_size", static_cast<int64_t>(tree_size)},
+      {"index_digest", DirectoryDigest(temp_root / "index")},
+      {"trust_digest", DirectoryDigest(temp_root / "trust")},
+      {"artifact_count", static_cast<int64_t>(artifact_count)},
+      {"verified", true},
+  };
+  WriteTextFile(temp_root / "publication.json", JsonText(publication));
+  if (!fs::exists(temp_root / "config.json") || !fs::exists(temp_root / "trust" / "root.json") ||
+      !fs::exists(temp_root / "publication.json"))
+  {
+    throw std::runtime_error("publication verification failed before distribution update");
+  }
+
+  if (fs::exists(final_root, ec))
+  {
+    throw std::runtime_error("publication already exists: " + publication_id);
+  }
+  fs::rename(temp_root, final_root, ec);
+  if (ec)
+  {
+    throw std::runtime_error("failed to publish immutable publication: " + ec.message());
+  }
+  fs::copy_file(final_root / "config.json", registry_root / "config.json", fs::copy_options::overwrite_existing, ec);
+  if (ec)
+  {
+    throw std::runtime_error("failed to activate publication config: " + ec.message());
+  }
+
+  const std::optional<nlohmann::json> previous = CurrentDistributionPointer(registry_root, "default");
+  const std::string previous_publication_id =
+      previous.has_value() ? previous->value("publication_id", std::string()) : std::string();
+  nlohmann::json current = {
+      {"distribution_id", "default"},
+      {"publication_id", publication_id},
+      {"repository_version_id", repository_version_id},
+      {"updated_at", generated_at},
+  };
+  if (!previous_publication_id.empty())
+  {
+    current["previous_publication_id"] = previous_publication_id;
+  }
+  WriteTextFile(registry_root / "_distributions" / "default" / "current.json", JsonText(current));
+
+  memory_.UpsertRegistryRepository({
+      .repository_id = "default",
+      .name = "default",
+      .tenant_id = "platform",
+      .policy = {{"immutable_artifacts", true}, {"append_only_versions", true}},
+      .created_at = generated_at,
+  });
+  memory_.RecordRegistryRepositoryVersion({
+      .repository_version_id = repository_version_id,
+      .repository_id = "default",
+      .sequence = publication_sequence,
+      .change_kind = change_kind,
+      .change_ref = change_ref,
+      .created_at = generated_at,
+  });
+  memory_.RecordRegistryPublication({
+      .publication_id = publication_id,
+      .repository_version_id = repository_version_id,
+      .layout_version = 2,
+      .root_path = (registry_root / "_publications" / publication_id).string(),
+      .manifest_sha256 = spio::Sha256File(final_root / "publication.json"),
+      .tree_size = static_cast<int>(tree_size),
+      .created_at = generated_at,
+      .verified = true,
+  });
+  memory_.UpsertRegistryDistribution({
+      .distribution_id = "default",
+      .repository_id = "default",
+      .name = "default",
+      .base_url = RegistryReadRootUrl(config_),
+      .current_publication_id = publication_id,
+      .previous_publication_id = previous_publication_id,
+      .updated_at = generated_at,
+  });
+  if (postgres_ != nullptr)
+  {
+    postgres_->UpsertRegistryRepository({
+        .repository_id = "default",
+        .name = "default",
+        .tenant_id = "platform",
+        .policy = {{"immutable_artifacts", true}, {"append_only_versions", true}},
+        .created_at = generated_at,
+    });
+    postgres_->RecordRegistryRepositoryVersion({
+        .repository_version_id = repository_version_id,
+        .repository_id = "default",
+        .sequence = publication_sequence,
+        .change_kind = change_kind,
+        .change_ref = change_ref,
+        .created_at = generated_at,
+    });
+    postgres_->RecordRegistryPublication({
+        .publication_id = publication_id,
+        .repository_version_id = repository_version_id,
+        .layout_version = 2,
+        .root_path = (registry_root / "_publications" / publication_id).string(),
+        .manifest_sha256 = spio::Sha256File(final_root / "publication.json"),
+        .tree_size = static_cast<int>(tree_size),
+        .created_at = generated_at,
+        .verified = true,
+    });
+    postgres_->UpsertRegistryDistribution({
+        .distribution_id = "default",
+        .repository_id = "default",
+        .name = "default",
+        .base_url = RegistryReadRootUrl(config_),
+        .current_publication_id = publication_id,
+        .previous_publication_id = previous_publication_id,
+        .updated_at = generated_at,
+    });
+  }
+  RecordMirrorState(
+      "fresh",
+      "checkpoint-" + PaddedNumber(tree_size, 4),
+      publication_id,
+      repository_version_id,
+      generated_at,
+      static_cast<int>(tree_size));
+
+  publication["manifest_sha256"] = spio::Sha256File(final_root / "publication.json");
+  publication["root_path"] = (registry_root / "_publications" / publication_id).generic_string();
+  publication["distribution"] = current;
+  return publication;
 }
 
 HttpResponse PlatformRouter::HandleRegistryStatus() const
@@ -2259,6 +3053,15 @@ HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
         "publishRelease",
         2);
   }
+  if (!RegistryWriteAuthorized(request, "package:publish", RegistryPackageId(draft.package)))
+  {
+    RecordRegistryAudit(
+        request,
+        "publishRelease",
+        {{"package_id", draft.package}, {"version", draft.version}},
+        "denied");
+    return FailureResponse(403, "registry publish denied", "token or identity lacks package:publish", "AuthError", "publishRelease", 2);
+  }
 
   try
   {
@@ -2278,8 +3081,16 @@ HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
       }
     }
 
-    if (published_releases_.contains(release_key) || ReleaseExistsOnDisk(registry_root, draft.package, draft.version))
+    const bool release_exists_in_postgres =
+        postgres_ != nullptr && postgres_->GetRegistryPackageRelease(RegistryPackageId(draft.package), draft.version).has_value();
+    if (memory_.HasPublishedRelease(release_key) || release_exists_in_postgres ||
+        ReleaseExistsOnDisk(registry_root, draft.package, draft.version))
     {
+      RecordRegistryAudit(
+          request,
+          "publishRelease",
+          {{"package_id", draft.package}, {"version", draft.version}},
+          "duplicate");
       return FailureResponse(
           409,
           "registry publish failed",
@@ -2304,6 +3115,8 @@ HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
     const LocalAppendResult append_result =
         AppendRegistryReleaseToLocal(config_, draft, release_record, artifact_path);
     const MetadataVersions metadata_versions = RefreshSignedRegistryMetadata(config_, role_keys, published_at);
+    const nlohmann::json publication =
+        CreateRegistryPublication("publish", RegistryReleaseKey(draft.package, draft.version), published_at);
     if (UsesS3ObjectStore(config_))
     {
       UploadRegistryTreeToS3(config_);
@@ -2331,13 +3144,64 @@ HttpResponse PlatformRouter::HandlePublishRelease(const HttpRequest &request)
         {"snapshot_version", metadata_versions.snapshot_version},
         {"timestamp_version", metadata_versions.timestamp_version},
         {"namespaces", static_cast<int64_t>(metadata_versions.namespaces)},
+        {"repository_id", "default"},
+        {"repository_version_id", publication.at("repository_version_id").get<std::string>()},
+        {"publication_id", publication.at("publication_id").get<std::string>()},
+        {"distribution_id", "default"},
     };
-    published_releases_[release_key] = payload;
-    RecordMirrorState("fresh", "checkpoint-" + PaddedNumber(append_result.sequence, 4));
+    memory_.RecordPublishedRelease(release_key, payload);
+    const size_t slash = draft.package.find('/');
+    RegistryPackageRecord package_record{
+        .package_id = RegistryPackageId(draft.package),
+        .package_namespace = draft.package.substr(0, slash),
+        .name = draft.package.substr(slash + 1),
+        .created_at = published_at,
+        .created_by = draft.publisher_id,
+        .visibility = "public",
+    };
+    RegistryPackageReleaseRecord release_record_state{
+        .package_id = RegistryPackageId(draft.package),
+        .version = draft.version,
+        .edition = "2026",
+        .manifest_sha256 = release_record.at("manifest_digest").get<std::string>(),
+        .source_artifact_sha256 = archive_sha256,
+        .dependencies = release_record.at("dependencies"),
+        .publisher_id = draft.publisher_id,
+        .published_at = published_at,
+        .yanked = false,
+        .yanked_reason = "",
+    };
+    RegistryPackageOwnerRecord owner_record{
+        .package_id = RegistryPackageId(draft.package),
+        .owner_id = draft.publisher_id,
+        .owner_kind = "user",
+        .role = "owner",
+        .added_by = RegistryActorId(request),
+        .added_at = published_at,
+    };
+    if (postgres_ != nullptr)
+    {
+      postgres_->UpsertRegistryPackage(package_record);
+      postgres_->UpsertRegistryPackageRelease(release_record_state);
+      postgres_->AddRegistryPackageOwner(owner_record);
+    }
+    memory_.UpsertRegistryPackage(package_record);
+    memory_.UpsertRegistryPackageRelease(release_record_state);
+    memory_.AddRegistryPackageOwner(owner_record);
+    RecordRegistryAudit(
+        request,
+        "publishRelease",
+        {{"package_id", draft.package}, {"version", draft.version}, {"publication_id", publication.at("publication_id")}},
+        "success");
     return JsonResponse(200, SuccessEnvelope("published registry v2 release", payload));
   }
   catch (const std::exception &error)
   {
+    RecordRegistryAudit(
+        request,
+        "publishRelease",
+        {{"package_id", draft.package}, {"version", draft.version}},
+        "failed");
     return FailureResponse(422, "registry publish failed", error.what(), "PublishError", "publishRelease");
   }
 }
@@ -2394,7 +3258,14 @@ HttpResponse PlatformRouter::HandleVerifyRegistry(const HttpRequest &request)
         {"releases", static_cast<int64_t>(releases)},
         {"tree_size", static_cast<int64_t>(tree_size)},
     };
-    RecordMirrorState("fresh", "checkpoint-" + PaddedNumber(tree_size, 4));
+    const std::optional<nlohmann::json> current = CurrentDistributionPointer(registry_root, "default");
+    RecordMirrorState(
+        "fresh",
+        "checkpoint-" + PaddedNumber(tree_size, 4),
+        current.has_value() ? current->value("publication_id", "") : "",
+        current.has_value() ? current->value("repository_version_id", "") : "",
+        UtcTimestampNow(),
+        static_cast<int>(tree_size));
     return JsonResponse(200, SuccessEnvelope("verified registry v2 root", payload));
   }
   catch (const std::exception &error)
@@ -2403,7 +3274,612 @@ HttpResponse PlatformRouter::HandleVerifyRegistry(const HttpRequest &request)
   }
 }
 
-void PlatformRouter::RecordMirrorState(std::string freshness, std::string replay_cursor)
+HttpResponse PlatformRouter::HandleGetPackage(const RouteMatch &match) const
+{
+  const std::string package = RegistryPackageFromRoute(match);
+  if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value())
+  {
+    return FailureResponse(400, "package lookup rejected", *error, "ValidationError", "getPackage", 2);
+  }
+  try
+  {
+    if (postgres_ != nullptr)
+    {
+      const std::optional<RegistryPackageRecord> record = postgres_->GetRegistryPackage(RegistryPackageId(package));
+      if (record.has_value())
+      {
+        nlohmann::json payload = SerializeRegistryPackageRecord(*record);
+        payload["releases"] = postgres_->ListRegistryPackageReleases(RegistryPackageId(package));
+        payload["release_count"] = payload.at("releases").size();
+        return JsonResponse(200, SuccessEnvelope("loaded package", payload));
+      }
+    }
+    return JsonResponse(
+        200,
+        SuccessEnvelope(
+            "loaded package",
+            PackagePayloadFromIndex(fs::path(config_.registry.root), package)));
+  }
+  catch (const std::exception &error)
+  {
+    return FailureResponse(404, "package lookup failed", error.what(), "NotFound", "getPackage");
+  }
+}
+
+HttpResponse PlatformRouter::HandleListPackageReleases(const RouteMatch &match) const
+{
+  const std::string package = RegistryPackageFromRoute(match);
+  if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value())
+  {
+    return FailureResponse(400, "package release lookup rejected", *error, "ValidationError", "listPackageReleases", 2);
+  }
+  const fs::path root(config_.registry.root);
+  const std::vector<nlohmann::json> releases = ReadPackageIndexRecords(root, package);
+  if (releases.empty())
+  {
+    if (postgres_ != nullptr)
+    {
+      nlohmann::json persisted_releases = postgres_->ListRegistryPackageReleases(RegistryPackageId(package));
+      if (!persisted_releases.empty())
+      {
+        return JsonResponse(
+            200,
+            SuccessEnvelope(
+                "loaded package releases",
+                {{"package_id", package}, {"releases", persisted_releases}}));
+      }
+    }
+    return FailureResponse(404, "package release lookup failed", "package is not found", "NotFound", "listPackageReleases");
+  }
+  return JsonResponse(
+      200,
+      SuccessEnvelope(
+          "loaded package releases",
+          {{"package_id", package}, {"releases", releases}}));
+}
+
+HttpResponse PlatformRouter::HandleGetPackageRelease(const RouteMatch &match) const
+{
+  const std::string package = RegistryPackageFromRoute(match);
+  const std::string version = match.parameters.at("version");
+  if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value())
+  {
+    return FailureResponse(400, "package release lookup rejected", *error, "ValidationError", "getPackageRelease", 2);
+  }
+  const std::optional<nlohmann::json> release =
+      PackageReleasePayloadFromIndex(fs::path(config_.registry.root), package, version);
+  if (!release.has_value())
+  {
+    if (postgres_ != nullptr)
+    {
+      const std::optional<RegistryPackageReleaseRecord> persisted_release =
+          postgres_->GetRegistryPackageRelease(RegistryPackageId(package), version);
+      if (persisted_release.has_value())
+      {
+        return JsonResponse(
+            200,
+            SuccessEnvelope("loaded package release", SerializeRegistryPackageReleaseRecord(*persisted_release)));
+      }
+    }
+    return FailureResponse(404, "package release lookup failed", "package release is not found", "NotFound", "getPackageRelease");
+  }
+  return JsonResponse(200, SuccessEnvelope("loaded package release", *release));
+}
+
+HttpResponse PlatformRouter::HandleSetPackageReleaseYanked(
+    const RouteMatch &match,
+    const HttpRequest &request,
+    const bool yanked)
+{
+  const std::string package = RegistryPackageFromRoute(match);
+  const std::string version = match.parameters.at("version");
+  const std::string operation = yanked ? "yankPackageRelease" : "unyankPackageRelease";
+  if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value())
+  {
+    return FailureResponse(400, "package release mutation rejected", *error, "ValidationError", operation, 2);
+  }
+  if (!request.body.is_object())
+  {
+    return FailureResponse(400, "package release mutation rejected", "request body must be an object", "ValidationError", operation, 2);
+  }
+  if (request.body.contains("reason") && !request.body["reason"].is_string())
+  {
+    return FailureResponse(400, "package release mutation rejected", "reason must be a string when present", "ValidationError", operation, 2);
+  }
+  if (!RegistryWriteAuthorized(request, yanked ? "package:yank" : "package:yank", RegistryPackageId(package)))
+  {
+    RecordRegistryAudit(request, operation, {{"package_id", package}, {"version", version}}, "denied");
+    return FailureResponse(403, "package release mutation denied", "token or identity lacks package:yank", "AuthError", operation, 2);
+  }
+
+  try
+  {
+    const fs::path root(config_.registry.root);
+    std::vector<nlohmann::json> records = ReadPackageIndexRecords(root, package);
+    bool found = false;
+    std::string artifact_path;
+    for (nlohmann::json &record : records)
+    {
+      if (record.value("version", "") == version)
+      {
+        found = true;
+        record["yanked"] = yanked;
+        record["yanked_reason"] = yanked ? request.body.value("reason", std::string()) : "";
+        if (yanked)
+        {
+          record["yanked_at"] = UtcTimestampNow();
+        }
+        else
+        {
+          record.erase("yanked_at");
+        }
+        artifact_path = record.at("source_artifact").at("path").get<std::string>();
+      }
+    }
+    if (!found)
+    {
+      RecordRegistryAudit(request, operation, {{"package_id", package}, {"version", version}}, "not_found");
+      return FailureResponse(404, "package release mutation failed", "package release is not found", "NotFound", operation);
+    }
+    WritePackageIndexRecords(root, package, records);
+    const std::map<std::string, RegistryRoleKey> role_keys = LoadOrCreateRegistryRoleKeys(fs::path(config_.registry.key_dir));
+    const std::string changed_at = UtcTimestampNow();
+    const MetadataVersions metadata_versions = RefreshSignedRegistryMetadata(config_, role_keys, changed_at);
+    const nlohmann::json publication =
+        CreateRegistryPublication(yanked ? "yank" : "unyank", RegistryReleaseKey(package, version), changed_at);
+    const std::string yank_reason = yanked ? request.body.value("reason", std::string()) : std::string();
+    if (postgres_ != nullptr)
+    {
+      postgres_->SetRegistryPackageReleaseYanked(RegistryPackageId(package), version, yanked, yank_reason);
+    }
+    memory_.SetRegistryPackageReleaseYanked(RegistryPackageId(package), version, yanked, yank_reason);
+    RecordRegistryAudit(request, operation, {{"package_id", package}, {"version", version}}, "success");
+    if (UsesS3ObjectStore(config_))
+    {
+      UploadRegistryTreeToS3(config_);
+    }
+    return JsonResponse(
+        200,
+        SuccessEnvelope(
+            yanked ? "yanked package release" : "unyanked package release",
+            {
+                {"package_id", package},
+                {"version", version},
+                {"yanked", yanked},
+                {"artifact_path", artifact_path},
+                {"artifact_preserved", fs::exists(root / artifact_path)},
+                {"checkpoint_version", metadata_versions.checkpoint_version},
+                {"snapshot_version", metadata_versions.snapshot_version},
+                {"timestamp_version", metadata_versions.timestamp_version},
+                {"repository_version_id", publication.at("repository_version_id")},
+                {"publication_id", publication.at("publication_id")},
+                {"distribution_id", "default"},
+            }));
+  }
+  catch (const std::exception &error)
+  {
+    RecordRegistryAudit(request, operation, {{"package_id", package}, {"version", version}}, "failed");
+    return FailureResponse(422, "package release mutation failed", error.what(), "PublishError", operation);
+  }
+}
+
+HttpResponse PlatformRouter::HandleListPackageOwners(const RouteMatch &match) const
+{
+  const std::string package = RegistryPackageFromRoute(match);
+  if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value())
+  {
+    return FailureResponse(400, "package owner lookup rejected", *error, "ValidationError", "listPackageOwners", 2);
+  }
+  if (ReadPackageIndexRecords(fs::path(config_.registry.root), package).empty())
+  {
+    return FailureResponse(404, "package owner lookup failed", "package is not found", "NotFound", "listPackageOwners");
+  }
+  nlohmann::json owners = postgres_ != nullptr
+      ? postgres_->ListRegistryPackageOwners(RegistryPackageId(package))
+      : memory_.ListRegistryPackageOwners(RegistryPackageId(package));
+  if (owners.empty())
+  {
+    const std::vector<nlohmann::json> releases = ReadPackageIndexRecords(fs::path(config_.registry.root), package);
+    if (!releases.empty())
+    {
+      owners.push_back({
+          {"package_id", package},
+          {"owner_id", releases.front().value("publisher_id", "")},
+          {"owner_kind", "user"},
+          {"role", "owner"},
+          {"added_by", "registry-index"},
+          {"added_at", releases.front().value("published_at", "")},
+      });
+    }
+  }
+  return JsonResponse(200, SuccessEnvelope("loaded package owners", {{"package_id", package}, {"owners", owners}}));
+}
+
+HttpResponse PlatformRouter::HandleAddPackageOwner(const RouteMatch &match, const HttpRequest &request)
+{
+  const std::string package = RegistryPackageFromRoute(match);
+  if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value())
+  {
+    return FailureResponse(400, "package owner mutation rejected", *error, "ValidationError", "addPackageOwner", 2);
+  }
+  if (!request.body.is_object() || !HasNonEmptyString(request.body, "owner_id"))
+  {
+    return FailureResponse(400, "package owner mutation rejected", "owner_id is required", "ValidationError", "addPackageOwner", 2);
+  }
+  if (!RegistryWriteAuthorized(request, "package:owner", RegistryPackageId(package)))
+  {
+    RecordRegistryAudit(request, "addPackageOwner", {{"package_id", package}, {"owner_id", request.body.value("owner_id", "")}}, "denied");
+    return FailureResponse(403, "package owner mutation denied", "token or identity lacks package:owner", "AuthError", "addPackageOwner", 2);
+  }
+  if (ReadPackageIndexRecords(fs::path(config_.registry.root), package).empty())
+  {
+    RecordRegistryAudit(request, "addPackageOwner", {{"package_id", package}, {"owner_id", request.body.value("owner_id", "")}}, "not_found");
+    return FailureResponse(404, "package owner mutation failed", "package is not found", "NotFound", "addPackageOwner");
+  }
+  RegistryPackageOwnerRecord owner{
+      .package_id = package,
+      .owner_id = request.body.at("owner_id").get<std::string>(),
+      .owner_kind = request.body.value("owner_kind", "user"),
+      .role = request.body.value("role", "owner"),
+      .added_by = RegistryActorId(request),
+      .added_at = UtcTimestampNow(),
+  };
+  if (postgres_ != nullptr)
+  {
+    postgres_->AddRegistryPackageOwner(owner);
+  }
+  memory_.AddRegistryPackageOwner(owner);
+  RecordRegistryAudit(request, "addPackageOwner", {{"package_id", package}, {"owner_id", owner.owner_id}}, "success");
+  return JsonResponse(200, SuccessEnvelope("added package owner", SerializeRegistryPackageOwnerRecord(owner)));
+}
+
+HttpResponse PlatformRouter::HandleRemovePackageOwner(const RouteMatch &match, const HttpRequest &request)
+{
+  const std::string package = RegistryPackageFromRoute(match);
+  const std::string owner_id = match.parameters.at("owner_id");
+  if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value())
+  {
+    return FailureResponse(400, "package owner mutation rejected", *error, "ValidationError", "removePackageOwner", 2);
+  }
+  if (!RegistryWriteAuthorized(request, "package:owner", RegistryPackageId(package)))
+  {
+    RecordRegistryAudit(request, "removePackageOwner", {{"package_id", package}, {"owner_id", owner_id}}, "denied");
+    return FailureResponse(403, "package owner mutation denied", "token or identity lacks package:owner", "AuthError", "removePackageOwner", 2);
+  }
+  const bool removed = postgres_ != nullptr
+      ? postgres_->RemoveRegistryPackageOwner(RegistryPackageId(package), owner_id)
+      : memory_.RemoveRegistryPackageOwner(RegistryPackageId(package), owner_id);
+  if (removed)
+  {
+    memory_.RemoveRegistryPackageOwner(RegistryPackageId(package), owner_id);
+  }
+  if (!removed)
+  {
+    RecordRegistryAudit(request, "removePackageOwner", {{"package_id", package}, {"owner_id", owner_id}}, "not_found");
+    return FailureResponse(404, "package owner mutation failed", "package owner is not found", "NotFound", "removePackageOwner");
+  }
+  RecordRegistryAudit(request, "removePackageOwner", {{"package_id", package}, {"owner_id", owner_id}}, "success");
+  return JsonResponse(200, SuccessEnvelope("removed package owner", {{"package_id", package}, {"owner_id", owner_id}}));
+}
+
+HttpResponse PlatformRouter::HandleCreatePublishToken(const HttpRequest &request)
+{
+  if (!request.body.is_object())
+  {
+    return FailureResponse(400, "publish token creation rejected", "request body must be an object", "ValidationError", "createPublishToken", 2);
+  }
+  if (const std::optional<std::string> error = ValidateStringArray(request.body, "scopes"); error.has_value())
+  {
+    return FailureResponse(400, "publish token creation rejected", *error, "ValidationError", "createPublishToken", 2);
+  }
+  if (const std::optional<std::string> error = ValidateStringArray(request.body, "package_patterns"); error.has_value())
+  {
+    return FailureResponse(400, "publish token creation rejected", *error, "ValidationError", "createPublishToken", 2);
+  }
+  const std::string actor = RegistryActorId(request);
+  const std::string owner_id = request.body.value("owner_id", actor);
+  if (!request.identity.has_value() || (request.identity->role != "operator" && owner_id != actor))
+  {
+    RecordRegistryAudit(request, "createPublishToken", {{"owner_id", owner_id}}, "denied");
+    return FailureResponse(403, "publish token creation denied", "token owner must match caller", "AuthError", "createPublishToken", 2);
+  }
+  const std::string token_id = postgres_ != nullptr ? postgres_->NextRegistryTokenId() : memory_.NextRegistryTokenId();
+  const std::string clear_token = "styio_pat_" + token_id + "_" + SecureRandomHex(24);
+  RegistryPublishTokenRecord token{
+      .token_id = token_id,
+      .token_hash = Sha256Bytes(clear_token),
+      .owner_id = owner_id,
+      .scopes = JsonStringArray(request.body, "scopes", {"package:publish"}),
+      .package_patterns = JsonStringArray(request.body, "package_patterns", {"*"}),
+      .expires_at = request.body.value("expires_at", ""),
+      .revoked_at = "",
+      .created_at = UtcTimestampNow(),
+  };
+  if (postgres_ != nullptr)
+  {
+    postgres_->UpsertRegistryPublishToken(token);
+  }
+  memory_.UpsertRegistryPublishToken(token);
+  nlohmann::json payload = SerializeRegistryPublishTokenRecord(token);
+  payload["token"] = clear_token;
+  RecordRegistryAudit(request, "createPublishToken", {{"token_id", token_id}, {"owner_id", owner_id}}, "success");
+  return JsonResponse(200, SuccessEnvelope("created publish token", payload));
+}
+
+HttpResponse PlatformRouter::HandleListPublishTokens(const HttpRequest &request) const
+{
+  const std::string owner_filter =
+      request.identity.has_value() && request.identity->role == "operator" ? std::string() : RegistryActorId(request);
+  return JsonResponse(
+      200,
+      SuccessEnvelope(
+          "loaded publish tokens",
+          {{"tokens", postgres_ != nullptr ? postgres_->ListRegistryPublishTokens(owner_filter)
+                                           : memory_.ListRegistryPublishTokens(owner_filter)}}));
+}
+
+HttpResponse PlatformRouter::HandleRevokePublishToken(const RouteMatch &match, const HttpRequest &request)
+{
+  const std::string token_id = match.parameters.at("token_id");
+  const std::optional<RegistryPublishTokenRecord> token = postgres_ != nullptr
+      ? postgres_->GetRegistryPublishToken(token_id)
+      : memory_.GetRegistryPublishToken(token_id);
+  if (!token.has_value())
+  {
+    RecordRegistryAudit(request, "revokePublishToken", {{"token_id", token_id}}, "not_found");
+    return FailureResponse(404, "publish token revocation failed", "token is not found", "NotFound", "revokePublishToken");
+  }
+  const std::string actor = RegistryActorId(request);
+  if (!request.identity.has_value() || (request.identity->role != "operator" && token->owner_id != actor))
+  {
+    RecordRegistryAudit(request, "revokePublishToken", {{"token_id", token_id}}, "denied");
+    return FailureResponse(403, "publish token revocation denied", "token owner must match caller", "AuthError", "revokePublishToken", 2);
+  }
+  const std::string revoked_at = UtcTimestampNow();
+  if (postgres_ != nullptr)
+  {
+    postgres_->RevokeRegistryPublishToken(token_id, revoked_at);
+  }
+  memory_.RevokeRegistryPublishToken(token_id, revoked_at);
+  RecordRegistryAudit(request, "revokePublishToken", {{"token_id", token_id}}, "success");
+  return JsonResponse(200, SuccessEnvelope("revoked publish token", {{"token_id", token_id}, {"revoked", true}}));
+}
+
+HttpResponse PlatformRouter::HandleListRepositories() const
+{
+  nlohmann::json repositories =
+      postgres_ != nullptr ? postgres_->ListRegistryRepositories() : memory_.ListRegistryRepositories();
+  if (repositories.empty())
+  {
+    repositories.push_back({
+        {"repository_id", "default"},
+        {"name", "default"},
+        {"tenant_id", "platform"},
+        {"policy", {{"immutable_artifacts", true}, {"append_only_versions", true}}},
+        {"created_at", ""},
+      });
+  }
+  return JsonResponse(200, SuccessEnvelope("loaded repositories", {{"repositories", repositories}}));
+}
+
+HttpResponse PlatformRouter::HandleListRepositoryVersions(const RouteMatch &match) const
+{
+  const std::string repository_id = match.parameters.at("repository_id");
+  return JsonResponse(
+      200,
+      SuccessEnvelope(
+          "loaded repository versions",
+          {{"repository_id", repository_id},
+           {"versions", postgres_ != nullptr ? postgres_->ListRegistryRepositoryVersions(repository_id)
+                                             : memory_.ListRegistryRepositoryVersions(repository_id)}}));
+}
+
+HttpResponse PlatformRouter::HandleGetPublication(const RouteMatch &match) const
+{
+  const std::string publication_id = match.parameters.at("publication_id");
+  const fs::path publication_path = fs::path(config_.registry.root) / "_publications" / publication_id / "publication.json";
+  if (!fs::exists(publication_path))
+  {
+    return FailureResponse(404, "publication lookup failed", "publication is not found", "NotFound", "getPublication");
+  }
+  nlohmann::json payload = nlohmann::json::parse(ReadFileBytes(publication_path));
+  const std::optional<RegistryPublicationRecord> record =
+      postgres_ != nullptr ? postgres_->GetRegistryPublication(publication_id) : memory_.GetRegistryPublication(publication_id);
+  if (record.has_value())
+  {
+    payload["control_plane_record"] = SerializeRegistryPublicationRecord(*record);
+  }
+  return JsonResponse(200, SuccessEnvelope("loaded publication", payload));
+}
+
+HttpResponse PlatformRouter::HandleVerifyPublication(const RouteMatch &match, const HttpRequest &request)
+{
+  if (!request.body.is_object() || !request.body.empty())
+  {
+    return FailureResponse(400, "publication verification rejected", "verify request must be an empty JSON object", "VerifyError", "verifyPublication", 2);
+  }
+  const std::string publication_id = match.parameters.at("publication_id");
+  const fs::path publication_root = fs::path(config_.registry.root) / "_publications" / publication_id;
+  const fs::path publication_path = publication_root / "publication.json";
+  if (!fs::exists(publication_path))
+  {
+    return FailureResponse(404, "publication verification failed", "publication is not found", "NotFound", "verifyPublication");
+  }
+  try
+  {
+    nlohmann::json publication = nlohmann::json::parse(ReadFileBytes(publication_path));
+    const bool index_ok = publication.value("index_digest", "") == DirectoryDigest(publication_root / "index");
+    const bool trust_ok = publication.value("trust_digest", "") == DirectoryDigest(publication_root / "trust");
+    if (!index_ok || !trust_ok)
+    {
+      return FailureResponse(422, "publication verification failed", "publication digest mismatch", "VerifyError", "verifyPublication");
+    }
+    publication["verified"] = true;
+    return JsonResponse(200, SuccessEnvelope("verified publication", publication));
+  }
+  catch (const std::exception &error)
+  {
+    return FailureResponse(422, "publication verification failed", error.what(), "VerifyError", "verifyPublication");
+  }
+}
+
+HttpResponse PlatformRouter::HandleListDistributions() const
+{
+  nlohmann::json distributions =
+      postgres_ != nullptr ? postgres_->ListRegistryDistributions() : memory_.ListRegistryDistributions();
+  if (distributions.empty())
+  {
+    const std::optional<nlohmann::json> current = CurrentDistributionPointer(fs::path(config_.registry.root), "default");
+    distributions.push_back({
+        {"distribution_id", "default"},
+        {"repository_id", "default"},
+        {"name", "default"},
+        {"base_url", RegistryReadRootUrl(config_)},
+        {"current_publication_id", current.has_value() ? current->value("publication_id", "") : ""},
+        {"previous_publication_id", current.has_value() ? current->value("previous_publication_id", "") : ""},
+        {"updated_at", current.has_value() ? current->value("updated_at", "") : ""},
+    });
+  }
+  return JsonResponse(200, SuccessEnvelope("loaded distributions", {{"distributions", distributions}}));
+}
+
+HttpResponse PlatformRouter::HandlePromoteDistribution(const RouteMatch &match, const HttpRequest &request)
+{
+  const std::string distribution_id = match.parameters.at("distribution_id");
+  if (!request.body.is_object() || !HasNonEmptyString(request.body, "publication_id"))
+  {
+    return FailureResponse(400, "distribution promotion rejected", "publication_id is required", "ValidationError", "promoteDistribution", 2);
+  }
+  if (!RegistryWriteAuthorized(request, "repository:promote", ""))
+  {
+    RecordRegistryAudit(request, "promoteDistribution", {{"distribution_id", distribution_id}}, "denied");
+    return FailureResponse(403, "distribution promotion denied", "token or identity lacks repository:promote", "AuthError", "promoteDistribution", 2);
+  }
+  const std::string publication_id = request.body.at("publication_id").get<std::string>();
+  const fs::path registry_root(config_.registry.root);
+  const fs::path publication_root = registry_root / "_publications" / publication_id;
+  const fs::path publication_path = publication_root / "publication.json";
+  if (!fs::exists(publication_path))
+  {
+    RecordRegistryAudit(request, "promoteDistribution", {{"distribution_id", distribution_id}, {"publication_id", publication_id}}, "not_found");
+    return FailureResponse(404, "distribution promotion failed", "publication is not found", "NotFound", "promoteDistribution");
+  }
+  try
+  {
+    const nlohmann::json publication = nlohmann::json::parse(ReadFileBytes(publication_path));
+    const std::optional<nlohmann::json> previous = CurrentDistributionPointer(registry_root, distribution_id);
+    if (distribution_id == "default")
+    {
+      MaterializePublicationToRoot(registry_root, publication_root);
+    }
+    const std::string updated_at = UtcTimestampNow();
+    const std::string previous_publication_id =
+        previous.has_value() ? previous->value("publication_id", std::string()) : std::string();
+    nlohmann::json current = {
+        {"distribution_id", distribution_id},
+        {"publication_id", publication_id},
+        {"repository_version_id", publication.at("repository_version_id").get<std::string>()},
+        {"updated_at", updated_at},
+    };
+    if (!previous_publication_id.empty())
+    {
+      current["previous_publication_id"] = previous_publication_id;
+    }
+    WriteTextFile(registry_root / "_distributions" / distribution_id / "current.json", JsonText(current));
+    RegistryDistributionRecord distribution_record{
+        .distribution_id = distribution_id,
+        .repository_id = publication.value("repository_id", "default"),
+        .name = distribution_id,
+        .base_url = RegistryReadRootUrl(config_),
+        .current_publication_id = publication_id,
+        .previous_publication_id = previous_publication_id,
+        .updated_at = updated_at,
+    };
+    if (postgres_ != nullptr)
+    {
+      postgres_->UpsertRegistryDistribution(distribution_record);
+    }
+    memory_.UpsertRegistryDistribution(distribution_record);
+    RecordRegistryAudit(request, "promoteDistribution", {{"distribution_id", distribution_id}, {"publication_id", publication_id}}, "success");
+    return JsonResponse(200, SuccessEnvelope("promoted distribution", current));
+  }
+  catch (const std::exception &error)
+  {
+    RecordRegistryAudit(request, "promoteDistribution", {{"distribution_id", distribution_id}, {"publication_id", publication_id}}, "failed");
+    return FailureResponse(422, "distribution promotion failed", error.what(), "PublishError", "promoteDistribution");
+  }
+}
+
+HttpResponse PlatformRouter::HandleRollbackDistribution(const RouteMatch &match, const HttpRequest &request)
+{
+  const std::string distribution_id = match.parameters.at("distribution_id");
+  if (!RegistryWriteAuthorized(request, "repository:promote", ""))
+  {
+    RecordRegistryAudit(request, "rollbackDistribution", {{"distribution_id", distribution_id}}, "denied");
+    return FailureResponse(403, "distribution rollback denied", "token or identity lacks repository:promote", "AuthError", "rollbackDistribution", 2);
+  }
+  const fs::path registry_root(config_.registry.root);
+  const std::optional<nlohmann::json> current_pointer = CurrentDistributionPointer(registry_root, distribution_id);
+  if (!current_pointer.has_value() || current_pointer->value("previous_publication_id", std::string()).empty())
+  {
+    RecordRegistryAudit(request, "rollbackDistribution", {{"distribution_id", distribution_id}}, "no_previous_publication");
+    return FailureResponse(409, "distribution rollback failed", "previous publication is not available", "StateError", "rollbackDistribution");
+  }
+  const std::string rollback_publication_id = current_pointer->at("previous_publication_id").get<std::string>();
+  const fs::path publication_root = registry_root / "_publications" / rollback_publication_id;
+  const fs::path publication_path = publication_root / "publication.json";
+  if (!fs::exists(publication_path))
+  {
+    RecordRegistryAudit(request, "rollbackDistribution", {{"distribution_id", distribution_id}, {"publication_id", rollback_publication_id}}, "not_found");
+    return FailureResponse(404, "distribution rollback failed", "previous publication is not found", "NotFound", "rollbackDistribution");
+  }
+  try
+  {
+    const nlohmann::json publication = nlohmann::json::parse(ReadFileBytes(publication_path));
+    if (distribution_id == "default")
+    {
+      MaterializePublicationToRoot(registry_root, publication_root);
+    }
+    const std::string updated_at = UtcTimestampNow();
+    nlohmann::json next_pointer = {
+        {"distribution_id", distribution_id},
+        {"publication_id", rollback_publication_id},
+        {"repository_version_id", publication.at("repository_version_id").get<std::string>()},
+        {"previous_publication_id", current_pointer->value("publication_id", "")},
+        {"updated_at", updated_at},
+    };
+    WriteTextFile(registry_root / "_distributions" / distribution_id / "current.json", JsonText(next_pointer));
+    RegistryDistributionRecord distribution_record{
+        .distribution_id = distribution_id,
+        .repository_id = publication.value("repository_id", "default"),
+        .name = distribution_id,
+        .base_url = RegistryReadRootUrl(config_),
+        .current_publication_id = rollback_publication_id,
+        .previous_publication_id = current_pointer->value("publication_id", ""),
+        .updated_at = updated_at,
+    };
+    if (postgres_ != nullptr)
+    {
+      postgres_->UpsertRegistryDistribution(distribution_record);
+    }
+    memory_.UpsertRegistryDistribution(distribution_record);
+    RecordRegistryAudit(request, "rollbackDistribution", {{"distribution_id", distribution_id}, {"publication_id", rollback_publication_id}}, "success");
+    return JsonResponse(200, SuccessEnvelope("rolled back distribution", next_pointer));
+  }
+  catch (const std::exception &error)
+  {
+    RecordRegistryAudit(request, "rollbackDistribution", {{"distribution_id", distribution_id}}, "failed");
+    return FailureResponse(422, "distribution rollback failed", error.what(), "PublishError", "rollbackDistribution");
+  }
+}
+
+void PlatformRouter::RecordMirrorState(
+    std::string freshness,
+    std::string replay_cursor,
+    std::string publication_id,
+    std::string repository_version_id,
+    std::string synced_at,
+    const int tree_size)
 {
   if (postgres_ != nullptr)
   {
@@ -2412,19 +3888,22 @@ void PlatformRouter::RecordMirrorState(std::string freshness, std::string replay
         config_.region,
         config_.registry.mirror_origin,
         freshness,
-        replay_cursor);
+        replay_cursor,
+        publication_id,
+        repository_version_id,
+        synced_at,
+        tree_size);
   }
-  mirrors_[config_.registry.mirror_id] = RegistryMirrorState{
-      .mirror_id = config_.registry.mirror_id,
-      .origin = config_.registry.mirror_origin,
-      .freshness = std::move(freshness),
-      .replay_cursor = std::move(replay_cursor),
-  };
-}
-
-std::string PlatformRouter::NextMemoryJobId()
-{
-  return "job-" + PaddedNumber(next_memory_job_sequence_++, 12);
+  memory_.RecordMirrorState(
+      config_.registry.mirror_id,
+      config_.region,
+      config_.registry.mirror_origin,
+      freshness,
+      replay_cursor,
+      publication_id,
+      repository_version_id,
+      synced_at,
+      tree_size);
 }
 
 }  // namespace spio::platform

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PlatformService/Identity.hpp"
+#include "PlatformSecurity/PlatformClientAuth/Identity.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -16,6 +16,7 @@ enum class HttpMethod
 {
   Get,
   Post,
+  Delete,
 };
 
 struct HttpRequest

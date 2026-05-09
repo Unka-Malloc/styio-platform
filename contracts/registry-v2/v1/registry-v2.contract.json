@@ -12,7 +12,9 @@
     "source_artifact_prefix": "artifacts/source/",
     "binary_artifact_prefix": "artifacts/binary/",
     "log_checkpoint": "log/checkpoint.json",
-    "log_leaf_prefix": "log/leaves/"
+    "log_leaf_prefix": "log/leaves/",
+    "publication_prefix": "_publications/",
+    "distribution_current_prefix": "_distributions/"
   },
   "capabilities": {
     "append_only_index": true,
@@ -30,6 +32,8 @@
     "namespace_targets": "signed-namespace-targets.schema.json",
     "package_index_record": "package-index-record.schema.json",
     "log_checkpoint": "signed-checkpoint.schema.json",
-    "log_leaf": "transparency-log-leaf.schema.json"
+    "log_leaf": "transparency-log-leaf.schema.json",
+    "publication": "publication.schema.json",
+    "distribution_current": "distribution-current.schema.json"
   }
 }

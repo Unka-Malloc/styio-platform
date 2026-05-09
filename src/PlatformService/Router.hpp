@@ -1,25 +1,17 @@
 #pragma once
 
-#include "PlatformService/Config.hpp"
+#include "PlatformCore/Config.hpp"
 #include "PlatformService/Http.hpp"
-#include "PlatformService/JobQueue.hpp"
-#include "PlatformService/PostgresStore.hpp"
+#include "PlatformCloud/DeveloperWorkspace/JobQueue.hpp"
+#include "PlatformStorage/PlatformPersistence/MemoryStateStore.hpp"
+#include "PlatformStorage/PlatformPersistence/PostgresStore.hpp"
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace spio::platform
 {
-
-struct RegistryMirrorState
-{
-  std::string mirror_id;
-  std::string origin;
-  std::string freshness = "lagging";
-  std::string replay_cursor = "checkpoint-0000";
-};
 
 class PlatformRouter
 {
@@ -39,6 +31,9 @@ private:
   HttpResponse HandleGetJobEvents(const RouteMatch &match) const;
   HttpResponse HandleCancelJob(const RouteMatch &match, const HttpRequest &request);
   HttpResponse HandleRegisterWorker(const HttpRequest &request);
+  HttpResponse HandleRegisterCompileContainer(const HttpRequest &request);
+  HttpResponse HandleGetCompileContainer(const RouteMatch &match) const;
+  HttpResponse HandleSwitchCompileContainerWorkspace(const RouteMatch &match, const HttpRequest &request);
   HttpResponse HandleClaimJob(const HttpRequest &request);
   HttpResponse HandleHeartbeatJob(const RouteMatch &match, const HttpRequest &request);
   HttpResponse HandleCompleteJob(const RouteMatch &match, const HttpRequest &request);
@@ -49,18 +44,44 @@ private:
   HttpResponse HandleRegistryDescriptor() const;
   HttpResponse HandlePublishRelease(const HttpRequest &request);
   HttpResponse HandleVerifyRegistry(const HttpRequest &request);
-  std::string NextMemoryJobId();
-  void RecordMirrorState(std::string freshness, std::string replay_cursor);
+  HttpResponse HandleGetPackage(const RouteMatch &match) const;
+  HttpResponse HandleListPackageReleases(const RouteMatch &match) const;
+  HttpResponse HandleGetPackageRelease(const RouteMatch &match) const;
+  HttpResponse HandleSetPackageReleaseYanked(const RouteMatch &match, const HttpRequest &request, bool yanked);
+  HttpResponse HandleListPackageOwners(const RouteMatch &match) const;
+  HttpResponse HandleAddPackageOwner(const RouteMatch &match, const HttpRequest &request);
+  HttpResponse HandleRemovePackageOwner(const RouteMatch &match, const HttpRequest &request);
+  HttpResponse HandleCreatePublishToken(const HttpRequest &request);
+  HttpResponse HandleListPublishTokens(const HttpRequest &request) const;
+  HttpResponse HandleRevokePublishToken(const RouteMatch &match, const HttpRequest &request);
+  HttpResponse HandleListRepositories() const;
+  HttpResponse HandleListRepositoryVersions(const RouteMatch &match) const;
+  HttpResponse HandleGetPublication(const RouteMatch &match) const;
+  HttpResponse HandleVerifyPublication(const RouteMatch &match, const HttpRequest &request);
+  HttpResponse HandleListDistributions() const;
+  HttpResponse HandlePromoteDistribution(const RouteMatch &match, const HttpRequest &request);
+  HttpResponse HandleRollbackDistribution(const RouteMatch &match, const HttpRequest &request);
+  bool RegistryWriteAuthorized(const HttpRequest &request, std::string_view scope, const std::string &package_id) const;
+  void RecordRegistryAudit(
+      const HttpRequest &request,
+      const std::string &operation,
+      const nlohmann::json &target,
+      const std::string &result);
+  nlohmann::json CreateRegistryPublication(
+      const std::string &change_kind,
+      const std::string &change_ref,
+      const std::string &generated_at);
+  void RecordMirrorState(
+      std::string freshness,
+      std::string replay_cursor,
+      std::string publication_id = {},
+      std::string repository_version_id = {},
+      std::string synced_at = {},
+      int tree_size = 0);
 
   PlatformConfig config_;
   std::vector<RouteSpec> routes_;
-  std::map<std::string, PlatformJobRecord> jobs_;
-  std::map<std::string, std::vector<JobEventRecord>> events_;
-  std::map<std::string, nlohmann::json> workers_;
-  std::map<std::string, std::map<std::string, nlohmann::json>> workgroups_;
-  std::map<std::string, RegistryMirrorState> mirrors_;
-  std::map<std::string, nlohmann::json> published_releases_;
-  size_t next_memory_job_sequence_ = 1;
+  MemoryStateStore memory_;
   std::unique_ptr<PostgresStore> postgres_;
 };
 

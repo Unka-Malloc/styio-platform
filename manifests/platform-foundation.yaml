@@ -1,0 +1,62 @@
+id: platform-foundation
+kind: platform-base
+owner: platform-core
+description: Non-removable foundation shared by every styio-platform business capability.
+split_policy:
+  extractable: false
+  reason: Provides process, system, storage, security, protocol, and service primitives used by every business.
+cmake_targets:
+  - styio_platform_system
+  - styio_platform_core
+  - styio_platform_security
+  - styio_platform_storage
+  - styio_platform_protocols
+  - styio_platform_service
+  - styio_platform_kernel
+modules:
+  core:
+    - src/PlatformCore/Config.*
+    - src/PlatformCore/Core
+    - src/PlatformCore/System
+    - src/PlatformCore/Manifest
+    - src/PlatformCore/RegistryClient
+    - src/PlatformCore/Resolve
+    - src/PlatformCore/Toolchain
+  storage:
+    - src/PlatformStorage/PlatformCache
+    - src/PlatformStorage/PlatformPersistence
+  security:
+    - src/PlatformSecurity/PlatformCA
+    - src/PlatformSecurity/PlatformClientAuth
+    - src/PlatformSecurity/SecurityHardening
+  protocols:
+    - src/SpioPlatformProtocols
+  service_base:
+    - src/PlatformService
+contracts:
+  service_runtime:
+    - health
+    - route_dispatch
+    - mtls_identity_extraction
+    - public_config_serialization
+storage:
+  persistence:
+    - memory_state_store
+    - postgres_state_store
+    - object_store
+  cache:
+    - local_cache_paths
+security:
+  primitives:
+    - local_ca_lifecycle
+    - mtls_client_identity
+    - operation_authorization
+runtime_adapters:
+  operating_system:
+    - filesystem
+    - process
+    - tcp
+invariants:
+  - Foundation code must not own product-specific state machines.
+  - Business capabilities may depend on foundation, but foundation must not depend on business capabilities.
+  - Service extraction must preserve these APIs as the common platform base.

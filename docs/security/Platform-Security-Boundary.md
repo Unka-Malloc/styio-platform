@@ -2,7 +2,7 @@
 
 **Purpose:** Define the initial trust split for hosted compile and registry control-plane services.
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-09
 
 ## Boundary
 
@@ -10,6 +10,12 @@
 inputs. It validates execution lanes, risk classes, source revisions, and
 registry write requests before dispatching work to hosted workers or server
 control planes.
+
+Source ownership is split under `src/PlatformSecurity/`: `PlatformCA` owns
+certificate authority, trust-anchor lifecycle, and managed mTLS certificate
+issuance, `PlatformClientAuth` owns mTLS identity and operation authorization
+policy, and `SecurityHardening` owns registry policy hooks and other hardening
+extension points.
 
 Compiler-private execution remains behind `styio`; package-manager credential
 storage remains in `styio-spio` until a platform credential service is designed.
@@ -24,6 +30,10 @@ traffic may not rely on bearer-only trust inside the platform boundary.
 from the client certificate URI SAN. Header-carried identity is accepted only
 when deployments explicitly trust an upstream proxy through
 `STYIO_PLATFORM_TRUST_PROXY_IDENTITY_HEADERS`.
+For local and development deployments, `STYIO_PLATFORM_MTLS_AUTO_PROVISION=1`
+uses `PlatformCA` to initialize a local CA and issue the node certificate before
+the TLS listener starts; production deployments can still mount externally
+managed CA/certificate/key material through the explicit mTLS path settings.
 
 Workgroup cluster registration is a control-plane write. The default policy
 accepts writes only from the configured platform tenant and from `operator`,
@@ -31,6 +41,11 @@ accepts writes only from the configured platform tenant and from `operator`,
 `registry-writer` identities may read registered clusters but cannot mutate
 membership. Deployments can require `STYIO_PLATFORM_WORKGROUP_REGISTRATION_TOKEN`
 as a second local registration factor.
+
+Compile containers are worker-owned but user-bound. Registration fixes the
+container to one `tenant_id` and `user_id`; workspace switching can update only
+the current workspace for that binding. Container-aware job claims must not
+assign queued work from another user into a warm compile container.
 
 Postgres is the durable control-plane state boundary. Provider-neutral object
 storage, with S3 first, stores artifacts and replayable registry objects;

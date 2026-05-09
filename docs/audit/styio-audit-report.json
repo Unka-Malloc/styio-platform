@@ -2,7 +2,7 @@
   "findings": [],
   "framework": {
     "name": "styio-audit",
-    "root": "/home/unka/styio-audit",
+    "root": "<styio-audit-root>",
     "version": "0.1.0"
   },
   "modules": [
@@ -37,6 +37,6 @@
   "target": {
     "framework_only": false,
     "project": "styio-platform",
-    "repo_root": "/home/unka/styio-platform"
+    "repo_root": "<repo-root>"
   }
 }

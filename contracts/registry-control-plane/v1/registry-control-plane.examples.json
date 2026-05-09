@@ -123,5 +123,95 @@
         "detail": "checkpoint hash mismatch"
       }
     }
+  },
+  "getPackage": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded package", "stdout": "", "stderr": "", "payload": {"package_id": "demo/app", "latest_version": "0.1.0"}},
+    "failure": {"returncode": 17, "message": "package lookup failed", "stdout": "", "stderr": "package is not found", "error_payload": {"category": "NotFound", "detail": "package is not found"}}
+  },
+  "listPackageReleases": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded package releases", "stdout": "", "stderr": "", "payload": {"package_id": "demo/app", "releases": []}},
+    "failure": {"returncode": 17, "message": "package release lookup failed", "stdout": "", "stderr": "package is not found", "error_payload": {"category": "NotFound", "detail": "package is not found"}}
+  },
+  "getPackageRelease": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded package release", "stdout": "", "stderr": "", "payload": {"package": "demo/app", "version": "0.1.0", "yanked": false}},
+    "failure": {"returncode": 17, "message": "package release lookup failed", "stdout": "", "stderr": "package release is not found", "error_payload": {"category": "NotFound", "detail": "package release is not found"}}
+  },
+  "yankPackageRelease": {
+    "request": {"reason": "bad metadata"},
+    "success": {"returncode": 0, "message": "yanked package release", "stdout": "", "stderr": "", "payload": {"package_id": "demo/app", "version": "0.1.0", "yanked": true, "publication_id": "pub-000002"}},
+    "failure": {"returncode": 17, "message": "package release mutation failed", "stdout": "", "stderr": "package release is not found", "error_payload": {"category": "NotFound", "detail": "package release is not found"}}
+  },
+  "unyankPackageRelease": {
+    "request": {},
+    "success": {"returncode": 0, "message": "unyanked package release", "stdout": "", "stderr": "", "payload": {"package_id": "demo/app", "version": "0.1.0", "yanked": false, "publication_id": "pub-000003"}},
+    "failure": {"returncode": 17, "message": "package release mutation failed", "stdout": "", "stderr": "package release is not found", "error_payload": {"category": "NotFound", "detail": "package release is not found"}}
+  },
+  "listPackageOwners": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded package owners", "stdout": "", "stderr": "", "payload": {"package_id": "demo/app", "owners": []}},
+    "failure": {"returncode": 17, "message": "package owner lookup failed", "stdout": "", "stderr": "package is not found", "error_payload": {"category": "NotFound", "detail": "package is not found"}}
+  },
+  "addPackageOwner": {
+    "request": {"owner_id": "user-bob", "owner_kind": "user", "role": "owner"},
+    "success": {"returncode": 0, "message": "added package owner", "stdout": "", "stderr": "", "payload": {"package_id": "demo/app", "owner_id": "user-bob"}},
+    "failure": {"returncode": 17, "message": "package owner mutation denied", "stdout": "", "stderr": "token or identity lacks package:owner", "error_payload": {"category": "AuthError", "detail": "token or identity lacks package:owner"}}
+  },
+  "removePackageOwner": {
+    "request": null,
+    "success": {"returncode": 0, "message": "removed package owner", "stdout": "", "stderr": "", "payload": {"package_id": "demo/app", "owner_id": "user-bob"}},
+    "failure": {"returncode": 17, "message": "package owner mutation failed", "stdout": "", "stderr": "package owner is not found", "error_payload": {"category": "NotFound", "detail": "package owner is not found"}}
+  },
+  "createPublishToken": {
+    "request": {"scopes": ["package:publish"], "package_patterns": ["demo/*"]},
+    "success": {"returncode": 0, "message": "created publish token", "stdout": "", "stderr": "", "payload": {"token_id": "tok-000000000001", "token": "styio_pat_tok-000000000001_example"}},
+    "failure": {"returncode": 17, "message": "publish token creation denied", "stdout": "", "stderr": "token owner must match caller", "error_payload": {"category": "AuthError", "detail": "token owner must match caller"}}
+  },
+  "listPublishTokens": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded publish tokens", "stdout": "", "stderr": "", "payload": {"tokens": []}},
+    "failure": {"returncode": 17, "message": "publish token lookup failed", "stdout": "", "stderr": "token is not found", "error_payload": {"category": "NotFound", "detail": "token is not found"}}
+  },
+  "revokePublishToken": {
+    "request": null,
+    "success": {"returncode": 0, "message": "revoked publish token", "stdout": "", "stderr": "", "payload": {"token_id": "tok-000000000001", "revoked": true}},
+    "failure": {"returncode": 17, "message": "publish token revocation failed", "stdout": "", "stderr": "token is not found", "error_payload": {"category": "NotFound", "detail": "token is not found"}}
+  },
+  "listRepositories": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded repositories", "stdout": "", "stderr": "", "payload": {"repositories": []}},
+    "failure": {"returncode": 17, "message": "repository lookup failed", "stdout": "", "stderr": "repository is not found", "error_payload": {"category": "NotFound", "detail": "repository is not found"}}
+  },
+  "listRepositoryVersions": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded repository versions", "stdout": "", "stderr": "", "payload": {"repository_id": "default", "versions": []}},
+    "failure": {"returncode": 17, "message": "repository version lookup failed", "stdout": "", "stderr": "repository is not found", "error_payload": {"category": "NotFound", "detail": "repository is not found"}}
+  },
+  "getPublication": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded publication", "stdout": "", "stderr": "", "payload": {"publication_id": "pub-000001", "repository_version_id": "rv-000001", "verified": true}},
+    "failure": {"returncode": 17, "message": "publication lookup failed", "stdout": "", "stderr": "publication is not found", "error_payload": {"category": "NotFound", "detail": "publication is not found"}}
+  },
+  "verifyPublication": {
+    "request": {},
+    "success": {"returncode": 0, "message": "verified publication", "stdout": "", "stderr": "", "payload": {"publication_id": "pub-000001", "verified": true}},
+    "failure": {"returncode": 17, "message": "publication verification failed", "stdout": "", "stderr": "publication digest mismatch", "error_payload": {"category": "VerifyError", "detail": "publication digest mismatch"}}
+  },
+  "listDistributions": {
+    "request": null,
+    "success": {"returncode": 0, "message": "loaded distributions", "stdout": "", "stderr": "", "payload": {"distributions": []}},
+    "failure": {"returncode": 17, "message": "distribution lookup failed", "stdout": "", "stderr": "distribution is not found", "error_payload": {"category": "NotFound", "detail": "distribution is not found"}}
+  },
+  "promoteDistribution": {
+    "request": {"publication_id": "pub-000001"},
+    "success": {"returncode": 0, "message": "promoted distribution", "stdout": "", "stderr": "", "payload": {"distribution_id": "default", "publication_id": "pub-000001"}},
+    "failure": {"returncode": 17, "message": "distribution promotion failed", "stdout": "", "stderr": "publication is not found", "error_payload": {"category": "NotFound", "detail": "publication is not found"}}
+  },
+  "rollbackDistribution": {
+    "request": {},
+    "success": {"returncode": 0, "message": "rolled back distribution", "stdout": "", "stderr": "", "payload": {"distribution_id": "default", "publication_id": "pub-000001"}},
+    "failure": {"returncode": 17, "message": "distribution rollback failed", "stdout": "", "stderr": "previous publication is not available", "error_payload": {"category": "StateError", "detail": "previous publication is not available"}}
   }
 }

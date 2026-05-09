@@ -11,14 +11,14 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
+PACKAGE_REGISTRY = ROOT / "src" / "PlatformCloud" / "PackageRegistry"
 import sys
 
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+if str(PACKAGE_REGISTRY) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_REGISTRY))
 
-from spio_registry_v2 import publish_to_registry_v2, verify_registry_root  # noqa: E402
-from spio_registry_v2.common import RegistryV2Error  # noqa: E402
+from package_registry_v2 import publish_to_registry_v2, verify_registry_root  # noqa: E402
+from package_registry_v2.common import RegistryV2Error  # noqa: E402
 
 
 BASE_PATH = "/api/spio-registry-control/v1"

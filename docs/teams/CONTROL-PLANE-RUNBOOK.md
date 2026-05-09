@@ -2,7 +2,7 @@
 
 **Purpose:** Own global hosted workspace, native JSON platform control-plane, regional node, registry distribution, mirror sync, server-script, and cloud stress surfaces.
 
-**Last updated:** 2026-05-05
+**Last updated:** 2026-05-09
 
 ## Mission
 
@@ -19,7 +19,7 @@ mirror synchronization.
 - `contracts/registry-v2/`
 - `docs/governance/Platform-Global-Service-Model.md`
 - `docs/governance/Platform-Workspace-Compile-Model.md`
-- `docs/governance/Spio-Cloud-Control-Plane-Contract.md`
+- `docs/governance/Platform-Cloud-Control-Plane-Contract.md`
 - `docs/operations/Platform-Regional-Node-Runbook.md`
 - `docs/registry/Platform-Mirror-Synchronization-Contract.md`
 - `scripts/cloud-compile-stress.py`
@@ -28,7 +28,9 @@ mirror synchronization.
 - `scripts/registry-v2-control-plane-server.py`
 - `scripts/registry-v2-static-read-server.py`
 - `scripts/registry-v2-vm-smoke.py`
-- `src/spio_cloud_stress/`
+- `src/PlatformCloud/PackageRegistry/`
+- `src/PlatformCloud/DeveloperWorkspace/`
+- `src/PlatformCloud/DeveloperWorkspace/workspace_compile_stress/`
 - `tests/interop/` and `tests/unit/`
 
 ## Daily Workflow
@@ -51,6 +53,10 @@ object immutability assumptions in the registry operations runbook.
 Tool-release publication changes must keep `scripts/publish-spio-tool-release.py`,
 the release target namespace map, and `tests/unit/test_tool_release.py`
 aligned with the client-side installer contract in `styio-spio`.
+User-bound compile container changes must keep
+`contracts/platform-control-plane/v1/`, `tests/interop/platform-control-plane-contract-gate.py`,
+the HTTP smoke job payload, and workspace compile governance aligned so
+container-aware claims cannot drift from the public route contract.
 
 ## Change Classes
 
@@ -61,6 +67,9 @@ mixed Styio/C++ execution envelopes, VM deployment packaging, and cloud stress
 scenarios. S3-backed registry publication and in-process mTLS termination are
 control-plane changes because they affect deployment authority and service
 trust boundaries.
+Compile container registration, status lookup, workspace hot-switching, and
+container-aware job claim semantics are also control-plane changes because they
+define how hosted work is assigned to user-bound warm environments.
 
 The V1 cloud-service implementation boundary is pure C++ with Boost.Beast and
 Boost.Asio, Postgres for durable state, provider-neutral object storage with S3
@@ -82,6 +91,9 @@ build-codex --output-on-failure`. For VM registry deployment changes, include
 `python3 tests/unit/test_registry_vm_deploy.py`.
 For tool-release namespace changes, include
 `python3 -m unittest tests/unit/test_tool_release.py`.
+For compile container route changes, include
+`python3 tests/interop/platform-control-plane-contract-gate.py --mode fuzz`
+and the native job queue tests covering user binding and workspace switching.
 
 ## Cross-Team Dependencies
 

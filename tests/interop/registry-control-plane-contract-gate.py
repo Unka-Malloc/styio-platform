@@ -17,6 +17,24 @@ EXPECTED_OPERATION_SNAPSHOT = [
     ("registryDescriptor", "GET", "/descriptor"),
     ("publishRelease", "POST", "/publish"),
     ("verifyRegistry", "POST", "/verify"),
+    ("getPackage", "GET", "/packages/{namespace}/{name}"),
+    ("listPackageReleases", "GET", "/packages/{namespace}/{name}/releases"),
+    ("getPackageRelease", "GET", "/packages/{namespace}/{name}/releases/{version}"),
+    ("yankPackageRelease", "POST", "/packages/{namespace}/{name}/releases/{version}/yank"),
+    ("unyankPackageRelease", "POST", "/packages/{namespace}/{name}/releases/{version}/unyank"),
+    ("listPackageOwners", "GET", "/packages/{namespace}/{name}/owners"),
+    ("addPackageOwner", "POST", "/packages/{namespace}/{name}/owners"),
+    ("removePackageOwner", "DELETE", "/packages/{namespace}/{name}/owners/{owner_id}"),
+    ("createPublishToken", "POST", "/tokens"),
+    ("listPublishTokens", "GET", "/tokens"),
+    ("revokePublishToken", "DELETE", "/tokens/{token_id}"),
+    ("listRepositories", "GET", "/repositories"),
+    ("listRepositoryVersions", "GET", "/repositories/{repository_id}/versions"),
+    ("getPublication", "GET", "/publications/{publication_id}"),
+    ("verifyPublication", "POST", "/publications/{publication_id}/verify"),
+    ("listDistributions", "GET", "/distributions"),
+    ("promoteDistribution", "POST", "/distributions/{distribution_id}/promote"),
+    ("rollbackDistribution", "POST", "/distributions/{distribution_id}/rollback"),
 ]
 
 
@@ -52,6 +70,8 @@ def validate_spec(contract: dict[str, Any], spec: dict[str, Any], value: Any, pa
         return
 
     spec_type = spec.get("type")
+    if spec_type == "any":
+        return
     if spec_type == "string":
         if not isinstance(value, str):
             errors.append(f"{path}: expected string")
@@ -89,6 +109,7 @@ def validate_shape(contract: dict[str, Any], shape_name: str, value: Any, path: 
     required = shape.get("required", {})
     optional = shape.get("optional", {})
     allowed = set(required) | set(optional)
+    allow_additional = bool(shape.get("allow_additional", False))
     for field_name, field_spec in required.items():
         if field_name not in value:
             errors.append(f"{path}: missing required field {field_name!r}")
@@ -96,6 +117,8 @@ def validate_shape(contract: dict[str, Any], shape_name: str, value: Any, path: 
         validate_spec(contract, field_spec, value[field_name], f"{path}.{field_name}", errors)
     for field_name, field_value in value.items():
         if field_name not in allowed:
+            if allow_additional:
+                continue
             errors.append(f"{path}: unexpected field {field_name!r}")
             continue
         if field_name in optional:

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "spio registry v2 distribution current pointer",
+  "type": "object",
+  "required": [
+    "distribution_id",
+    "publication_id",
+    "repository_version_id",
+    "updated_at"
+  ],
+  "properties": {
+    "distribution_id": {"type": "string", "minLength": 1},
+    "publication_id": {"type": "string", "minLength": 1},
+    "repository_version_id": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "previous_publication_id": {"type": "string"}
+  },
+  "additionalProperties": false
+}

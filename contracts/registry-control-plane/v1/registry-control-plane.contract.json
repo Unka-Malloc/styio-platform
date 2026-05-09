@@ -35,6 +35,150 @@
       "request_shape": "EmptyObject",
       "success_shape": "VerifyEnvelope",
       "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "getPackage",
+      "method": "GET",
+      "path": "/packages/{namespace}/{name}",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listPackageReleases",
+      "method": "GET",
+      "path": "/packages/{namespace}/{name}/releases",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "getPackageRelease",
+      "method": "GET",
+      "path": "/packages/{namespace}/{name}/releases/{version}",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "yankPackageRelease",
+      "method": "POST",
+      "path": "/packages/{namespace}/{name}/releases/{version}/yank",
+      "request_shape": "GenericObjectRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "unyankPackageRelease",
+      "method": "POST",
+      "path": "/packages/{namespace}/{name}/releases/{version}/unyank",
+      "request_shape": "GenericObjectRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listPackageOwners",
+      "method": "GET",
+      "path": "/packages/{namespace}/{name}/owners",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "addPackageOwner",
+      "method": "POST",
+      "path": "/packages/{namespace}/{name}/owners",
+      "request_shape": "GenericObjectRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "removePackageOwner",
+      "method": "DELETE",
+      "path": "/packages/{namespace}/{name}/owners/{owner_id}",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "createPublishToken",
+      "method": "POST",
+      "path": "/tokens",
+      "request_shape": "GenericObjectRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listPublishTokens",
+      "method": "GET",
+      "path": "/tokens",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "revokePublishToken",
+      "method": "DELETE",
+      "path": "/tokens/{token_id}",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listRepositories",
+      "method": "GET",
+      "path": "/repositories",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listRepositoryVersions",
+      "method": "GET",
+      "path": "/repositories/{repository_id}/versions",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "getPublication",
+      "method": "GET",
+      "path": "/publications/{publication_id}",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "verifyPublication",
+      "method": "POST",
+      "path": "/publications/{publication_id}/verify",
+      "request_shape": "EmptyObject",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "listDistributions",
+      "method": "GET",
+      "path": "/distributions",
+      "request_shape": "NoRequestBody",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "promoteDistribution",
+      "method": "POST",
+      "path": "/distributions/{distribution_id}/promote",
+      "request_shape": "GenericObjectRequest",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
+    },
+    {
+      "id": "rollbackDistribution",
+      "method": "POST",
+      "path": "/distributions/{distribution_id}/rollback",
+      "request_shape": "EmptyObject",
+      "success_shape": "GenericEnvelope",
+      "failure_shape": "FailureEnvelope"
     }
   ],
   "shapes": {
@@ -44,6 +188,34 @@
     "EmptyObject": {
       "kind": "object",
       "required": {},
+      "optional": {}
+    },
+    "GenericObjectRequest": {
+      "kind": "object",
+      "required": {},
+      "optional": {},
+      "allow_additional": true
+    },
+    "GenericEnvelope": {
+      "kind": "object",
+      "required": {
+        "returncode": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "min_length": 1
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "any"
+        }
+      },
       "optional": {}
     },
     "FailurePayload": {
@@ -287,7 +459,44 @@
           "type": "integer"
         }
       },
-      "optional": {}
+      "optional": {
+        "registry_read_root": {
+          "type": "string",
+          "min_length": 1
+        },
+        "object_store_provider": {
+          "type": "string",
+          "min_length": 1
+        },
+        "checkpoint_version": {
+          "type": "integer"
+        },
+        "snapshot_version": {
+          "type": "integer"
+        },
+        "timestamp_version": {
+          "type": "integer"
+        },
+        "namespaces": {
+          "type": "integer"
+        },
+        "repository_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "repository_version_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "publication_id": {
+          "type": "string",
+          "min_length": 1
+        },
+        "distribution_id": {
+          "type": "string",
+          "min_length": 1
+        }
+      }
     },
     "PublishEnvelope": {
       "kind": "object",
@@ -334,7 +543,16 @@
           "type": "integer"
         }
       },
-      "optional": {}
+      "optional": {
+        "registry_read_root": {
+          "type": "string",
+          "min_length": 1
+        },
+        "object_store_provider": {
+          "type": "string",
+          "min_length": 1
+        }
+      }
     },
     "VerifyEnvelope": {
       "kind": "object",

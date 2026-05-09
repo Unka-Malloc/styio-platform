@@ -17,9 +17,10 @@ Generated or third-party API description formats are not authoritative for
 ## Route Families
 
 The V1 package covers health, node introspection, hosted job lifecycle,
-worker-internal lifecycle, workgroup cluster registration, and mirror
-freshness/replay status. It is the route surface implemented by the C++
-`styio-platformd` kernel.
+worker-internal lifecycle, user-bound compile container registration and
+workspace switching, workgroup cluster registration, and mirror freshness/replay
+status. It is the route surface implemented by the C++ `styio-platformd`
+kernel.
 
 ## Implementation Target
 

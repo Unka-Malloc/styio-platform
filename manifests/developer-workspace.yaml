@@ -1,0 +1,92 @@
+id: developer-workspace
+kind: business-capability
+owner: platform-workspace
+description: User-bound cloud development workspaces, compile containers, hot switching, and hosted Styio build jobs.
+depends_on:
+  - platform-foundation
+integrates_with:
+  - package-registry
+split_policy:
+  extractable: true
+  extraction_shape: workspace-control-plane + worker-runtime + compile-container-adapter
+  base_must_remain_shared:
+    - platform-foundation
+cmake_targets:
+  - styio_platform_developer_workspace
+modules:
+  cpp:
+    - src/PlatformCloud/DeveloperWorkspace
+  service_routes:
+    - src/PlatformService/Router.cpp::BuildPlatformControlPlaneRoutes
+  stress_harness:
+    - src/PlatformCloud/DeveloperWorkspace/workspace_compile_stress
+  scripts:
+    - scripts/cloud-compile-stress.py
+protocols:
+  owned:
+    - contracts/platform-control-plane/v1
+  spio_platform_protocols:
+    - compile_plan
+    - cloud_execution_policy
+    - cloud_build_job_request
+    - worker_job_claim
+apis:
+  control_plane_base_path: /api/styio-platform/v1
+  operations:
+    - submitJob
+    - getJob
+    - cancelJob
+    - claimJob
+    - heartbeatJob
+    - completeJob
+    - registerWorker
+    - registerCompileContainer
+    - getCompileContainer
+    - switchCompileContainerWorkspace
+storage:
+  persistence:
+    - job_records
+    - job_events
+    - worker_records
+    - compile_container_records
+    - workgroup_cluster_records
+  object_store:
+    - compile_artifacts
+    - job_logs
+  cache:
+    - workspace_session_state
+    - local_compile_cache
+security:
+  user_bound: true
+  required_roles:
+    - worker
+    - operator
+  scopes:
+    - workspace:create
+    - workspace:use
+    - compile:submit
+    - compile:claim
+runtime:
+  factories:
+    - WorkerCompileContainerFactory
+    - WorkerWorkspaceFactory
+  adapters:
+    - PlatformCore/System/OperatingSystemAdapter
+  container_runtime_policy:
+    interface: planned
+    current_adapter: os_process_and_workspace_paths
+  workspace_hot_switch:
+    current_state: compile_container_workspace_binding
+    next_state: persisted_workspace_session_snapshot
+observability:
+  health:
+    - queue_depth
+    - worker_heartbeat
+    - compile_container_capacity
+tests:
+  unit:
+    - tests/unit/test_cloud_compile_stress.py
+  native:
+    - tests/native/PlatformKernelTests.cpp
+  contract:
+    - tests/interop/platform-control-plane-contract-gate.py

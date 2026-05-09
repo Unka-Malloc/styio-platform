@@ -75,13 +75,13 @@ bundle_dir="$OUTPUT_DIR/$bundle_name"
 archive_path="$OUTPUT_DIR/$bundle_name.tar.gz"
 
 rm -rf "$bundle_dir" "$archive_path"
-install -d "$bundle_dir/scripts" "$bundle_dir/src" "$bundle_dir/docs"
+install -d "$bundle_dir/scripts" "$bundle_dir/src/PlatformCloud" "$bundle_dir/docs"
 
 install -m 0755 scripts/deploy-registry-vm.sh "$bundle_dir/install.sh"
 install -m 0755 scripts/registry-v2-control-plane-server.py "$bundle_dir/scripts/registry-v2-control-plane-server.py"
 install -m 0755 scripts/registry-v2-static-read-server.py "$bundle_dir/scripts/registry-v2-static-read-server.py"
 install -m 0755 scripts/registry-v2-vm-smoke.py "$bundle_dir/scripts/registry-v2-vm-smoke.py"
-cp -R src/spio_registry_v2 "$bundle_dir/src/spio_registry_v2"
+cp -R src/PlatformCloud/PackageRegistry "$bundle_dir/src/PlatformCloud/PackageRegistry"
 cp docs/operations/Spio-Registry-Server-Runbook.md "$bundle_dir/docs/Spio-Registry-Server-Runbook.md"
 
 cat >"$bundle_dir/README.md" <<EOF

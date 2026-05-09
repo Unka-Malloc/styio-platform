@@ -15,11 +15,11 @@ from urllib.request import Request, urlopen
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+PACKAGE_REGISTRY = ROOT / "src" / "PlatformCloud" / "PackageRegistry"
+if str(PACKAGE_REGISTRY) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_REGISTRY))
 
-from spio_registry_v2 import initialize_registry_v2_root, verify_registry_root  # noqa: E402
+from package_registry_v2 import initialize_registry_v2_root, verify_registry_root  # noqa: E402
 
 
 def start_server(handler: type) -> tuple[ThreadingHTTPServer, threading.Thread]:
@@ -154,8 +154,10 @@ class RegistryVmDeployTests(unittest.TestCase):
                 f"{prefix}/scripts/registry-v2-control-plane-server.py",
                 f"{prefix}/scripts/registry-v2-static-read-server.py",
                 f"{prefix}/scripts/registry-v2-vm-smoke.py",
-                f"{prefix}/src/spio_registry_v2/__init__.py",
-                f"{prefix}/src/spio_registry_v2/publisher.py",
+                f"{prefix}/src/PlatformCloud/PackageRegistry/package_registry_v2/__init__.py",
+                f"{prefix}/src/PlatformCloud/PackageRegistry/package_registry_v2/publisher.py",
+                f"{prefix}/src/PlatformCloud/PackageRegistry/PublicationBuilder/package_registry_v2/publisher.py",
+                f"{prefix}/src/PlatformCloud/PackageRegistry/StaticReadPlane/package_registry_v2/validator.py",
             }
             self.assertTrue(required.issubset(names), sorted(required - names))
 

@@ -7,7 +7,8 @@
 #endif
 
 #include "PlatformService/Http.hpp"
-#include "PlatformService/Identity.hpp"
+#include "PlatformSecurity/PlatformClientAuth/Identity.hpp"
+#include "PlatformSecurity/PlatformCA/CertificateAuthority.hpp"
 #include "PlatformService/Router.hpp"
 
 #include <array>
@@ -312,7 +313,7 @@ HttpResponse DispatchRawRequest(
   {
     return {
         .status_code = 405,
-        .body = BadRequestBody("method must be GET or POST"),
+        .body = BadRequestBody("method must be GET, POST, or DELETE"),
     };
   }
 
@@ -353,15 +354,61 @@ std::string OpenSslErrorText()
   return buffer.data();
 }
 
+std::string PreferredCertificateRole(const PlatformConfig &config)
+{
+  for (const std::string &role : config.roles)
+  {
+    if (role == "control-plane")
+    {
+      return role;
+    }
+  }
+  return config.roles.empty() ? std::string("control-plane") : config.roles.front();
+}
+
+struct TlsMaterialPaths
+{
+  std::string ca_path;
+  std::string cert_path;
+  std::string key_path;
+};
+
+TlsMaterialPaths ResolveTlsMaterialPaths(const PlatformConfig &config)
+{
+  TlsMaterialPaths paths{
+      .ca_path = config.mtls.ca_path,
+      .cert_path = config.mtls.cert_path,
+      .key_path = config.mtls.key_path,
+  };
+  const bool no_explicit_paths = paths.ca_path.empty() && paths.cert_path.empty() && paths.key_path.empty();
+  if (config.mtls.auto_provision && no_explicit_paths)
+  {
+    PlatformCertificateAuthorityConfig ca_config;
+    ca_config.root_dir = config.mtls.ca_root;
+    const PlatformCertificateSubject subject = BuildPlatformNodeCertificateSubject(
+        PreferredCertificateRole(config),
+        config.workgroup.registration_tenant,
+        config.node_id);
+    const PlatformCertificateBundle bundle = EnsurePlatformMtlsCertificate(ca_config, subject);
+    paths.ca_path = bundle.ca_certificate_path.string();
+    paths.cert_path = bundle.certificate_path.string();
+    paths.key_path = bundle.private_key_path.string();
+    std::cerr << "styio-platformd provisioned managed mTLS certificate for " << bundle.identity_uri_san << "\n";
+  }
+  return paths;
+}
+
 std::unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)> BuildTlsContext(const PlatformConfig &config)
 {
-  if (config.mtls.cert_path.empty() || config.mtls.key_path.empty())
+  const TlsMaterialPaths tls_paths = ResolveTlsMaterialPaths(config);
+  if (tls_paths.cert_path.empty() || tls_paths.key_path.empty())
   {
-    throw std::runtime_error("TLS mode requires STYIO_PLATFORM_MTLS_CERT and STYIO_PLATFORM_MTLS_KEY");
+    throw std::runtime_error(
+        "TLS mode requires STYIO_PLATFORM_MTLS_CERT and STYIO_PLATFORM_MTLS_KEY, or STYIO_PLATFORM_MTLS_AUTO_PROVISION=1");
   }
-  if (config.mtls.required && config.mtls.ca_path.empty())
+  if (config.mtls.required && tls_paths.ca_path.empty())
   {
-    throw std::runtime_error("mTLS mode requires STYIO_PLATFORM_MTLS_CA");
+    throw std::runtime_error("mTLS mode requires STYIO_PLATFORM_MTLS_CA, or STYIO_PLATFORM_MTLS_AUTO_PROVISION=1");
   }
 
   SSL_library_init();
@@ -374,17 +421,17 @@ std::unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)> BuildTlsContext(const Platform
     throw std::runtime_error("failed to create TLS context: " + OpenSslErrorText());
   }
   SSL_CTX_set_min_proto_version(context.get(), TLS1_2_VERSION);
-  if (SSL_CTX_use_certificate_chain_file(context.get(), config.mtls.cert_path.c_str()) != 1)
+  if (SSL_CTX_use_certificate_chain_file(context.get(), tls_paths.cert_path.c_str()) != 1)
   {
     throw std::runtime_error("failed to load TLS certificate: " + OpenSslErrorText());
   }
-  if (SSL_CTX_use_PrivateKey_file(context.get(), config.mtls.key_path.c_str(), SSL_FILETYPE_PEM) != 1)
+  if (SSL_CTX_use_PrivateKey_file(context.get(), tls_paths.key_path.c_str(), SSL_FILETYPE_PEM) != 1)
   {
     throw std::runtime_error("failed to load TLS private key: " + OpenSslErrorText());
   }
-  if (!config.mtls.ca_path.empty())
+  if (!tls_paths.ca_path.empty())
   {
-    if (SSL_CTX_load_verify_locations(context.get(), config.mtls.ca_path.c_str(), nullptr) != 1)
+    if (SSL_CTX_load_verify_locations(context.get(), tls_paths.ca_path.c_str(), nullptr) != 1)
     {
       throw std::runtime_error("failed to load mTLS CA: " + OpenSslErrorText());
     }
@@ -623,7 +670,7 @@ http::response<http::string_body> DispatchHttpRequest(
   const std::optional<HttpMethod> method = ParseHttpMethod(std::string(request.method_string()));
   if (!method.has_value())
   {
-    return BuildHttpResponse(request, 405, BadRequestBody("method must be GET or POST"));
+    return BuildHttpResponse(request, 405, BadRequestBody("method must be GET, POST, or DELETE"));
   }
 
   nlohmann::json body = nlohmann::json::object();

@@ -68,6 +68,7 @@
   "submitJob": {
     "request": {
       "tenant_id": "tenant-demo",
+      "user_id": "user-demo",
       "workspace_id": "workspace-demo",
       "action": "build",
       "region": "local-dev",
@@ -102,6 +103,7 @@
       "payload": {
         "job_id": "job-demo",
         "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
         "workspace_id": "workspace-demo",
         "action": "build",
         "status": "queued",
@@ -142,6 +144,7 @@
       "payload": {
         "job_id": "job-demo",
         "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
         "workspace_id": "workspace-demo",
         "action": "build",
         "status": "running",
@@ -207,6 +210,7 @@
       "payload": {
         "job_id": "job-demo",
         "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
         "workspace_id": "workspace-demo",
         "action": "build",
         "status": "cancelled",
@@ -259,11 +263,128 @@
       }
     }
   },
+  "registerCompileContainer": {
+    "request": {
+      "container_id": "compile-container-demo",
+      "worker_id": "worker-local",
+      "tenant_id": "tenant-demo",
+      "user_id": "user-demo",
+      "workspace_id": "workspace-demo",
+      "region": "local-dev",
+      "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+      "capacity": 1
+    },
+    "success": {
+      "returncode": 0,
+      "message": "registered compile container",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "container_id": "compile-container-demo",
+        "worker_id": "worker-local",
+        "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
+        "current_workspace_id": "workspace-demo",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "status": "active",
+        "capacity": 1,
+        "workspace_generation": 1,
+        "created_at": "2026-04-24T00:00:00Z"
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "compile container registration rejected",
+      "stdout": "",
+      "stderr": "user_id is required",
+      "error_payload": {
+        "category": "ValidationError",
+        "detail": "user_id is required",
+        "operation_id": "registerCompileContainer"
+      }
+    }
+  },
+  "getCompileContainer": {
+    "request": null,
+    "success": {
+      "returncode": 0,
+      "message": "loaded compile container",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "container_id": "compile-container-demo",
+        "worker_id": "worker-local",
+        "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
+        "current_workspace_id": "workspace-demo",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "status": "active",
+        "capacity": 1,
+        "workspace_generation": 1,
+        "created_at": "2026-04-24T00:00:00Z"
+      }
+    },
+    "failure": {
+      "returncode": 17,
+      "message": "compile container lookup failed",
+      "stdout": "",
+      "stderr": "compile container not found",
+      "error_payload": {
+        "category": "NotFound",
+        "detail": "compile container not found",
+        "operation_id": "getCompileContainer"
+      }
+    }
+  },
+  "switchCompileContainerWorkspace": {
+    "request": {
+      "worker_id": "worker-local",
+      "tenant_id": "tenant-demo",
+      "user_id": "user-demo",
+      "workspace_id": "workspace-next",
+      "reason": "claimJob"
+    },
+    "success": {
+      "returncode": 0,
+      "message": "switched compile container workspace",
+      "stdout": "",
+      "stderr": "",
+      "payload": {
+        "container_id": "compile-container-demo",
+        "worker_id": "worker-local",
+        "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
+        "current_workspace_id": "workspace-next",
+        "region": "local-dev",
+        "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+        "status": "active",
+        "capacity": 1,
+        "workspace_generation": 2,
+        "created_at": "2026-04-24T00:00:00Z",
+        "last_switched_at": "2026-04-24T00:01:00Z",
+        "last_switch_reason": "claimJob"
+      }
+    },
+    "failure": {
+      "returncode": 2,
+      "message": "compile container workspace switch rejected",
+      "stdout": "",
+      "stderr": "user binding mismatch",
+      "error_payload": {
+        "category": "BindingError",
+        "detail": "user binding mismatch",
+        "operation_id": "switchCompileContainerWorkspace"
+      }
+    }
+  },
   "claimJob": {
     "request": {
       "worker_id": "worker-local",
       "worker_pool_key": "linux/x86_64/build/nightly/minimal",
-      "region": "local-dev"
+      "region": "local-dev",
+      "compile_container_id": "compile-container-demo"
     },
     "success": {
       "returncode": 0,
@@ -275,6 +396,7 @@
         "job": {
           "job_id": "job-demo",
           "tenant_id": "tenant-demo",
+          "user_id": "user-demo",
           "workspace_id": "workspace-demo",
           "action": "build",
           "status": "running",
@@ -292,6 +414,19 @@
               "requested_revision": "nightly-head"
             }
           }
+        },
+        "compile_container": {
+          "container_id": "compile-container-demo",
+          "worker_id": "worker-local",
+          "tenant_id": "tenant-demo",
+          "user_id": "user-demo",
+          "current_workspace_id": "workspace-demo",
+          "region": "local-dev",
+          "worker_pool_key": "linux/x86_64/build/nightly/minimal",
+          "status": "active",
+          "capacity": 1,
+          "workspace_generation": 1,
+          "created_at": "2026-04-24T00:00:00Z"
         }
       }
     },
@@ -320,6 +455,7 @@
       "payload": {
         "job_id": "job-demo",
         "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
         "workspace_id": "workspace-demo",
         "action": "build",
         "status": "running",
@@ -362,6 +498,7 @@
       "payload": {
         "job_id": "job-demo",
         "tenant_id": "tenant-demo",
+        "user_id": "user-demo",
         "workspace_id": "workspace-demo",
         "action": "build",
         "status": "succeeded",

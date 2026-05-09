@@ -2,7 +2,7 @@
 
 **Purpose:** Define the first-priority workspace design goal: Styio-by-default compilation with native C++/LLVM fallback and smooth mixed compile execution.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-05-09
 
 ## Mission
 
@@ -50,6 +50,19 @@ workspace run:
 The success condition is not merely that C++ can be compiled somewhere. The
 success condition is that mixed Styio/C++ compilation and execution remain
 smooth inside one workspace.
+
+## User-Bound Compile Containers
+
+Hosted compile containers are logical worker-side build environments bound to a
+single `tenant_id` and `user_id`. A bound container may hot-switch its current
+workspace when the next job for the same user targets a different
+`workspace_id`, but it must not accept jobs for another user.
+
+The control plane records the container's `current_workspace_id` and
+`workspace_generation`. Claiming a job with `compile_container_id` atomically
+filters queued work to the container's tenant/user binding and increments the
+workspace generation when a workspace switch is required. This preserves a warm
+compiler/toolchain process while keeping user isolation explicit.
 
 ## Ownership
 

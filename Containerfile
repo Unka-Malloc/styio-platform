@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 AS build-base
+FROM debian:trixie-slim AS build-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CMAKE_BUILD_PARALLEL_LEVEL=2
@@ -10,12 +10,12 @@ RUN apt-get update \
     cmake \
     curl \
     git \
-	    libboost-dev \
-	    libclang-18-dev \
-	    libcurl4-openssl-dev \
-	    libedit-dev \
-	    libpq-dev \
-	    libssl-dev \
+    libboost-dev \
+    libclang-18-dev \
+    libcurl4-openssl-dev \
+    libedit-dev \
+    libpq-dev \
+    libssl-dev \
     libzstd-dev \
     lld-18 \
     llvm-18-dev \
@@ -58,16 +58,16 @@ RUN cmake -S /src/styio-platform -B /tmp/platform-build -G Ninja \
   && mkdir -p /opt/styio-platform/bin \
   && cp /tmp/platform-build/bin/styio-platformd /opt/styio-platform/bin/styio-platformd
 
-FROM ubuntu:24.04 AS runtime
+FROM debian:trixie-slim AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-	    git \
-	    openssl \
-	    libpq5 \
+    git \
+    openssl \
+    libpq5 \
     python3 \
   && rm -rf /var/lib/apt/lists/*
 
@@ -75,10 +75,11 @@ COPY --from=platform-build /opt/styio-platform/bin/styio-platformd /usr/local/bi
 COPY --from=spio-build /opt/spio/bin/spio /usr/local/bin/spio
 COPY --from=styio-build /opt/styio/bin/styio /usr/local/bin/styio
 COPY scripts /opt/styio-platform/scripts
-COPY src/spio_registry_v2 /opt/styio-platform/src/spio_registry_v2
+COPY src/PlatformCloud/PackageRegistry /opt/styio-platform/src/PlatformCloud/PackageRegistry
+COPY src/PlatformCloud/DeveloperWorkspace/workspace_compile_stress /opt/styio-platform/src/PlatformCloud/DeveloperWorkspace/workspace_compile_stress
 
 ENV PATH="/usr/local/bin:${PATH}"
-ENV PYTHONPATH="/opt/styio-platform/src"
+ENV PYTHONPATH="/opt/styio-platform/src/PlatformCloud/PackageRegistry:/opt/styio-platform/src/PlatformCloud/DeveloperWorkspace"
 ENV STYIO_PLATFORM_WORKER_SPIO_BIN=/usr/local/bin/spio
 ENV STYIO_PLATFORM_WORKER_STYIO_BIN=/usr/local/bin/styio
 

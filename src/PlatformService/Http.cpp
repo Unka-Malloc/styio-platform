@@ -43,6 +43,8 @@ std::string ToString(HttpMethod method)
       return "GET";
     case HttpMethod::Post:
       return "POST";
+    case HttpMethod::Delete:
+      return "DELETE";
   }
   return "GET";
 }
@@ -56,6 +58,10 @@ std::optional<HttpMethod> ParseHttpMethod(std::string_view method)
   if (method == "POST")
   {
     return HttpMethod::Post;
+  }
+  if (method == "DELETE")
+  {
+    return HttpMethod::Delete;
   }
   return std::nullopt;
 }

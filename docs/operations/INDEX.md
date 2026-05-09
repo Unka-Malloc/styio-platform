@@ -10,6 +10,6 @@
 
 | Path | Entry | Summary |
 |------|-------|---------|
+| `Platform-Cloud-Compile-Stress-Runbook.md` | [Platform Cloud Compile Stress Runbook](./Platform-Cloud-Compile-Stress-Runbook.md) | Provide the executable procedure for running the public multi-tenant compile-cloud stress framework and interpreting its JSON/JSONL output. |
 | `Platform-Regional-Node-Runbook.md` | [Platform Regional Node Runbook](./Platform-Regional-Node-Runbook.md) | Define the operating expectations for multi-region and cross-network styio-platform deployment nodes. |
-| `Spio-Cloud-Compile-Stress-Runbook.md` | [Spio Cloud Compile Stress Runbook](./Spio-Cloud-Compile-Stress-Runbook.md) | Provide the executable procedure for running the public multi-tenant compile-cloud stress framework and interpreting its JSON/JSONL output. |
 | `Spio-Registry-Server-Runbook.md` | [Spio Registry Origin Runbook](./Spio-Registry-Server-Runbook.md) | Provide the executable validation and deployment procedure for a shared spio registry v2 origin without mixing it with client cache behavior or hosted publish-service policy. |
