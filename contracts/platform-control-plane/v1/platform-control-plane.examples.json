@@ -891,7 +891,7 @@
       "release_id": "v0.1.0",
       "version": "v0.1.0",
       "components": {
-        "styio-view": "v0.1.1-view"
+        "vityo-nightly": "v0.1.1-vityo"
       }
     },
     "success": {

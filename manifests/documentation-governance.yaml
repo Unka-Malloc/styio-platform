@@ -39,7 +39,7 @@ ecosystem_repositories:
   managed:
     - styio
     - styio-spio
-    - styio-view
+    - vityo-nightly
     - styio-platform
     - styio-community
   branch_policy:

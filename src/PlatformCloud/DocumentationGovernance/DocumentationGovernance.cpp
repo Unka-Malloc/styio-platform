@@ -128,7 +128,7 @@ std::vector<nlohmann::json> EcosystemDocsBoundaries()
   return {
       DocsBoundary("styio", "language-and-compiler", {"language reference", "compiler behavior", "standard library"}),
       DocsBoundary("styio-spio", "package-manager", {"CLI usage", "package resolution", "registry client behavior"}),
-      DocsBoundary("styio-view", "product-experience", {"hosted workspace UX", "control console flows", "frontend contract usage"}),
+      DocsBoundary("vityo-nightly", "product-experience", {"hosted workspace UX", "control console flows", "frontend contract usage"}),
       DocsBoundary("styio-platform", "platform-foundation", {"control-plane contracts", "package registry", "cloud workspaces", "operations"}),
       DocsBoundary("styio-community", "community", {"tutorials", "examples", "public ecosystem guides"}),
   };

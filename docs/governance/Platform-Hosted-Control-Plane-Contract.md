@@ -1,6 +1,6 @@
 # Platform Hosted Control-Plane Contract
 
-**Purpose:** Freeze the frontend/backend HTTP contract used by hosted workspaces so `styio-view`, the platform control console, and backend services can develop independently against a versioned native JSON package.
+**Purpose:** Freeze the frontend/backend HTTP contract used by hosted workspaces so `vityo-nightly`, the platform control console, and backend services can develop independently against a versioned native JSON package.
 
 **Last updated:** 2026-04-24
 

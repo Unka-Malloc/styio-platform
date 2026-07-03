@@ -194,7 +194,7 @@
       "workspace": {
         "workspaceId": "demo-workspace",
         "schemaVersion": "1",
-        "ownerRef": "styio-view",
+        "ownerRef": "vityo-nightly",
         "status": "active",
         "entryUrl": "https://hosted.example.test/workspaces/demo-workspace",
         "createdAt": "2026-04-21T00:00:00Z",
@@ -278,7 +278,7 @@
       "workspace": {
         "workspaceId": "demo-workspace",
         "schemaVersion": "1",
-        "ownerRef": "styio-view",
+        "ownerRef": "vityo-nightly",
         "status": "active",
         "entryUrl": "https://hosted.example.test/workspaces/demo-workspace",
         "createdAt": "2026-04-21T00:00:00Z",

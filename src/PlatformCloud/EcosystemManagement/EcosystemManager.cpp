@@ -52,13 +52,13 @@ std::vector<nlohmann::json> RepositoryList()
           {"registry-v2/v1", "compile-plan/v1"},
           {"build", "native-test", "registry-interop"}),
       Repository(
-          "styio-view",
-          "https://github.com/eBioRing/styio-view.git",
+          "vityo-nightly",
+          "https://github.com/Unka-Malloc/vityo-nightly.git",
           "frontend",
-          "node-web",
-          {"web-console-bundle", "desktop-shell-bundle"},
+          "flutter-app",
+          {"vityo-app-bundle", "desktop-shell-bundle"},
           {"hosted-control-plane/v1", "platform-control-plane/v1"},
-          {"install", "lint", "test", "web-build"}),
+          {"install", "flutter-analyze", "flutter-test", "web-build"}),
       Repository(
           "styio-platform",
           "https://github.com/eBioRing/styio-platform.git",

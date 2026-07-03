@@ -1241,13 +1241,13 @@ TEST(PlatformEcosystemManagementTests, ListsRepositoriesAndPlansStableRelease)
       {
           {"release_id", "v0.1.0"},
           {"version", "v0.1.0"},
-          {"components", {{"styio-view", "v0.1.1-view"}}},
+          {"components", {{"vityo-nightly", "v0.1.1-vityo"}}},
       }));
   ASSERT_EQ(plan.status_code, 200);
   EXPECT_EQ(plan.body.at("payload").at("branch").get<std::string>(), "stable");
   ASSERT_EQ(plan.body.at("payload").at("execution_plan").size(), 5U);
-  EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(2).at("repository_id").get<std::string>(), "styio-view");
-  EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(2).at("fetch").at("ref").get<std::string>(), "v0.1.1-view");
+  EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(2).at("repository_id").get<std::string>(), "vityo-nightly");
+  EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(2).at("fetch").at("ref").get<std::string>(), "v0.1.1-vityo");
   EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(3).at("fetch").at("ref").get<std::string>(), "v0.1.0");
 
   const spio::platform::HttpResponse invalid = router.Dispatch(RequestWithIdentity(

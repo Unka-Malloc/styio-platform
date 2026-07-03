@@ -22,7 +22,7 @@ repositories:
   managed:
     - styio
     - styio-spio
-    - styio-view
+    - vityo-nightly
     - styio-platform
     - styio-community
   branch_policy:
@@ -31,7 +31,7 @@ repositories:
 runtime_adapters:
   - cmake-native
   - cmake-server
-  - node-web
+  - flutter-app
   - static-docs
 apis:
   control_plane_base_path: /api/styio-platform/v1
