@@ -128,6 +128,6 @@ changes local package-manager behavior.
 ## Handoff / Recovery
 
 If a server contract cannot move yet, keep a temporary `styio-spio` reference
-and record the platform-side blocker in `docs/planning/Platform-Migration-Plan.md`.
+and record the platform-side blocker in `docs/plan/repository-delivery-convergence/Evidence.md`.
 If a regional node or mirror sync contract is not executable yet, keep the
 documented contract here and record the missing gate before claiming cutover.

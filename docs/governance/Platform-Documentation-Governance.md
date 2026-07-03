@@ -36,7 +36,7 @@ surface:
 | `docs/security/` | Platform Security | Trust-boundary documentation |
 | `docs/specs/` | Docs Delivery | Repository-wide process specifications |
 | `docs/adr/` | Architecture | Decision records |
-| `docs/planning/` | Platform Kernel | Roadmap items and migration plans |
+| `docs/plan/` | Platform Kernel | Roadmap items and migration plans |
 | `docs/external/` | Docs Delivery | Downstream handoff material |
 | `docs/assets/` | Docs Delivery | Workflow templates and reusable gate docs |
 | `docs/teams/` | Docs Delivery | Ownership and recovery runbooks |

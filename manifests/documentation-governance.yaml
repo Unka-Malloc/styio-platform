@@ -30,7 +30,7 @@ documentation_domains:
     - docs/security
     - docs/specs
     - docs/adr
-    - docs/planning
+    - docs/plan
     - docs/external
     - docs/assets
     - docs/teams

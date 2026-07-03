@@ -1,0 +1,169 @@
+[
+  {
+    "id": "f5b71a4a-8c68-49dd-abfa-882fa978851e",
+    "status": "completed",
+    "role": "product_requirements",
+    "prerequisites": [],
+    "platform": "windows",
+    "difficulty": "deep",
+    "goal": "Define the current delivery contract for Styio Cloud Nightly planning convergence.",
+    "description": "Scope: docs/plan/repository-delivery-convergence/Requirements.md and the repository planning root. Context: prior planning material existed in multiple planning roots or plan-named files, so maintainers lacked one current Better Plan contract. Target: REQ-001 through REQ-005 define one final planning structure under docs/plan. Design Considerations: use stable requirement labels and keep product implementation completion separate from plan refactoring. Design Value: a single labeled contract keeps later implementation and validation traceable. Constraints & Risks: do not claim product work is complete only because the planning format is current.",
+    "acceptance_criteria": [
+      {
+        "checked": true,
+        "text": "Requirements.md exists and defines REQ-001 through REQ-005 for the current planning workspace."
+      }
+    ],
+    "commit": {
+      "repository": ".git",
+      "message": "Define planning convergence requirements",
+      "target": "docs/plan/repository-delivery-convergence/Requirements.md"
+    },
+    "next": [
+      "665bb704-c061-400b-be5f-f08da6ff0cf6"
+    ]
+  },
+  {
+    "id": "665bb704-c061-400b-be5f-f08da6ff0cf6",
+    "status": "completed",
+    "role": "evidence",
+    "prerequisites": [
+      "f5b71a4a-8c68-49dd-abfa-882fa978851e"
+    ],
+    "platform": "windows",
+    "difficulty": "deep",
+    "goal": "Record source evidence and open-work signals for Styio Cloud Nightly.",
+    "description": "Scope: docs/plan/repository-delivery-convergence/Evidence.md and imported planning-source inventory. Context: old plan files had to be removed as active sources while their useful delivery signals still needed traceability. Target: REQ-001 and REQ-003 are backed by a source inventory and open-work signal ledger. Design Considerations: record source summaries and signal locations instead of copying old plan prose into a second long-lived source. Design Value: reviewers can see what was consolidated without reintroducing old planning roots. Constraints & Risks: extracted signals are evidence for planning status, not proof that the underlying product work is complete.",
+    "acceptance_criteria": [
+      {
+        "checked": true,
+        "text": "Evidence.md lists imported planning sources and open-work signals derived from current repository files."
+      }
+    ],
+    "commit": {
+      "repository": ".git",
+      "message": "Record planning source evidence",
+      "target": "docs/plan/repository-delivery-convergence/Evidence.md"
+    },
+    "next": [
+      "99445201-076c-4ef9-b28e-297e6bc4270d"
+    ]
+  },
+  {
+    "id": "99445201-076c-4ef9-b28e-297e6bc4270d",
+    "status": "completed",
+    "role": "validation_matrix",
+    "prerequisites": [
+      "f5b71a4a-8c68-49dd-abfa-882fa978851e",
+      "665bb704-c061-400b-be5f-f08da6ff0cf6"
+    ],
+    "platform": "windows",
+    "difficulty": "deep",
+    "goal": "Map Styio Cloud Nightly planning requirements to concrete checks.",
+    "description": "Scope: docs/plan/repository-delivery-convergence/Validation.md and final validation acceptance criteria. Context: Better Plan requires validation targets before implementation claims. Target: REQ-001 through REQ-005 each have an explicit check. Design Considerations: use manifest validation, search evidence, and source-inventory inspection rather than informal review. Design Value: validation remains repeatable for future agents and maintainers. Constraints & Risks: final validation must not be treated as complete until repository-level searches and manifest validation are run.",
+    "acceptance_criteria": [
+      {
+        "checked": true,
+        "text": "Validation.md maps every requirement label to a concrete check."
+      }
+    ],
+    "commit": {
+      "repository": ".git",
+      "message": "Map planning validation checks",
+      "target": "docs/plan/repository-delivery-convergence/Validation.md"
+    },
+    "next": [
+      "e5ee21eb-9cf2-4f09-9640-59e93429d564"
+    ]
+  },
+  {
+    "id": "e5ee21eb-9cf2-4f09-9640-59e93429d564",
+    "status": "completed",
+    "role": "architecture_scaffold",
+    "prerequisites": [
+      "f5b71a4a-8c68-49dd-abfa-882fa978851e",
+      "665bb704-c061-400b-be5f-f08da6ff0cf6",
+      "99445201-076c-4ef9-b28e-297e6bc4270d"
+    ],
+    "platform": "windows",
+    "difficulty": "high",
+    "goal": "Establish the Styio Cloud Nightly Better Plan workspace architecture.",
+    "description": "Scope: docs/plan/README.md, docs/plan/Manifest.json, and docs/plan/repository-delivery-convergence/Architecture.md. Context: the repository needs one machine-readable planning root with plan-local artifacts. Target: REQ-002 and REQ-004 are represented by a Manifest-only root and one dedicated plan directory. Design Considerations: keep root navigation thin, keep execution detail in Checkpoints.json, and organize by repository delivery responsibility and validation target. Design Value: this avoids duplicate plan roots and keeps state-machine validation cheap. Constraints & Risks: do not add marker files or alternate planning directories to identify the workspace.",
+    "acceptance_criteria": [
+      {
+        "checked": true,
+        "text": "Architecture.md describes the docs/plan workspace boundary and artifact ownership."
+      }
+    ],
+    "commit": {
+      "repository": ".git",
+      "message": "Establish planning workspace architecture",
+      "target": "docs/plan docs/plan/repository-delivery-convergence/Architecture.md"
+    },
+    "next": [
+      "445d6cc7-ebfc-46cc-ba6c-5333128000b6"
+    ]
+  },
+  {
+    "id": "445d6cc7-ebfc-46cc-ba6c-5333128000b6",
+    "status": "in_progress",
+    "role": "implementation",
+    "prerequisites": [
+      "f5b71a4a-8c68-49dd-abfa-882fa978851e",
+      "665bb704-c061-400b-be5f-f08da6ff0cf6",
+      "99445201-076c-4ef9-b28e-297e6bc4270d",
+      "e5ee21eb-9cf2-4f09-9640-59e93429d564"
+    ],
+    "platform": "windows",
+    "difficulty": "high",
+    "goal": "Close extracted open work for Docs/plan/styio Cloud Migration Plan Md:16.",
+    "description": "Scope: Evidence.md source `docs/plan/Styio-Cloud-Migration-Plan.md:16` and the repository code, tests, contracts, or docs referenced by its open-work signals. Context: the previous planning source recorded unresolved or uncertain work that must now be tracked only through docs/plan. Target: each extracted signal is either delivered with validation evidence or explicitly skipped with rationale in the current Better Plan graph. Design Considerations: follow existing repository boundaries and avoid restoring old planning roots or compatibility-era task lists. Design Value: source-specific implementation nodes make unclosed work reviewable without preserving stale plan documents. Constraints & Risks: do not mark this node completed until every acceptance item has direct evidence.",
+    "acceptance_criteria": [
+      {
+        "checked": false,
+        "text": "Close or explicitly skip extracted open-work signal `docs/plan/Styio-Cloud-Migration-Plan.md:16: `pafio` remains the local-first package-manager client. It must keep` with code, documentation, and validation evidence."
+      }
+    ],
+    "commit": {
+      "repository": ".git",
+      "message": "Close Docs/plan/styio Cloud Migration Plan Md:16 open work",
+      "target": "docs/plan repository sources"
+    },
+    "next": [
+      "7cad10aa-7b44-4c17-9fd2-04c2d1d26573"
+    ]
+  },
+  {
+    "id": "7cad10aa-7b44-4c17-9fd2-04c2d1d26573",
+    "status": "pending",
+    "role": "final_validation",
+    "prerequisites": [
+      "445d6cc7-ebfc-46cc-ba6c-5333128000b6",
+      "99445201-076c-4ef9-b28e-297e6bc4270d"
+    ],
+    "platform": "windows",
+    "difficulty": "high",
+    "goal": "Validate repository delivery convergence after extracted work closes.",
+    "description": "Scope: docs/plan Manifest.json, Checkpoints.json, Evidence.md, repository search results, and validation commands. Context: final validation must prove the Better Plan workspace remains the only current planning root and all extracted source-specific work has closure evidence. Target: REQ-001 through REQ-005 are proven by manifest validation, audit gate evidence, and completed implementation nodes. Design Considerations: run the same checks used by styio-audit Better Plan policy and project-local gates relevant to touched code. Design Value: final validation ties planning structure to actual closure evidence instead of treating formatting as delivery. Constraints & Risks: do not complete this node while any source-specific implementation node remains pending or in_progress.",
+    "acceptance_criteria": [
+      {
+        "checked": false,
+        "text": "manifest_tool.py validate docs/plan passes."
+      },
+      {
+        "checked": false,
+        "text": "styio-audit Better Plan policy reports zero findings for this repository."
+      },
+      {
+        "checked": false,
+        "text": "All source-specific implementation nodes are completed or intentionally skipped with evidence."
+      }
+    ],
+    "commit": {
+      "repository": ".git",
+      "message": "Validate delivery convergence",
+      "target": "docs/plan"
+    },
+    "next": []
+  }
+]

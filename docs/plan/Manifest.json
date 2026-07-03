@@ -1,0 +1,18 @@
+[
+  {
+    "id": "86da7002-dfef-4a20-a4c8-4367f96fcbfd",
+    "status": "in_progress",
+    "title": "Styio Cloud Nightly Repository Delivery Convergence",
+    "directory": "repository-delivery-convergence",
+    "source_files": [
+      "docs/plan/repository-delivery-convergence/Requirements.md",
+      "docs/plan/repository-delivery-convergence/Evidence.md",
+      "docs/plan/repository-delivery-convergence/Validation.md",
+      "docs/plan/repository-delivery-convergence/Architecture.md",
+      "docs/plan/repository-delivery-convergence/Source-Material.md"
+    ],
+    "goal": "Keep Unka-Malloc/styio-cloud-nightly planning under one Better Plan workspace rooted at docs/plan.",
+    "description": "Current planning workspace for Unka-Malloc/styio-cloud-nightly; executable scope and validation live in repository-delivery-convergence/Checkpoints.json.",
+    "checkpoints": "repository-delivery-convergence/Checkpoints.json"
+  }
+]

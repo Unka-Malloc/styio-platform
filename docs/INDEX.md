@@ -16,7 +16,7 @@
 | `external/` | [External Docs Index](./external/INDEX.md) | Track upstream and downstream handoff documents for the platform repository. |
 | `governance/` | [Governance Index](./governance/INDEX.md) | Publish normative platform contracts, ownership rules, workspace compile rules, and service-boundary policy. |
 | `operations/` | [Operations Index](./operations/INDEX.md) | Provide runbooks for running, validating, and recovering platform service surfaces. |
-| `planning/` | [Planning Index](./planning/INDEX.md) | Track staged platform migration plans and future service-boundary work. |
+| `planning/` | [Planning Index](./plan/repository-delivery-convergence/Evidence.md) | Track staged platform migration plans and future service-boundary work. |
 | `registry/` | [Registry Index](./registry/INDEX.md) | Own package repository distribution, registry server, registry control-plane, and mirror synchronization documentation for platform-hosted package services. |
 | `security/` | [Security Index](./security/INDEX.md) | Document platform security boundaries for hosted workspaces, registry control planes, and cloud execution lanes. |
 | `specs/` | [Specs Index](./specs/INDEX.md) | Keep cross-cutting platform delivery specs, audit rules, and post-push workflow requirements. |

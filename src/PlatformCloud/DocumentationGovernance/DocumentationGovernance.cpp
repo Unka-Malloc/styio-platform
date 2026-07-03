@@ -79,7 +79,7 @@ std::vector<DocumentationCollection> CollectionList()
        {"architecture decisions", "migration rationale"},
        {"docs-index", "docs-audit"}},
       {"planning",
-       "docs/planning",
+       "docs/plan",
        "platform-kernel",
        "planning",
        {"migration plans", "roadmap items"},

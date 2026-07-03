@@ -77,4 +77,4 @@ server-side checks and `styio-spio` has client-only compatibility coverage.
 ## Handoff / Recovery
 
 When a platform migration fails, keep `styio-spio` compatibility shims in place
-and record the missing platform gate in `docs/planning/`.
+and record the missing platform gate in `docs/plan/`.
