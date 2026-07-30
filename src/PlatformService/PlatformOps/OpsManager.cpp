@@ -1,6 +1,6 @@
 #include "PlatformService/PlatformOps/OpsManager.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 bool PlatformRateLimiter::Allow(
@@ -63,5 +63,5 @@ nlohmann::json PlatformRequestMetrics::Snapshot() const
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform
 

@@ -8,7 +8,7 @@
 
 #include "PlatformCore/Core/Process.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 // Raw TCP request used by workers and test adapters. Callers provide a complete
@@ -32,11 +32,11 @@ public:
   virtual void CreateDirectories(const std::filesystem::path &path) const = 0;
   virtual void RemoveAll(const std::filesystem::path &path) const = 0;
   virtual void WriteTextFile(const std::filesystem::path &path, std::string_view text) const = 0;
-  virtual spio::ProcessResult RunProcess(const spio::ProcessRequest &request) const = 0;
+  virtual pafio::ProcessResult RunProcess(const pafio::ProcessRequest &request) const = 0;
   virtual std::string SendTcpRequest(const TcpRequest &request) const = 0;
   virtual void SleepFor(std::chrono::milliseconds duration) const = 0;
 };
 
 const OperatingSystemAdapter &DefaultOperatingSystemAdapter();
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

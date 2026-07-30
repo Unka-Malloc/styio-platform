@@ -3,7 +3,7 @@
 #include <array>
 #include <stdexcept>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -103,5 +103,5 @@ nlohmann::json SerializeExternalIdentityRecord(const ExternalIdentityRecord &rec
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform
 

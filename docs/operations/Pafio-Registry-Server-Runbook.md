@@ -1,6 +1,6 @@
-# Spio Registry Origin Runbook
+# Pafio Registry Origin Runbook
 
-**Purpose:** Provide the executable validation and deployment procedure for a shared `spio` registry `v2` origin without mixing it with client cache behavior or hosted publish-service policy.
+**Purpose:** Provide the executable validation and deployment procedure for a shared `pafio` registry `v2` origin without mixing it with client cache behavior or hosted publish-service policy.
 
 **Last updated:** 2026-05-02
 
@@ -13,19 +13,19 @@ This runbook owns:
 - deployment checklist for the current registry `v2` static root and publish-control-plane boundary
 - hosted registry and mirror service validation in `styio-platform`
 
-Server policy lives in [../registry/Spio-Registry-Control-Plane-Contract.md](../registry/Spio-Registry-Control-Plane-Contract.md) and [../registry/Spio-Registry-V2-Publish-Control-Plane.md](../registry/Spio-Registry-V2-Publish-Control-Plane.md). Deployment baseline still lives in [../registry/Spio-Registry-Deployment-Baseline.md](../registry/Spio-Registry-Deployment-Baseline.md).
+Server policy lives in [../registry/Pafio-Registry-Control-Plane-Contract.md](../registry/Pafio-Registry-Control-Plane-Contract.md) and [../registry/Pafio-Registry-V2-Publish-Control-Plane.md](../registry/Pafio-Registry-V2-Publish-Control-Plane.md). Deployment baseline still lives in [../registry/Pafio-Registry-Deployment-Baseline.md](../registry/Pafio-Registry-Deployment-Baseline.md).
 
-`styio-spio` remains the offline-capable local package manager. This runbook
+`pafio-nightly` remains the offline-capable local package manager. This runbook
 must not require client cache, vendored, or imported packages to contact a
 platform mirror before they can be used locally.
 
 ## 2. Preconditions
 
-- native `spio` binary is buildable locally
+- native `pafio` binary is buildable locally
 - target registry root already exposes the canonical shared layout
 - if publish and fetch roots are split, replication or synchronization is already configured between them
 - Linux VM deployments use Python 3, OpenSSL, and systemd
-- manifest-based publish requests on the server need a local `spio` binary path; archive-based publish requests can run without one
+- manifest-based publish requests on the server need a local `pafio` binary path; archive-based publish requests can run without one
 
 Recommended local build entry:
 
@@ -63,11 +63,11 @@ Safe default binds:
 - control plane: `127.0.0.1:8787`
 - read plane: `0.0.0.0:8788`
 
-Use these flags when the VM has a non-default `spio` binary or a different
+Use these flags when the VM has a non-default `pafio` binary or a different
 network policy:
 
 ```text
-sudo ./install.sh --spio-bin /opt/spio/bin/spio --control-bind 127.0.0.1 --read-bind 0.0.0.0
+sudo ./install.sh --pafio-bin /opt/pafio/bin/pafio --control-bind 127.0.0.1 --read-bind 0.0.0.0
 ```
 
 The installer initializes an empty but valid registry root before starting the
@@ -98,7 +98,7 @@ before exposing it outside the host.
 Use this when one origin handles both publish and fetch:
 
 ```text
-./scripts/registry-server-gate.py --registry-root https://registry.example.internal --spio-bin ./build-codex/bin/spio --json
+./scripts/registry-server-gate.py --registry-root https://registry.example.internal --pafio-bin ./build-codex/bin/pafio --json
 ```
 
 What it proves:
@@ -111,13 +111,13 @@ What it proves:
 If the write origin sits behind an upload gateway that expects fixed headers, pass them explicitly:
 
 ```text
-./scripts/registry-server-gate.py --registry-root https://registry-upload.example.internal --publish-header 'X-Spio-Write-Token: dev-token' --spio-bin ./build-codex/bin/spio --json
+./scripts/registry-server-gate.py --registry-root https://registry-upload.example.internal --publish-header 'X-Pafio-Write-Token: dev-token' --pafio-bin ./build-codex/bin/pafio --json
 ```
 
 If the deployment links a private security module and the write-origin rules should live in a reusable file instead of command-line headers:
 
 ```text
-./scripts/registry-server-gate.py --registry-root https://registry-upload.example.internal --publish-policy-file /etc/spio/publish-policy.toml --spio-bin ./build-codex/bin/spio --json
+./scripts/registry-server-gate.py --registry-root https://registry-upload.example.internal --publish-policy-file /etc/pafio/publish-policy.toml --pafio-bin ./build-codex/bin/pafio --json
 ```
 
 ## 5. Split Publish and Fetch Origins
@@ -125,7 +125,7 @@ If the deployment links a private security module and the write-origin rules sho
 Use this when write traffic goes to an upload origin and read traffic goes to a download origin or CDN:
 
 ```text
-./scripts/registry-server-gate.py --publish-root https://registry-upload.example.internal --fetch-root https://registry.example.internal --sync-timeout-seconds 30 --spio-bin ./build-codex/bin/spio --json
+./scripts/registry-server-gate.py --publish-root https://registry-upload.example.internal --fetch-root https://registry.example.internal --sync-timeout-seconds 30 --pafio-bin ./build-codex/bin/pafio --json
 ```
 
 Notes:
@@ -139,13 +139,13 @@ Notes:
 Use this when the write root and read root are backed by different local serving roots or mounted storage views:
 
 ```text
-./scripts/registry-promote.py --source-root /srv/spio/upload-root --dest-root /srv/spio/read-root --json
+./scripts/registry-promote.py --source-root /srv/pafio/upload-root --dest-root /srv/pafio/read-root --json
 ```
 
 Scoped promotion is also supported:
 
 ```text
-./scripts/registry-promote.py --source-root /srv/spio/upload-root --dest-root /srv/spio/read-root --package acme/util --version 0.2.0 --json
+./scripts/registry-promote.py --source-root /srv/pafio/upload-root --dest-root /srv/pafio/read-root --package acme/util --version 0.2.0 --json
 ```
 
 What it proves:
@@ -160,7 +160,7 @@ What it proves:
 The repository black-box gate for the recommended upload/download split is:
 
 ```text
-bash ./tests/interop/registry-split-origin-promotion.sh ./build-codex/bin/spio
+bash ./tests/interop/registry-split-origin-promotion.sh ./build-codex/bin/pafio
 ```
 
 This validates `publish -> promote -> fetch`.
@@ -170,7 +170,7 @@ This validates `publish -> promote -> fetch`.
 The repository also ships a closer deployment-shape smoke test:
 
 ```text
-bash ./tests/interop/registry-split-origin-http.sh ./build-codex/bin/spio
+bash ./tests/interop/registry-split-origin-http.sh ./build-codex/bin/pafio
 ```
 
 This validates:
@@ -187,7 +187,7 @@ Use this when you want to rehearse the recommended "internal upload origin plus 
 The repository black-box gate uses the local immutable test server:
 
 ```text
-bash ./tests/interop/registry-server-gate.sh ./build-codex/bin/spio
+bash ./tests/interop/registry-server-gate.sh ./build-codex/bin/pafio
 ```
 
 Use this before touching a real shared registry.

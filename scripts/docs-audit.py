@@ -18,7 +18,7 @@ REQUIRED_COLLECTION_DIRS = [
     DOCS / "assets" / "workflow",
     DOCS / "governance",
     DOCS / "operations",
-    DOCS / "planning",
+    DOCS / "plan",
     DOCS / "registry",
     DOCS / "security",
     DOCS / "specs",

@@ -21,7 +21,8 @@ import sys
 if str(PACKAGE_REGISTRY) not in sys.path:
     sys.path.insert(0, str(PACKAGE_REGISTRY))
 
-from package_registry_v2 import publish_to_registry_v2, validate_publish_archive_bytes, verify_registry_root  # noqa: E402
+from PublicationBuilder.package_registry_v2 import publish_to_registry_v2, validate_publish_archive_bytes  # noqa: E402
+from StaticReadPlane.package_registry_v2 import verify_registry_root  # noqa: E402
 from package_registry_v2.common import RegistryV2Error  # noqa: E402
 
 

@@ -1,8 +1,8 @@
 add_library(styio_platform_build_config INTERFACE)
 target_include_directories(styio_platform_build_config INTERFACE "${CMAKE_SOURCE_DIR}/src")
 target_compile_definitions(styio_platform_build_config INTERFACE
-  "SPIO_PROJECT_ROOT=\"${CMAKE_SOURCE_DIR}\""
-  "SPIO_PROJECT_VERSION=\"${PROJECT_VERSION}-platform-dev\""
+  "PAFIO_PROJECT_ROOT=\"${CMAKE_SOURCE_DIR}\""
+  "PAFIO_PROJECT_VERSION=\"${PROJECT_VERSION}-platform-dev\""
   "STYIO_PLATFORM_PROJECT_ROOT=\"${CMAKE_SOURCE_DIR}\""
 )
 target_link_libraries(styio_platform_build_config INTERFACE tomlplusplus::tomlplusplus nlohmann_json::nlohmann_json)

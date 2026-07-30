@@ -1,6 +1,6 @@
 # ADR
 
-**Purpose:** Record platform boundary decisions inherited from `styio-spio` and new decisions made inside `styio-platform`.
+**Purpose:** Record Platform-owned hosted execution, registry, storage, security, and service-boundary decisions.
 
 **Last updated:** 2026-07-30
 

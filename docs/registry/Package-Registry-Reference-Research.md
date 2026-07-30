@@ -124,7 +124,7 @@ Styio mapping:
 | package file | Styio package artifact |
 | `.sig` | release signature / trust metadata |
 | mirrorlist | registry mirror descriptor |
-| `pacman -Sy` metadata refresh | `spio` registry index refresh |
+| `pacman -Sy` metadata refresh | `pafio` registry index refresh |
 
 ## Target Styio Architecture
 
@@ -166,7 +166,7 @@ The registry is a modular monolith with four explicit package-registry layers:
 | `MirrorSync` | `PackageRegistry/MirrorSync` consumes the origin distribution pointer, copies the referenced publication, verifies the snapshot, and only then switches the local current pointer. |
 
 The default repository and distribution are both named `default`. The root
-registry layout remains compatible with old registry v2 clients:
+registry layout is the stable registry v2 read contract consumed by Pafio:
 
 ```text
 config.json
@@ -222,7 +222,7 @@ This creates a useful failure boundary:
 |---|---:|---|---|
 | ControlPlane | yes | publishers, CI, operators | new publish/admin work stops |
 | PublicationBuilder | yes, internal | registry backend | new snapshots stop |
-| StaticReadPlane | no | `spio`, workspaces, mirrors | existing packages keep downloading |
+| StaticReadPlane | no | `pafio`, workspaces, mirrors | existing packages keep downloading |
 | MirrorSync | pointer/copy state | mirror operators | mirrors may lag but remain readable |
 
 ## Decisions For styio-platform
@@ -235,8 +235,8 @@ This creates a useful failure boundary:
   and trust metadata.
 - Treat `MirrorSync` as a consumer of published snapshots, not as a second
   publisher.
-- Keep compatibility facade imports for current scripts while moving
-  implementation code into layered directories.
+- Import publication and verification behavior directly from the owning
+  `PublicationBuilder` and `StaticReadPlane` modules.
 
 ## Sources
 

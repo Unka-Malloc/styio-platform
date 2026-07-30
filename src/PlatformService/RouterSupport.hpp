@@ -22,7 +22,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -294,4 +294,4 @@ RequestSubject(const HttpRequest &request) {
 
 }  // namespace
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -101,7 +101,7 @@ Container and job events add tenant, container, job, status, and latency fields 
 
 ## When To Run
 
-Run `spio_cloud_compile_stress_gate` when changing:
+Run `pafio_cloud_compile_stress_gate` when changing:
 
 - hosted control-plane execution routing
 - Platform worker-pool selection

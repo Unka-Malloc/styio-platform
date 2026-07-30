@@ -1,7 +1,7 @@
 #include "PlatformCloud/PackageRegistry/ControlPlane/RegistryControlPlaneSupport.hpp"
 #include "PlatformCloud/PackageRegistry/ReleaseManagement/ReleaseManager.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 HttpResponse
@@ -246,4 +246,4 @@ PlatformRouter::HandleRollbackDistribution(const RouteMatch &match, const HttpRe
   }
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

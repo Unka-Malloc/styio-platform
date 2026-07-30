@@ -3,9 +3,9 @@
 #include <filesystem>
 #include <string>
 
-namespace spio
+namespace pafio
 {
 
 std::string Sha256File(const std::filesystem::path &path);
 
-}  // namespace spio
+}  // namespace pafio

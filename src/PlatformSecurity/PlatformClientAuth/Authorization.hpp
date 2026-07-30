@@ -4,10 +4,10 @@
 
 #include <string_view>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 bool IsInternalRole(const MtlsIdentity &identity);
 bool IsAuthorizedForOperation(std::string_view operation_id, const MtlsIdentity &identity);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

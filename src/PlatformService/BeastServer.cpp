@@ -51,7 +51,7 @@
 #include <unistd.h>
 #endif
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 size_t HttpRequestBodyLimitForTarget(std::string_view target)
@@ -1028,4 +1028,4 @@ int RunBeastServer(const PlatformConfig &config, BeastServerOptions options)
 
 #endif
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

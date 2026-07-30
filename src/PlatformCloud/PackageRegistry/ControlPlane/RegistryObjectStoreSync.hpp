@@ -8,7 +8,7 @@
 #include "PlatformCloud/PackageRegistry/ControlPlane/RegistryIndexStore.hpp"
 #include "PlatformStorage/PlatformPersistence/ObjectStore.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -81,4 +81,4 @@ UploadRegistryTreeToS3(const PlatformConfig &config) {
 
 }  // namespace
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

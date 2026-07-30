@@ -14,7 +14,7 @@
 #include "PlatformCore/Core/Process.hpp"
 #include "PlatformCore/Core/Sha256.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -44,13 +44,13 @@ Base64Encode(std::string_view payload) {
   return encoded;
 }
 
-spio::ProcessResult
+pafio::ProcessResult
 RunRegistryOpenSsl(
   std::vector<std::string> args,
   std::string input = {},
   const size_t max_stdout_bytes = 1U << 20
 ) {
-  spio::ProcessResult result = spio::RunProcess({
+  pafio::ProcessResult result = pafio::RunProcess({
     .program = "openssl",
     .args = std::move(args),
     .timeout = std::chrono::seconds{30},
@@ -60,7 +60,7 @@ RunRegistryOpenSsl(
     .error_context = "registry v2 openssl command",
   });
   if (result.exit_code != 0 || result.timed_out) {
-    throw std::runtime_error("registry v2 openssl command failed: " + spio::DescribeProcessFailure(result));
+    throw std::runtime_error("registry v2 openssl command failed: " + pafio::DescribeProcessFailure(result));
   }
   return result;
 }
@@ -84,7 +84,7 @@ RegistryRoleNames() {
 
 std::string
 RegistryFileKeyId(const fs::path &public_key_path) {
-  const spio::ProcessResult der = RunRegistryOpenSsl(
+  const pafio::ProcessResult der = RunRegistryOpenSsl(
     {"pkey", "-pubin", "-in", public_key_path.string(), "-outform", "DER"},
     {},
     64U << 10
@@ -262,7 +262,7 @@ SignedFileMeta(const fs::path &path, const int version) {
   return {
     {"version", version},
     {"length", static_cast<int64_t>(fs::file_size(path))},
-    {"hashes", {{"sha256", spio::Sha256File(path)}}},
+    {"hashes", {{"sha256", pafio::Sha256File(path)}}},
   };
 }
 
@@ -518,4 +518,4 @@ EnsureRegistryRootInitialized(const PlatformConfig &config) {
 
 }  // namespace
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

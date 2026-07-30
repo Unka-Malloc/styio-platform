@@ -208,7 +208,7 @@ log "initializing registry root and signing keys"
 PYTHONPATH="$INSTALL_DIR/src/PlatformCloud/PackageRegistry" "$PYTHON_BIN" - "$REGISTRY_ROOT" "$KEY_DIR" "$REGISTRY_NAME" <<'PY'
 import pathlib
 import sys
-from package_registry_v2 import initialize_registry_v2_root
+from PublicationBuilder.package_registry_v2 import initialize_registry_v2_root
 
 registry_root = pathlib.Path(sys.argv[1])
 key_dir = pathlib.Path(sys.argv[2])

@@ -11,7 +11,7 @@ baselines, global package distribution, regional mirrors, and cross-network
 sync. Client package resolution, offline cache use, and publish command UX
 remain Pafio responsibilities.
 The VM deployment bundle is owned by
-[../operations/Spio-Registry-Server-Runbook.md](../operations/Spio-Registry-Server-Runbook.md)
+[../operations/Pafio-Registry-Server-Runbook.md](../operations/Pafio-Registry-Server-Runbook.md)
 and must remain compatible with the same control-plane and static read-plane
 contracts.
 

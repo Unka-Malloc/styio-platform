@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -127,7 +127,7 @@ std::vector<nlohmann::json> EcosystemDocsBoundaries()
 {
   return {
       DocsBoundary("styio", "language-and-compiler", {"language reference", "compiler behavior", "standard library"}),
-      DocsBoundary("styio-spio", "package-manager", {"CLI usage", "package resolution", "registry client behavior"}),
+      DocsBoundary("pafio-nightly", "package-manager", {"CLI usage", "package resolution", "registry client behavior"}),
       DocsBoundary("vityo-nightly", "product-experience", {"hosted workspace UX", "control console flows", "frontend contract usage"}),
       DocsBoundary("styio-platform", "platform-foundation", {"control-plane contracts", "package registry", "cloud workspaces", "operations"}),
       DocsBoundary("styio-community", "community", {"tutorials", "examples", "public ecosystem guides"}),
@@ -310,4 +310,4 @@ nlohmann::json BuildDocumentationChangePlan(const nlohmann::json &request)
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

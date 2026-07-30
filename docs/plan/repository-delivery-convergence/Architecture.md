@@ -1,19 +1,21 @@
-# Architecture
+# Styio Platform Owner Convergence Architecture
 
-## Workspace Boundary
+**Purpose:** Define the Platform side of the Pafio ecosystem handoff.
 
-`docs/plan` is the repository planning root. The root `Manifest.json` indexes Plan objects only. Each Plan owns a dedicated directory and a local `Checkpoints.json` execution graph.
+**Last updated:** 2026-07-30
 
-## Plan Layout
+`PackageRegistry` owns registry mutation, immutable publication generation,
+static reads, trust metadata, distribution pointers, and mirror synchronization.
+`DeveloperWorkspace` owns hosted workspaces, job queues, workers, and service
+routing. The worker executes `pafio build` and supplies the externally installed
+Styio path through the Pafio compiler-discovery contract.
 
-- `docs/plan/Manifest.json`: workspace index.
-- `docs/plan/README.md`: navigation only.
-- `docs/plan/repository-delivery-convergence/Requirements.md`: delivery contract.
-- `docs/plan/repository-delivery-convergence/Evidence.md`: source inventory and observed open-work signals.
-- `docs/plan/repository-delivery-convergence/Validation.md`: requirement-to-check mapping.
-- `docs/plan/repository-delivery-convergence/Architecture.md`: current planning workspace boundary.
-- `docs/plan/repository-delivery-convergence/Checkpoints.json`: state-machine validated task graph.
+Pafio owns manifest, lock, resolution, package lifecycle, and local project
+workflows. Styio owns compilation, diagnostics, receipts, and runtime events.
+Platform consumes those public contracts and does not embed either client's
+business logic.
 
-## Design Constraints
-
-The workspace is organized by repository delivery responsibility and validation target. It does not preserve planning directories by historical stage, migration round, compatibility era, or old file layout.
+The migration is atomic across namespaces, build targets, scripts, schemas,
+protocol values, environment variables, fixtures, and documentation. Python
+registry code is imported directly from its owning layer; no compatibility
+facade remains.

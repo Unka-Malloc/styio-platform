@@ -5,7 +5,7 @@
 
 #include "PlatformService/RouterSupport.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -49,4 +49,4 @@ ValidateCompileContainerSwitch(const nlohmann::json &body) {
 
 }  // namespace
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

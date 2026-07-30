@@ -15,10 +15,11 @@ if str(PACKAGE_REGISTRY) not in sys.path:
     sys.path.insert(0, str(PACKAGE_REGISTRY))
 
 import package_registry_v2.common as common  # noqa: E402
-from package_registry_v2 import generate_key_directory, publish_to_registry_v2, verify_registry_root  # noqa: E402
+from PublicationBuilder.package_registry_v2 import generate_key_directory, publish_to_registry_v2  # noqa: E402
+from StaticReadPlane.package_registry_v2 import verify_registry_root  # noqa: E402
 from package_registry_v2.common import RegistryV2Error, sha256_file  # noqa: E402
-from package_registry_v2 import validator  # noqa: E402
-from package_registry_v2.validator import RootReader  # noqa: E402
+from StaticReadPlane.package_registry_v2 import validator  # noqa: E402
+from StaticReadPlane.package_registry_v2.validator import RootReader  # noqa: E402
 
 
 CONTRACT_DIR = ROOT / "contracts" / "registry-v2" / "v1"
@@ -439,7 +440,6 @@ class RegistryV2Tests(unittest.TestCase):
 alpha = { package = "acme/alpha", version = "1.0.0", registry = "https://packages.example.test" }
 """
         invalid_manifests = {
-            "legacy-spio": (pafio_manifest(preamble="[spio]\nlegacy = true\n\n"), "acme/util", "1.0.0", []),
             "manifest-version": (
                 pafio_manifest(manifest_version=2),
                 "acme/util",

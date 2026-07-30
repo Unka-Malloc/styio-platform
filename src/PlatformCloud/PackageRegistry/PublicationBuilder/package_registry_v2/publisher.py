@@ -581,8 +581,6 @@ def _validate_pafio_manifest(
     except tomllib.TOMLDecodeError as err:
         raise RegistryV2Error("source package pafio.toml is not valid TOML") from err
 
-    if "spio" in manifest_doc:
-        raise RegistryV2Error("source package pafio.toml must not contain [spio]")
     pafio_table = require_object(manifest_doc.get("pafio"), "source package manifest [pafio]")
     manifest_version = pafio_table.get("manifest-version")
     if not isinstance(manifest_version, int) or isinstance(manifest_version, bool) or manifest_version != 1:

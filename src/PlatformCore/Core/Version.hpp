@@ -2,9 +2,9 @@
 
 #include <string_view>
 
-namespace spio
+namespace pafio
 {
 
-inline constexpr std::string_view kVersion = SPIO_PROJECT_VERSION;
+inline constexpr std::string_view kVersion = PAFIO_PROJECT_VERSION;
 
-}  // namespace spio
+}  // namespace pafio

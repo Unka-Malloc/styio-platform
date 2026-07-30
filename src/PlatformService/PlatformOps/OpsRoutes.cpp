@@ -2,7 +2,7 @@
 #include "PlatformService/RouterSupport.hpp"
 #include "PlatformStorage/PlatformRecovery/RecoveryManager.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 HttpResponse
@@ -107,4 +107,4 @@ PlatformRouter::HandleExchangeExternalIdentity(const HttpRequest &request) const
   }
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

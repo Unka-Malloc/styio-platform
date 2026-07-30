@@ -9,7 +9,7 @@
 #include "PlatformCore/Core/Process.hpp"
 #include "PlatformCore/System/OperatingSystemAdapter.hpp"
 
-namespace spio
+namespace pafio
 {
 
 // Defines which Git transports are acceptable for a caller. Workspace and
@@ -82,7 +82,7 @@ struct GitWorktreeResult
 // Resolver code consumes snapshots so dependency resolution is repeatable.
 struct GitSnapshotRequest
 {
-  std::filesystem::path spio_home;
+  std::filesystem::path pafio_home;
   std::optional<std::filesystem::path> vendor_root;
   std::string origin;
   std::string revision;
@@ -128,4 +128,4 @@ private:
   const platform::OperatingSystemAdapter &os_;
 };
 
-}  // namespace spio
+}  // namespace pafio

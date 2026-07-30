@@ -54,7 +54,7 @@ node_modules/
 build/
 build-codex/
 build-*/
-.spio/
+.pafio/
 .styio-platform/
 tmp/
 dist/

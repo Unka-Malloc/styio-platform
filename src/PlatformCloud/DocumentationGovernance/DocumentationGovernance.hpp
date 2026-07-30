@@ -2,10 +2,10 @@
 
 #include <nlohmann/json.hpp>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 nlohmann::json DefaultDocumentationGovernance();
 nlohmann::json BuildDocumentationChangePlan(const nlohmann::json &request);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

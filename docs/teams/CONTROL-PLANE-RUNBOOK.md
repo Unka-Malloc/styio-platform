@@ -46,9 +46,11 @@ the package bundle, installer, systemd services, static read plane, and smoke
 check aligned in the same change.
 Registry descriptor changes must keep
 `GET /api/pafio-registry-control/v1/descriptor`, examples, smoke scripts, and
-Pafio trust-import docs aligned. Hosted publish changes that move registry
-objects to S3 must describe the write authority, static read root URL, and
-object immutability assumptions in the registry operations runbook.
+Pafio trust-import docs aligned with `pafio-static-registry`. Registry scripts
+must import publication and verification code directly from their owning
+layers. Hosted publish changes that move registry objects to S3 must describe
+the write authority, static read root URL, and object immutability assumptions
+in the registry operations runbook.
 User-bound compile container changes must keep
 `contracts/platform-control-plane/v1/`, `tests/interop/platform-control-plane-contract-gate.py`,
 the HTTP smoke job payload, and workspace compile governance aligned so

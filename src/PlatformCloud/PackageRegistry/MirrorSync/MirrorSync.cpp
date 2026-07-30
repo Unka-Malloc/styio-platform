@@ -18,7 +18,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -147,7 +147,7 @@ std::string DirectoryDigest(const fs::path &root)
     {
       files.push_back({
           {"path", fs::relative(path, root).generic_string()},
-          {"sha256", spio::Sha256File(path)},
+          {"sha256", pafio::Sha256File(path)},
       });
     }
   }
@@ -282,4 +282,4 @@ int RunMirrorSyncOnce(const PlatformConfig &config)
   }
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -19,7 +19,7 @@ void PrintUsage()
       << "Usage: styio-platformd [--check-config|--migrate|--serve|--serve-once|--worker|--worker-once|--sync-mirror-once|--self-test|--print-routes|--print-migrations]\n";
 }
 
-spio::platform::MtlsIdentity SelfTestIdentity()
+pafio::platform::MtlsIdentity SelfTestIdentity()
 {
   return {
       .role = "operator",
@@ -33,8 +33,8 @@ spio::platform::MtlsIdentity SelfTestIdentity()
 int main(int argc, char **argv)
 {
   const std::string command = argc > 1 ? argv[1] : "--check-config";
-  spio::platform::PlatformConfig config = spio::platform::LoadPlatformConfigFromEnvironment();
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformConfig config = pafio::platform::LoadPlatformConfigFromEnvironment();
+  pafio::platform::PlatformRouter router(config);
 
   if (command == "--help" || command == "-h")
   {
@@ -43,24 +43,24 @@ int main(int argc, char **argv)
   }
   if (command == "--check-config")
   {
-    nlohmann::json payload = spio::platform::SerializePublicConfig(config);
-    payload["http_adapter"] = spio::platform::DescribeBeastServerCapability();
+    nlohmann::json payload = pafio::platform::SerializePublicConfig(config);
+    payload["http_adapter"] = pafio::platform::DescribeBeastServerCapability();
     std::cout << payload.dump(2) << "\n";
     return 0;
   }
   if (command == "--serve")
   {
-    return spio::platform::RunBeastServer(config);
+    return pafio::platform::RunBeastServer(config);
   }
   if (command == "--serve-once")
   {
-    return spio::platform::RunBeastServer(config, {.once = true});
+    return pafio::platform::RunBeastServer(config, {.once = true});
   }
   if (command == "--migrate")
   {
     try
     {
-      spio::platform::PostgresStore store(config.postgres_dsn);
+      pafio::platform::PostgresStore store(config.postgres_dsn);
       store.ApplyMigrations();
       store.UpsertNode(config);
       std::cout << "styio-platform postgres migrations applied\n";
@@ -74,24 +74,24 @@ int main(int argc, char **argv)
   }
   if (command == "--worker")
   {
-    return spio::platform::RunWorker(config);
+    return pafio::platform::RunWorker(config);
   }
   if (command == "--worker-once")
   {
-    return spio::platform::RunWorker(config, {.once = true});
+    return pafio::platform::RunWorker(config, {.once = true});
   }
   if (command == "--sync-mirror-once")
   {
-    return spio::platform::RunMirrorSyncOnce(config);
+    return pafio::platform::RunMirrorSyncOnce(config);
   }
   if (command == "--print-routes")
   {
     nlohmann::json routes = nlohmann::json::array();
-    for (const spio::platform::RouteSpec &route : router.routes())
+    for (const pafio::platform::RouteSpec &route : router.routes())
     {
       routes.push_back({
           {"operation_id", route.operation_id},
-          {"method", spio::platform::ToString(route.method)},
+          {"method", pafio::platform::ToString(route.method)},
           {"path", route.path},
           {"internal", route.internal},
       });
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
   }
   if (command == "--print-migrations")
   {
-    for (const spio::platform::SqlMigration &migration : spio::platform::CloudKernelMigrations())
+    for (const pafio::platform::SqlMigration &migration : pafio::platform::CloudKernelMigrations())
     {
       std::cout << "-- " << migration.id << "\n" << migration.sql << "\n";
     }
@@ -109,13 +109,13 @@ int main(int argc, char **argv)
   }
   if (command == "--self-test")
   {
-    const spio::platform::HttpResponse health = router.Dispatch({
-        .method = spio::platform::HttpMethod::Get,
+    const pafio::platform::HttpResponse health = router.Dispatch({
+        .method = pafio::platform::HttpMethod::Get,
         .path = "/health",
         .identity = SelfTestIdentity(),
     });
-    const spio::platform::HttpResponse submit = router.Dispatch({
-        .method = spio::platform::HttpMethod::Post,
+    const pafio::platform::HttpResponse submit = router.Dispatch({
+        .method = pafio::platform::HttpMethod::Post,
         .path = "/jobs",
         .body = {
             {"tenant_id", "tenant-demo"},

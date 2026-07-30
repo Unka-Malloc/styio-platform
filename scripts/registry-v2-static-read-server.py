@@ -27,7 +27,7 @@ def is_relative_to(path: Path, parent: Path) -> bool:
 
 
 def content_type_for(path: Path) -> str:
-    if path.name.endswith(".spio.src.tar"):
+    if path.name.endswith(".pafio.src.tar"):
         return "application/x-tar"
     return CONTENT_TYPES.get(path.suffix, "application/octet-stream")
 
@@ -116,7 +116,7 @@ def cache_control_for(path: Path) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Serve a spio registry v2 root as a read-only HTTP static read plane.")
+    parser = argparse.ArgumentParser(description="Serve a pafio registry v2 root as a read-only HTTP static read plane.")
     parser.add_argument("--root", required=True, help="Local directory containing the registry v2 static root.")
     parser.add_argument("--bind", default="127.0.0.1", help="Address to bind for registry reads.")
     parser.add_argument("--port", type=int, required=True, help="Port to bind for registry reads.")

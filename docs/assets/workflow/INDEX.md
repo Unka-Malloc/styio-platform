@@ -12,6 +12,6 @@
 |------|-------|---------|
 | `DELIVERY-GATE.md` | [Delivery Gate](./DELIVERY-GATE.md) | Define the common delivery-floor entrypoint for styio-platform so contributors can run repository hygiene, the unified docs gate, native tests, and Python contract tests through one command before checkpoint merge or branch delivery. |
 | `DOCS-GATE.md` | [Docs Gate](./DOCS-GATE.md) | Define the common docs/process gate entrypoint for styio-platform so contributors can run owner-runbook maintenance and docs audit through one command. |
-| `REPO-HYGIENE.md` | [Repository Hygiene](./REPO-HYGIENE.md) | Define the repository hygiene entrypoint for spio so contributors and CI use one script to reject generated artifacts, dependency payloads, and undocumented binary blobs. |
+| `REPO-HYGIENE.md` | [Repository Hygiene](./REPO-HYGIENE.md) | Define the repository hygiene entrypoint for pafio so contributors and CI use one script to reject generated artifacts, dependency payloads, and undocumented binary blobs. |
 | `TEAM-RUNBOOK-MAINTENANCE-GATE.md` | [Team Runbook Maintenance Gate](./TEAM-RUNBOOK-MAINTENANCE-GATE.md) | Define the delivery gate that requires team runbooks under docs/teams/ to be updated and kept in the standard template shape when files in corresponding team-owned folders are added, modified, renamed, or deleted. |
-| `TEAM-RUNBOOK-TEMPLATE.md` | [Team Runbook Template](./TEAM-RUNBOOK-TEMPLATE.md) | Provide the required section template for spio team runbooks so owner-gate automation and human reviewers share the same shape. |
+| `TEAM-RUNBOOK-TEMPLATE.md` | [Team Runbook Template](./TEAM-RUNBOOK-TEMPLATE.md) | Provide the required section template for pafio team runbooks so owner-gate automation and human reviewers share the same shape. |

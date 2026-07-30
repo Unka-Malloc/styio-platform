@@ -11,7 +11,7 @@
 #include <string_view>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 struct SqlMigration
@@ -134,4 +134,4 @@ private:
   std::string dsn_;
 };
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

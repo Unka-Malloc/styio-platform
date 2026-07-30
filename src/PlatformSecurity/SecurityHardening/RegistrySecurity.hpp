@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace spio
+namespace pafio
 {
 
 struct RegistryReadSecurityRequest
@@ -50,4 +50,4 @@ RegistryWriteSecurityResolver RegisterRegistryWriteSecurityResolver(RegistryWrit
 RegistryReadSecurityDecision ResolveRegistryReadSecurity(const RegistryReadSecurityRequest &request);
 RegistryWriteSecurityDecision ResolveRegistryWriteSecurity(const RegistryWriteSecurityRequest &request);
 
-}  // namespace spio
+}  // namespace pafio

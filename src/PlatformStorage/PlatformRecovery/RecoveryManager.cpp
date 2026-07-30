@@ -10,7 +10,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -190,4 +190,4 @@ nlohmann::json BuildStorageStatus(
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

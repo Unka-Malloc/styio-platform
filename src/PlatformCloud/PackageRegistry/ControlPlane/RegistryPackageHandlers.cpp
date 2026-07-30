@@ -1,6 +1,6 @@
 #include "PlatformCloud/PackageRegistry/ControlPlane/RegistryControlPlaneSupport.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 HttpResponse
@@ -42,7 +42,7 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
 
   try {
     MaterializePublishArchive(request.body, config_, draft);
-    const std::string archive_sha256 = spio::Sha256File(draft.archive_path);
+    const std::string archive_sha256 = pafio::Sha256File(draft.archive_path);
     const uintmax_t archive_size = fs::file_size(draft.archive_path);
     if (archive_sha256 != draft.archive_sha256 || archive_size != draft.archive_size_bytes) {
       throw std::runtime_error("staged archive integrity verification failed");
@@ -171,7 +171,7 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
     );
     return JsonResponse(200, SuccessEnvelope("published registry v2 release", payload));
   }
-  catch (const spio::ValidationError &error) {
+  catch (const pafio::ValidationError &error) {
     RecordRegistryAudit(
       request,
       "publishRelease",
@@ -437,4 +437,4 @@ PlatformRouter::HandleSetPackageReleaseYanked(
   }
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

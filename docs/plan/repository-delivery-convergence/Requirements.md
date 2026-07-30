@@ -1,30 +1,23 @@
-# Requirements
+# Styio Platform Owner Convergence Requirements
 
-## Product Problem
+**Purpose:** Freeze the Platform-owned server and hosted-execution boundary for
+the clean-break Pafio ecosystem.
 
-`Unka-Malloc/styio-cloud-nightly` had planning material split across old planning directories and document names. The current requirement is a single Better Plan workspace under `docs/plan` that captures open work without preserving duplicate planning roots.
+**Last updated:** 2026-07-30
 
-## Target Users And Workflows
+- **REQ-PLATFORM-CONV-001:** Platform is the sole owner of registry control
+  plane, static registry distribution, hosted workspaces, cloud jobs, and
+  workers.
+- **REQ-PLATFORM-CONV-002:** Registry identity is
+  `pafio-static-registry` and `/api/pafio-registry-control/v1`; published
+  project manifests use `[pafio]` and `pafio.toml`.
+- **REQ-PLATFORM-CONV-003:** Hosted workers invoke `pafio build`; Pafio remains
+  the package/project workflow client and Styio remains the system compiler.
+- **REQ-PLATFORM-CONV-004:** Platform contains no retired product identity,
+  client business-logic copy, import facade, alias, or protocol fallback.
+- **REQ-PLATFORM-CONV-005:** Focused Platform validation precedes one full
+  repository regression and one fixed-revision ecosystem matrix.
 
-- Maintainers need one project-local plan root for delivery decisions and status checks.
-- Agents need machine-readable `Manifest.json` and `Checkpoints.json` state that validates with the Better Plan manifest tool.
-- Reviewers need plan-local evidence that shows which previous planning sources were consolidated.
-
-## Functional Requirements
-
-- REQ-001: All current planning sources for `Unka-Malloc/styio-cloud-nightly` are represented under `docs/plan`.
-- REQ-002: `docs/plan/Manifest.json` indexes only Plan objects, and every Plan points to a plan-local `Checkpoints.json`.
-- REQ-003: Open or uncertain work extracted from prior planning sources is represented as current Better Plan acceptance criteria rather than as old checklist files.
-- REQ-004: The workspace uses current project naming and does not retain separate planning roots named `docs/plan`, `docs/plan`, or `docs/plan`.
-- REQ-005: Validation evidence maps every requirement to concrete repository checks.
-
-## Non-Goals
-
-- This refactor does not claim underlying product implementation tasks are finished.
-- This refactor does not introduce compatibility paths, historical phases, or duplicate planning formats.
-
-## Final Acceptance Targets
-
-- `python <better-plan>/scripts/manifest_tool.py validate docs/plan` succeeds.
-- Repository search finds no planning root outside `docs/plan` for consolidated plan material.
-- The source inventory in `Evidence.md` lists the imported planning sources and their open-work signals.
+Pafio resolver/workflow implementation, Styio compiler implementation, compiler
+distribution, and Vityo adapter composition are owned by their respective
+repositories and are out of scope here.

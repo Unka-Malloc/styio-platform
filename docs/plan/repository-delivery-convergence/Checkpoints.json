@@ -1,133 +1,144 @@
 [
   {
-    "id": "f5b71a4a-8c68-49dd-abfa-882fa978851e",
-    "status": "completed",
-    "role": "product_requirements",
-    "prerequisites": [],
-    "platform": "windows",
-    "difficulty": "deep",
-    "goal": "Define the current delivery contract for Styio Cloud Nightly planning convergence.",
-    "description": "Scope: docs/plan/repository-delivery-convergence/Requirements.md and the repository planning root. Context: prior planning material existed in multiple planning roots or plan-named files, so maintainers lacked one current Better Plan contract. Target: REQ-001 through REQ-005 define one final planning structure under docs/plan. Design Considerations: use stable requirement labels and keep product implementation completion separate from plan refactoring. Design Value: a single labeled contract keeps later implementation and validation traceable. Constraints & Risks: do not claim product work is complete only because the planning format is current.",
-    "acceptance_criteria": [
-      {
-        "checked": true,
-        "text": "Requirements.md exists and defines REQ-001 through REQ-005 for the current planning workspace."
-      }
-    ],
-    "commit": {
-      "repository": ".git",
-      "message": "Define planning convergence requirements",
-      "target": "docs/plan/repository-delivery-convergence/Requirements.md"
-    },
-    "next": [
-      "665bb704-c061-400b-be5f-f08da6ff0cf6"
-    ]
-  },
-  {
-    "id": "665bb704-c061-400b-be5f-f08da6ff0cf6",
-    "status": "completed",
-    "role": "evidence",
-    "prerequisites": [
-      "f5b71a4a-8c68-49dd-abfa-882fa978851e"
-    ],
-    "platform": "windows",
-    "difficulty": "deep",
-    "goal": "Record source evidence and open-work signals for Styio Cloud Nightly.",
-    "description": "Scope: docs/plan/repository-delivery-convergence/Evidence.md and imported planning-source inventory. Context: old plan files had to be removed as active sources while their useful delivery signals still needed traceability. Target: REQ-001 and REQ-003 are backed by a source inventory and open-work signal ledger. Design Considerations: record source summaries and signal locations instead of copying old plan prose into a second long-lived source. Design Value: reviewers can see what was consolidated without reintroducing old planning roots. Constraints & Risks: extracted signals are evidence for planning status, not proof that the underlying product work is complete.",
-    "acceptance_criteria": [
-      {
-        "checked": true,
-        "text": "Evidence.md lists imported planning sources and open-work signals derived from current repository files."
-      }
-    ],
-    "commit": {
-      "repository": ".git",
-      "message": "Record planning source evidence",
-      "target": "docs/plan/repository-delivery-convergence/Evidence.md"
-    },
-    "next": [
-      "99445201-076c-4ef9-b28e-297e6bc4270d"
-    ]
-  },
-  {
-    "id": "99445201-076c-4ef9-b28e-297e6bc4270d",
-    "status": "completed",
-    "role": "validation_matrix",
-    "prerequisites": [
-      "f5b71a4a-8c68-49dd-abfa-882fa978851e",
-      "665bb704-c061-400b-be5f-f08da6ff0cf6"
-    ],
-    "platform": "windows",
-    "difficulty": "deep",
-    "goal": "Map Styio Cloud Nightly planning requirements to concrete checks.",
-    "description": "Scope: docs/plan/repository-delivery-convergence/Validation.md and final validation acceptance criteria. Context: Better Plan requires validation targets before implementation claims. Target: REQ-001 through REQ-005 each have an explicit check. Design Considerations: use manifest validation, search evidence, and source-inventory inspection rather than informal review. Design Value: validation remains repeatable for future agents and maintainers. Constraints & Risks: final validation must not be treated as complete until repository-level searches and manifest validation are run.",
-    "acceptance_criteria": [
-      {
-        "checked": true,
-        "text": "Validation.md maps every requirement label to a concrete check."
-      }
-    ],
-    "commit": {
-      "repository": ".git",
-      "message": "Map planning validation checks",
-      "target": "docs/plan/repository-delivery-convergence/Validation.md"
-    },
-    "next": [
-      "e5ee21eb-9cf2-4f09-9640-59e93429d564"
-    ]
-  },
-  {
-    "id": "e5ee21eb-9cf2-4f09-9640-59e93429d564",
-    "status": "completed",
-    "role": "architecture_scaffold",
-    "prerequisites": [
-      "f5b71a4a-8c68-49dd-abfa-882fa978851e",
-      "665bb704-c061-400b-be5f-f08da6ff0cf6",
-      "99445201-076c-4ef9-b28e-297e6bc4270d"
-    ],
-    "platform": "windows",
-    "difficulty": "high",
-    "goal": "Establish the Styio Cloud Nightly Better Plan workspace architecture.",
-    "description": "Scope: docs/plan/README.md, docs/plan/Manifest.json, and docs/plan/repository-delivery-convergence/Architecture.md. Context: the repository needs one machine-readable planning root with plan-local artifacts. Target: REQ-002 and REQ-004 are represented by a Manifest-only root and one dedicated plan directory. Design Considerations: keep root navigation thin, keep execution detail in Checkpoints.json, and organize by repository delivery responsibility and validation target. Design Value: this avoids duplicate plan roots and keeps state-machine validation cheap. Constraints & Risks: do not add marker files or alternate planning directories to identify the workspace.",
-    "acceptance_criteria": [
-      {
-        "checked": true,
-        "text": "Architecture.md describes the docs/plan workspace boundary and artifact ownership."
-      }
-    ],
-    "commit": {
-      "repository": ".git",
-      "message": "Establish planning workspace architecture",
-      "target": "docs/plan docs/plan/repository-delivery-convergence/Architecture.md"
-    },
-    "next": [
-      "445d6cc7-ebfc-46cc-ba6c-5333128000b6"
-    ]
-  },
-  {
     "id": "445d6cc7-ebfc-46cc-ba6c-5333128000b6",
     "status": "in_progress",
     "role": "implementation",
-    "prerequisites": [
-      "f5b71a4a-8c68-49dd-abfa-882fa978851e",
-      "665bb704-c061-400b-be5f-f08da6ff0cf6",
-      "99445201-076c-4ef9-b28e-297e6bc4270d",
-      "e5ee21eb-9cf2-4f09-9640-59e93429d564"
+    "prerequisites": [],
+    "platform": "any",
+    "difficulty": "deep",
+    "goal": "Complete the Platform-owned Pafio registry and hosted-execution cutover without compatibility residue.",
+    "description": "Scope: Platform registry/control-plane, hosted workspace/job/worker, contracts, build identity, tests, scripts, and owner documentation. Context: Platform already owns server and hosted execution, but retained the retired product identity, facade imports, and stale migration planning. Target: publish the Pafio registry identifiers, invoke pafio build from workers, remove duplicate facades and retired identity, and keep Pafio and Styio business logic at their owners. Design Considerations: preserve the existing native service architecture and immutable registry publication model. Design Value: every ecosystem server surface has one owner. Constraints & Risks: no client compatibility shim or old protocol fallback; run focused tests only during this closure.",
+    "requirements": [
+      "REQ-PLATFORM-CONV-001",
+      "REQ-PLATFORM-CONV-002",
+      "REQ-PLATFORM-CONV-003",
+      "REQ-PLATFORM-CONV-004"
     ],
-    "platform": "windows",
-    "difficulty": "high",
-    "goal": "Close extracted open work for Docs/plan/styio Cloud Migration Plan Md:16.",
-    "description": "Scope: Evidence.md source `docs/plan/Styio-Cloud-Migration-Plan.md:16` and the repository code, tests, contracts, or docs referenced by its open-work signals. Context: the previous planning source recorded unresolved or uncertain work that must now be tracked only through docs/plan. Target: each extracted signal is either delivered with validation evidence or explicitly skipped with rationale in the current Better Plan graph. Design Considerations: follow existing repository boundaries and avoid restoring old planning roots or compatibility-era task lists. Design Value: source-specific implementation nodes make unclosed work reviewable without preserving stale plan documents. Constraints & Risks: do not mark this node completed until every acceptance item has direct evidence.",
+    "design": {
+      "artifact": "docs/plan/repository-delivery-convergence/Architecture.md",
+      "owned_paths": [
+        "src/PlatformCloud/PackageRegistry",
+        "src/PlatformCloud/DeveloperWorkspace",
+        "src/PlatformCloud/PackageRegistry/ControlPlane/RegistryIdentifiers.hpp",
+        "src/PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.cpp",
+        "src/PlatformCloud/DeveloperWorkspace/Worker.cpp",
+        "contracts/registry-v2/v1",
+        "contracts/registry-control-plane/v1",
+        "scripts"
+      ],
+      "scaffold_paths": [
+        "src/PlatformCloud/PackageRegistry/ControlPlane/RegistryIdentifiers.hpp",
+        "src/PlatformCloud/DeveloperWorkspace/Worker.cpp"
+      ],
+      "acceptance_paths": [
+        "docs/plan/repository-delivery-convergence/Validation.md",
+        "tests/interop/native-contract-source-gate.py"
+      ],
+      "symbols": [
+        {
+          "path": "src/PlatformCloud/PackageRegistry/ControlPlane/RegistryIdentifiers.hpp",
+          "kind": "module",
+          "name": "Pafio registry identifiers",
+          "operation": "modify",
+          "signature": "pafio-static-registry and /api/pafio-registry-control/v1"
+        },
+        {
+          "path": "src/PlatformCloud/DeveloperWorkspace/Worker.cpp",
+          "kind": "function",
+          "name": "hosted build invocation",
+          "operation": "modify",
+          "signature": "pafio build"
+        }
+      ],
+      "interfaces": [
+        {
+          "name": "registry-control-v1",
+          "producer": "src/PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.cpp",
+          "consumers": [
+            "Pafio publish and registry clients"
+          ],
+          "inputs": "authenticated registry operations",
+          "outputs": "immutable publications and control responses",
+          "errors": [
+            "invalid publication",
+            "unauthorized operation",
+            "storage failure"
+          ]
+        },
+        {
+          "name": "hosted-workspace-v1",
+          "producer": "src/PlatformCloud/DeveloperWorkspace/Worker.cpp",
+          "consumers": [
+            "Vityo hosted adapter"
+          ],
+          "inputs": "hosted workspace and job requests",
+          "outputs": "workspace and job state",
+          "errors": [
+            "invalid request",
+            "worker failure"
+          ]
+        }
+      ],
+      "dependencies": [
+        {
+          "from": "src/PlatformCloud/DeveloperWorkspace",
+          "to": "Pafio workflow contract",
+          "reason": "Hosted workers run the public Pafio build entry."
+        }
+      ],
+      "decisions": {
+        "composition": "registry and hosted execution remain separate Platform modules",
+        "algorithms": "immutable publication and queue workflows are preserved",
+        "data_structures": "existing contract JSON and native state records",
+        "state": "Platform owns server and hosted state only",
+        "isolation": "client and compiler logic remain external",
+        "concurrency": "existing worker and service synchronization is preserved"
+      },
+      "test_seams": [
+        "native service tests",
+        "registry Python tests",
+        "contract tests",
+        "tracked-file identity search"
+      ]
+    },
     "acceptance_criteria": [
       {
         "checked": false,
-        "text": "Close or explicitly skip extracted open-work signal `docs/plan/Styio-Cloud-Migration-Plan.md:16: `pafio` remains the local-first package-manager client. It must keep` with code, documentation, and validation evidence."
+        "text": "Registry, hosted workspace, job, and worker tests pass with Pafio identifiers and pafio build."
+      },
+      {
+        "checked": false,
+        "text": "Tracked Platform files contain no retired product identity, compatibility facade, or copied Pafio client business logic."
+      },
+      {
+        "checked": false,
+        "text": "Better Plan, documentation, native source, and repository hygiene gates pass."
       }
     ],
     "commit": {
       "repository": ".git",
-      "message": "Close Docs/plan/styio Cloud Migration Plan Md:16 open work",
-      "target": "docs/plan repository sources"
+      "message": "refactor!: complete Pafio platform migration",
+      "target": "temporary Platform convergence branch"
+    },
+    "regression": {
+      "scope": "focused",
+      "commands": [
+        "cmake --build build-codex -j4",
+        "ctest --test-dir build-codex --output-on-failure -R <platform-convergence-selection>",
+        "python3 scripts/repo-hygiene-gate.py --mode working"
+      ],
+      "criteria": [
+        0,
+        1,
+        2
+      ],
+      "paths": [
+        "src/PlatformCloud/PackageRegistry",
+        "src/PlatformCloud/DeveloperWorkspace",
+        "contracts",
+        "scripts",
+        "tests"
+      ]
     },
     "next": [
       "7cad10aa-7b44-4c17-9fd2-04c2d1d26573"
@@ -138,31 +149,88 @@
     "status": "pending",
     "role": "final_validation",
     "prerequisites": [
-      "445d6cc7-ebfc-46cc-ba6c-5333128000b6",
-      "99445201-076c-4ef9-b28e-297e6bc4270d"
+      "445d6cc7-ebfc-46cc-ba6c-5333128000b6"
     ],
-    "platform": "windows",
+    "platform": "any",
     "difficulty": "high",
-    "goal": "Validate repository delivery convergence after extracted work closes.",
-    "description": "Scope: docs/plan Manifest.json, Checkpoints.json, Evidence.md, repository search results, and validation commands. Context: final validation must prove the Better Plan workspace remains the only current planning root and all extracted source-specific work has closure evidence. Target: REQ-001 through REQ-005 are proven by manifest validation, audit gate evidence, and completed implementation nodes. Design Considerations: run the same checks used by styio-audit Better Plan policy and project-local gates relevant to touched code. Design Value: final validation ties planning structure to actual closure evidence instead of treating formatting as delivery. Constraints & Risks: do not complete this node while any source-specific implementation node remains pending or in_progress.",
+    "goal": "Validate the fixed Platform revision in the coordinated Pafio ecosystem candidate.",
+    "description": "Context: the Platform implementation closure is complete and independently reviewed. Target: run the maintained Platform full suite once and include its immutable revision in the cross-repository product matrix. Constraints: validation is read-only, contains no credentials or runtime data, and does not restore compatibility behavior.",
+    "requirements": [
+      "REQ-PLATFORM-CONV-001",
+      "REQ-PLATFORM-CONV-002",
+      "REQ-PLATFORM-CONV-003",
+      "REQ-PLATFORM-CONV-004",
+      "REQ-PLATFORM-CONV-005"
+    ],
+    "design": {
+      "artifact": "docs/plan/repository-delivery-convergence/Validation.md",
+      "owned_paths": [
+        "docs/plan/repository-delivery-convergence/Evidence.md"
+      ],
+      "scaffold_paths": [
+        "docs/plan/repository-delivery-convergence/Evidence.md"
+      ],
+      "acceptance_paths": [
+        "docs/plan/repository-delivery-convergence/Validation.md"
+      ],
+      "symbols": [],
+      "interfaces": [
+        {
+          "name": "fixed-revision Platform evidence",
+          "producer": "docs/plan/repository-delivery-convergence/Evidence.md",
+          "consumers": [
+            "Pafio ecosystem matrix"
+          ],
+          "inputs": "immutable Platform revision",
+          "outputs": "pass or fail evidence",
+          "errors": [
+            "regression failure",
+            "contract mismatch"
+          ]
+        }
+      ],
+      "dependencies": [],
+      "decisions": {
+        "composition": "one full Platform suite then one ecosystem matrix",
+        "algorithms": "fail-fast validation",
+        "data_structures": "immutable revision record",
+        "state": "read-only candidate",
+        "isolation": "no private runtime data",
+        "concurrency": "repository suites may run independently"
+      },
+      "test_seams": [
+        "full Platform suite",
+        "fixed-revision ecosystem matrix"
+      ]
+    },
     "acceptance_criteria": [
       {
         "checked": false,
-        "text": "manifest_tool.py validate docs/plan passes."
+        "text": "The maintained Platform full regression passes once at the recorded revision."
       },
       {
         "checked": false,
-        "text": "styio-audit Better Plan policy reports zero findings for this repository."
-      },
-      {
-        "checked": false,
-        "text": "All source-specific implementation nodes are completed or intentionally skipped with evidence."
+        "text": "The fixed-revision ecosystem matrix accepts Platform registry and hosted-workspace ownership."
       }
     ],
     "commit": {
       "repository": ".git",
-      "message": "Validate delivery convergence",
-      "target": "docs/plan"
+      "message": "test(release): record Platform convergence matrix",
+      "target": "temporary Platform convergence branch"
+    },
+    "regression": {
+      "scope": "full",
+      "commands": [
+        "ctest --test-dir build-codex --output-on-failure",
+        "python3 <pafio-repository>/scripts/verify-ecosystem-contracts.py --full"
+      ],
+      "criteria": [
+        0,
+        1
+      ],
+      "paths": [
+        "docs/plan/repository-delivery-convergence/Evidence.md"
+      ]
     },
     "next": []
   }

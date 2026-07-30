@@ -2,7 +2,7 @@
   "openWorkspace": {
     "request": {
       "workspace_root": "/workspace/demo",
-      "manifest_path": "/workspace/demo/spio.toml",
+      "manifest_path": "/workspace/demo/pafio.toml",
       "platform": "ios"
     },
     "success": {
@@ -11,21 +11,21 @@
       "stdout": "",
       "stderr": "",
       "payload": {
-        "id": "/workspace/demo/spio.toml",
+        "id": "/workspace/demo/pafio.toml",
         "title": "demo/app",
         "kind": "hosted",
         "workspace_root": "/workspace/demo",
         "workspace_members": [],
-        "manifest_path": "/workspace/demo/spio.toml",
-        "lockfile_path": "/workspace/demo/spio.lock",
-        "vendor_root": "/workspace/demo/.spio/vendor",
-        "build_root": "/workspace/demo/.spio/build",
+        "manifest_path": "/workspace/demo/pafio.toml",
+        "lockfile_path": "/workspace/demo/pafio.lock",
+        "vendor_root": "/workspace/demo/.pafio/vendor",
+        "build_root": "/workspace/demo/.pafio/build",
         "packages": [
           {
             "package_name": "demo/app",
             "version": "0.1.0",
             "root_path": "/workspace/demo",
-            "manifest_path": "/workspace/demo/spio.toml",
+            "manifest_path": "/workspace/demo/pafio.toml",
             "targets": [
               {
                 "id": "demo/app:bin:demo",
@@ -118,18 +118,18 @@
       "stdout": "",
       "stderr": "",
       "payload": {
-        "id": "/workspace/demo/spio.toml",
+        "id": "/workspace/demo/pafio.toml",
         "title": "demo/app",
         "kind": "hosted",
         "workspace_root": "/workspace/demo",
         "workspace_members": [],
-        "manifest_path": "/workspace/demo/spio.toml",
+        "manifest_path": "/workspace/demo/pafio.toml",
         "packages": [
           {
             "package_name": "demo/app",
             "version": "0.1.0",
             "root_path": "/workspace/demo",
-            "manifest_path": "/workspace/demo/spio.toml",
+            "manifest_path": "/workspace/demo/pafio.toml",
             "targets": [
               {
                 "id": "demo/app:bin:demo",
@@ -201,8 +201,8 @@
         "packages": [
           "demo/app"
         ],
-        "vendor_root": "/workspace/demo/.spio/vendor",
-        "metadata_path": "/workspace/demo/.spio/vendor/vendor.json"
+        "vendor_root": "/workspace/demo/.pafio/vendor",
+        "metadata_path": "/workspace/demo/.pafio/vendor/vendor.json"
       }
     },
     "failure": {

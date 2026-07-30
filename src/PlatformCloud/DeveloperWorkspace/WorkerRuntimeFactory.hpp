@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <string>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 struct WorkerRuntimeConfig
@@ -64,7 +64,7 @@ struct WorkerWorkspace
   std::filesystem::path result_path;
 };
 
-spio::ProcessRequest BuildWorkerPafioProcessRequest(
+pafio::ProcessRequest BuildWorkerPafioProcessRequest(
     const WorkerRuntimeConfig &worker,
     const PlatformConfig &platform,
     const WorkerWorkspace &workspace,
@@ -81,4 +81,4 @@ private:
   const OperatingSystemAdapter &os_;
 };
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 enum class HttpMethod
@@ -54,4 +54,4 @@ std::optional<RouteMatch> MatchRoute(const std::vector<RouteSpec> &routes, HttpM
 nlohmann::json SuccessEnvelope(std::string message, nlohmann::json payload);
 nlohmann::json FailureEnvelope(std::string message, std::string detail, std::string category, std::string operation_id, int returncode = 17);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

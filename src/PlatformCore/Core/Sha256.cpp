@@ -181,7 +181,7 @@ private:
 
 }  // namespace
 
-namespace spio
+namespace pafio
 {
 
 std::string Sha256File(const fs::path &path)
@@ -210,4 +210,4 @@ std::string Sha256File(const fs::path &path)
   return sha256.FinalHex();
 }
 
-}  // namespace spio
+}  // namespace pafio

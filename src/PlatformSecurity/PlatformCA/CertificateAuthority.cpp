@@ -21,7 +21,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -381,4 +381,4 @@ PlatformCertificateBundle EnsurePlatformMtlsCertificate(
   return bundle;
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

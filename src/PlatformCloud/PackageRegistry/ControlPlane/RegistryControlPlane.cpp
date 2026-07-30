@@ -1,6 +1,6 @@
 #include "PlatformCloud/PackageRegistry/ControlPlane/RegistryControlPlaneSupport.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 HttpResponse
@@ -198,7 +198,7 @@ PlatformRouter::CreateRegistryPublication(
     .repository_version_id = repository_version_id,
     .layout_version = 2,
     .root_path = (registry_root / "_publications" / publication_id).string(),
-    .manifest_sha256 = spio::Sha256File(final_root / "publication.json"),
+    .manifest_sha256 = pafio::Sha256File(final_root / "publication.json"),
     .tree_size = static_cast<int>(tree_size),
     .created_at = generated_at,
     .verified = true,
@@ -233,7 +233,7 @@ PlatformRouter::CreateRegistryPublication(
       .repository_version_id = repository_version_id,
       .layout_version = 2,
       .root_path = (registry_root / "_publications" / publication_id).string(),
-      .manifest_sha256 = spio::Sha256File(final_root / "publication.json"),
+      .manifest_sha256 = pafio::Sha256File(final_root / "publication.json"),
       .tree_size = static_cast<int>(tree_size),
       .created_at = generated_at,
       .verified = true,
@@ -257,7 +257,7 @@ PlatformRouter::CreateRegistryPublication(
     static_cast<int>(tree_size)
   );
 
-  publication["manifest_sha256"] = spio::Sha256File(final_root / "publication.json");
+  publication["manifest_sha256"] = pafio::Sha256File(final_root / "publication.json");
   publication["root_path"] = (registry_root / "_publications" / publication_id).generic_string();
   publication["distribution"] = current;
   return publication;
@@ -374,7 +374,7 @@ PlatformRouter::HandleRegistryDescriptor() const {
     {"registry_name", config_.registry.registry_name},
     {"registry_root", RegistryReadRootUrl(config_)},
     {"control_plane_base_url", RegistryControlPlaneBaseUrl(config_)},
-    {"root_sha256", spio::Sha256File(root_metadata)},
+    {"root_sha256", pafio::Sha256File(root_metadata)},
     {"issued_at", "2026-05-02T00:00:00Z"},
     {"expires", "2026-06-02T00:00:00Z"},
     {"descriptor_signature", "platform-control-plane-mtls"},
@@ -417,4 +417,4 @@ PlatformRouter::RecordMirrorState(
   );
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -21,7 +21,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -135,10 +135,10 @@ nlohmann::json HttpJson(
       args.push_back("--key");
       args.push_back(worker.mtls_key_path);
     }
-    spio::ProcessResult result = os.RunProcess({
+    pafio::ProcessResult result = os.RunProcess({
         .program = "curl",
         .args = std::move(args),
-        .timeout = spio::kExternalProcessProbeTimeout,
+        .timeout = pafio::kExternalProcessProbeTimeout,
         .max_stdout_bytes = 16U << 20,
         .max_stderr_bytes = 1U << 20,
         .stdin_text = payload,
@@ -146,7 +146,7 @@ nlohmann::json HttpJson(
     });
     if (result.exit_code != 0 || result.timed_out)
     {
-      throw std::runtime_error("control plane returned non-success status: " + spio::DescribeProcessFailure(result));
+      throw std::runtime_error("control plane returned non-success status: " + pafio::DescribeProcessFailure(result));
     }
     return nlohmann::json::parse(result.stdout_text);
   }
@@ -303,7 +303,7 @@ void ExecuteClaimedJob(
 
   try
   {
-    const spio::GitSourceFetcher fetcher(os);
+    const pafio::GitSourceFetcher fetcher(os);
     (void) fetcher.EnsureWorktree({
         .origin = origin,
         .checkout_root = workspace.checkout_root,
@@ -312,11 +312,11 @@ void ExecuteClaimedJob(
         .shallow = true,
         .depth = 1,
         .clone_revision_as_branch = false,
-        .policy = spio::PublicGitSourcePolicy(),
+        .policy = pafio::PublicGitSourcePolicy(),
         .error_context = "git fetch for platform worker",
     });
   }
-  catch (const spio::SourceFetchError &error)
+  catch (const pafio::SourceFetchError &error)
   {
     WriteText(os, workspace.stderr_path, error.result().stderr_text.empty() ? error.what() : error.result().stderr_text);
     Complete(
@@ -330,7 +330,7 @@ void ExecuteClaimedJob(
         {{"source_fetch", error.result().exit_code}});
     return;
   }
-  catch (const spio::FetchError &error)
+  catch (const pafio::FetchError &error)
   {
     WriteText(os, workspace.stderr_path, error.what());
     Complete(os, control, worker, job_id, "failed", "source fetch failed", nlohmann::json::array(), {{"source_fetch", 1}});
@@ -346,7 +346,7 @@ void ExecuteClaimedJob(
       std::cref(worker),
       std::cref(job_id),
       std::ref(heartbeat_done));
-  spio::ProcessResult build;
+  pafio::ProcessResult build;
   try
   {
     build = os.RunProcess(BuildWorkerPafioProcessRequest(
@@ -462,4 +462,4 @@ int RunWorker(const PlatformConfig &config, WorkerOptions options)
   }
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

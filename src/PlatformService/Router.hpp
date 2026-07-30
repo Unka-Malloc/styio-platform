@@ -12,7 +12,7 @@
 #include "PlatformStorage/PlatformPersistence/MemoryStateStore.hpp"
 #include "PlatformStorage/PlatformPersistence/PostgresStore.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 // Routes control-plane HTTP requests to capability handlers while keeping
@@ -124,4 +124,4 @@ private:
   PlatformRequestMetrics metrics_;
 };
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

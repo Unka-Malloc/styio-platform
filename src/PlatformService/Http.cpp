@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -129,4 +129,4 @@ nlohmann::json FailureEnvelope(std::string message, std::string detail, std::str
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

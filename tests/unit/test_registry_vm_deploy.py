@@ -21,7 +21,8 @@ PACKAGE_REGISTRY = ROOT / "src" / "PlatformCloud" / "PackageRegistry"
 if str(PACKAGE_REGISTRY) not in sys.path:
     sys.path.insert(0, str(PACKAGE_REGISTRY))
 
-from package_registry_v2 import initialize_registry_v2_root, verify_registry_root  # noqa: E402
+from PublicationBuilder.package_registry_v2 import initialize_registry_v2_root  # noqa: E402
+from StaticReadPlane.package_registry_v2 import verify_registry_root  # noqa: E402
 
 
 def ustar_octal(value: int, width: int) -> bytes:
@@ -326,9 +327,9 @@ publish = false
                 self.assertEqual(index_record["dev_dependencies"][0]["alias"], "fixture")
 
                 malformed: list[dict[str, object]] = []
-                legacy = pafio_publish_request()
-                legacy["manifest_path"] = "/tmp/pafio.toml"
-                malformed.append(legacy)
+                unexpected_field = pafio_publish_request()
+                unexpected_field["manifest_path"] = "/tmp/pafio.toml"
+                malformed.append(unexpected_field)
                 missing = pafio_publish_request()
                 missing.pop("dependencies")
                 malformed.append(missing)
@@ -429,7 +430,6 @@ publish = false
                 f"{prefix}/scripts/registry-v2-static-read-server.py",
                 f"{prefix}/scripts/registry-v2-vm-smoke.py",
                 f"{prefix}/src/PlatformCloud/PackageRegistry/package_registry_v2/__init__.py",
-                f"{prefix}/src/PlatformCloud/PackageRegistry/package_registry_v2/publisher.py",
                 f"{prefix}/src/PlatformCloud/PackageRegistry/PublicationBuilder/package_registry_v2/publisher.py",
                 f"{prefix}/src/PlatformCloud/PackageRegistry/StaticReadPlane/package_registry_v2/validator.py",
             }

@@ -2,7 +2,7 @@
 
 #include "PlatformCore/Config.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 struct WorkerOptions
@@ -12,4 +12,4 @@ struct WorkerOptions
 
 int RunWorker(const PlatformConfig &config, WorkerOptions options = {});
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

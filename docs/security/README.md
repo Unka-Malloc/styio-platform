@@ -7,5 +7,5 @@
 ## Scope
 
 Security docs should describe platform-side trust boundaries and extension
-policy. Package-manager credential UX stays in `styio-spio` unless it directly
+policy. Package-manager credential UX stays in `pafio-nightly` unless it directly
 affects hosted platform operation.

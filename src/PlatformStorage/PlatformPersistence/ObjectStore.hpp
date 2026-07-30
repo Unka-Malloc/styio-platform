@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 enum class ObjectStoreProvider
@@ -34,4 +34,4 @@ bool ObjectExists(const ObjectStoreConfig &config, std::string_view key);
 std::vector<std::string> ListObjectKeys(const ObjectStoreConfig &config, std::string_view prefix);
 nlohmann::json DescribeObjectStore(const ObjectStoreConfig &config);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

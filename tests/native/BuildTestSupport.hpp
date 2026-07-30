@@ -9,12 +9,12 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::testsupport
+namespace pafio::testsupport
 {
 
 inline fs::path MakeTempDir(const std::string &label)
 {
-  const fs::path root = fs::temp_directory_path() / "spio-native-build-tests" / label;
+  const fs::path root = fs::temp_directory_path() / "pafio-native-build-tests" / label;
   fs::remove_all(root);
   fs::create_directories(root);
   return root;
@@ -37,4 +37,4 @@ inline std::string ReadFile(const fs::path &path)
   return buffer.str();
 }
 
-}  // namespace spio::testsupport
+}  // namespace pafio::testsupport

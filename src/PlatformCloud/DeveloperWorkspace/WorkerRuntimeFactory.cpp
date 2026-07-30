@@ -9,7 +9,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -163,7 +163,7 @@ WorkerWorkspace WorkerWorkspaceFactory::Create(const WorkerRuntimeConfig &worker
   };
 }
 
-spio::ProcessRequest BuildWorkerPafioProcessRequest(
+pafio::ProcessRequest BuildWorkerPafioProcessRequest(
     const WorkerRuntimeConfig &worker,
     const PlatformConfig &platform,
     const WorkerWorkspace &workspace,
@@ -222,9 +222,9 @@ spio::ProcessRequest BuildWorkerPafioProcessRequest(
           {"STYIO_PLATFORM_REGION", platform.region},
           {"STYIO_PLATFORM_COMPILE_CONTAINER_ID", worker.compile_container_id},
       },
-      .timeout = spio::kExternalProcessBuildTimeout,
+      .timeout = pafio::kExternalProcessBuildTimeout,
       .error_context = "pafio build for platform worker",
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

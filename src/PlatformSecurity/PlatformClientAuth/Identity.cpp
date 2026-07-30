@@ -4,7 +4,7 @@
 #include <sstream>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -89,4 +89,4 @@ nlohmann::json SerializeMtlsIdentity(const MtlsIdentity &identity)
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -27,7 +27,7 @@ Technology stack:
 - Bash delivery and docs scripts.
 - YAML repository tool configuration.
 - Systemd-managed Linux VM deployment packaging for registry server nodes.
-- OCI image packaging for `styio-platformd`, `spio`, and `styio` through
+- OCI image packaging for `styio-platformd`, `pafio`, and `styio` through
   Podman/Buildah-compatible `Containerfile`.
 - Kubernetes deployment manifests managed through Helm.
 - Postgres-backed platform state through libpq when the deployment selects the

@@ -1,6 +1,6 @@
 #include "PlatformCloud/DeveloperWorkspace/WorkspaceControlPlaneSupport.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 HttpResponse
@@ -447,4 +447,4 @@ PlatformRouter::HandleCompleteJob(const RouteMatch &match, const HttpRequest &re
   return JsonResponse(200, SuccessEnvelope("completed platform job", SerializeJobRecord(*job)));
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

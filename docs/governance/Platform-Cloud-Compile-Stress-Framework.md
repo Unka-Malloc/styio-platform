@@ -105,7 +105,7 @@ The summary JSON emitted by the framework is intentionally stable enough for gat
 ```json
 {
   "schema_version": 1,
-  "tool": "spio-cloud-compile-stress",
+  "tool": "pafio-cloud-compile-stress",
   "mode": "synthetic-container-scheduler",
   "scenario": "cloud-compile-hot-replace",
   "config": {},
@@ -138,7 +138,7 @@ Consumers must use `schema_version`, `tool`, and `gate.passed` instead of scrapi
 The named public gate is:
 
 ```text
-spio_cloud_compile_stress_gate
+pafio_cloud_compile_stress_gate
 ```
 
 Minimum command:
@@ -152,8 +152,8 @@ Minimum command:
   --concurrency 128 \
   --hot-replace-every 200 \
   --require-hot-replacement \
-  --summary-json /tmp/spio-cloud-stress-summary.json \
-  --events-jsonl /tmp/spio-cloud-stress-events.jsonl
+  --summary-json /tmp/pafio-cloud-stress-summary.json \
+  --events-jsonl /tmp/pafio-cloud-stress-events.jsonl
 ```
 
 Pass conditions:
@@ -173,4 +173,4 @@ Pass conditions:
 2. Private tenant auth and quota gates belong under `tests-private/` or `scripts-private/` until their redacted public contract exists.
 3. The harness must not require `styio` compiler internals.
 4. The harness must not require a developer-local Docker daemon for the public CI gate.
-5. New stress scenarios must add tests before becoming part of `spio_cloud_compile_stress_gate`.
+5. New stress scenarios must add tests before becoming part of `pafio_cloud_compile_stress_gate`.

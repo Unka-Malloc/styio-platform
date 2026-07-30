@@ -2,9 +2,9 @@
 
 #include "PlatformCore/Config.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 int RunMirrorSyncOnce(const PlatformConfig &config);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

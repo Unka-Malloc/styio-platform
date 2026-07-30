@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 struct ArtifactRecord
@@ -191,4 +191,4 @@ public:
   CompileContainerRecord CreateFromRegistration(const nlohmann::json &body) const;
 };
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

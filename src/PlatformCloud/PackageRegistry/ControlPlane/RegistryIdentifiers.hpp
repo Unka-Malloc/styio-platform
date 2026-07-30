@@ -13,7 +13,7 @@
 #include "PlatformService/RouterSupport.hpp"
 #include "PlatformStorage/PlatformPersistence/ObjectStore.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -215,4 +215,4 @@ VersionLess(const std::string &left, const std::string &right) {
 
 }  // namespace
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

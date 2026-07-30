@@ -18,7 +18,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -315,9 +315,9 @@ std::vector<std::string> S3SignedHeaders(
   return headers;
 }
 
-spio::ProcessResult RunCurl(std::vector<std::string> args, std::string stdin_text = {})
+pafio::ProcessResult RunCurl(std::vector<std::string> args, std::string stdin_text = {})
 {
-  spio::ProcessRequest request{
+  pafio::ProcessRequest request{
       .program = "curl",
       .args = std::move(args),
       .timeout = std::chrono::seconds{60},
@@ -326,10 +326,10 @@ spio::ProcessResult RunCurl(std::vector<std::string> args, std::string stdin_tex
       .stdin_text = std::move(stdin_text),
       .error_context = "curl s3 object request",
   };
-  spio::ProcessResult result = spio::RunProcess(request);
+  pafio::ProcessResult result = pafio::RunProcess(request);
   if (result.exit_code != 0)
   {
-    throw std::runtime_error("curl S3 request failed: " + spio::DescribeProcessFailure(result));
+    throw std::runtime_error("curl S3 request failed: " + pafio::DescribeProcessFailure(result));
   }
   return result;
 }
@@ -464,7 +464,7 @@ void PutObjectFile(const ObjectStoreConfig &config, std::string_view key, const 
   {
     throw std::runtime_error("PutObjectFile currently requires the S3 object store provider");
   }
-  const std::string payload_hash = spio::Sha256File(path);
+  const std::string payload_hash = pafio::Sha256File(path);
   std::vector<std::string> args = {"-sS", "-X", "PUT", "--upload-file", path.string(), S3Url(config, object_key)};
   AppendHeaders(args, S3SignedHeaders(config, "PUT", object_key, payload_hash));
   args.push_back("-H");
@@ -500,7 +500,7 @@ bool ObjectExists(const ObjectStoreConfig &config, std::string_view key)
   }
   std::vector<std::string> args = {"-sS", "-o", "/dev/null", "-w", "%{http_code}", "-I", S3Url(config, object_key)};
   AppendHeaders(args, S3SignedHeaders(config, "HEAD", object_key, "UNSIGNED-PAYLOAD"));
-  const spio::ProcessResult result = RunCurl(std::move(args));
+  const pafio::ProcessResult result = RunCurl(std::move(args));
   return result.stdout_text.starts_with("2");
 }
 
@@ -536,4 +536,4 @@ nlohmann::json DescribeObjectStore(const ObjectStoreConfig &config)
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

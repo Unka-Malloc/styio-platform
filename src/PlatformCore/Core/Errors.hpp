@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace spio
+namespace pafio
 {
 
 inline constexpr int kExitSuccess = 0;
@@ -107,4 +107,4 @@ struct CommandError
   std::string command;
 };
 
-}  // namespace spio
+}  // namespace pafio

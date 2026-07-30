@@ -9,7 +9,7 @@
 #include <optional>
 #include <string_view>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 inline constexpr size_t kDefaultHttpRequestBodyLimitBytes = 1U * 1024U * 1024U;
@@ -26,4 +26,4 @@ std::optional<size_t> CheckedHttpRequestSize(size_t header_bytes, uint64_t conte
 nlohmann::json DescribeBeastServerCapability();
 int RunBeastServer(const PlatformConfig &config, BeastServerOptions options = {});
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

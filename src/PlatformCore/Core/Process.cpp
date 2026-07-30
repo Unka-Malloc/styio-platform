@@ -41,7 +41,7 @@ void SetNonBlocking(int fd, const std::string &context)
   const int flags = fcntl(fd, F_GETFL, 0);
   if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) != 0)
   {
-    throw spio::ProcessFailure("failed to configure non-blocking pipe for " + context);
+    throw pafio::ProcessFailure("failed to configure non-blocking pipe for " + context);
   }
 }
 
@@ -70,7 +70,7 @@ void AppendOutputChunk(
   }
 }
 
-void ApplyChildEnvironment(const spio::ProcessRequest &request)
+void ApplyChildEnvironment(const pafio::ProcessRequest &request)
 {
   if (request.clear_environment)
   {
@@ -112,7 +112,7 @@ void KillChildProcess(const pid_t child, const bool terminate_process_group)
 
 }  // namespace
 
-namespace spio
+namespace pafio
 {
 
 ProcessResult RunProcessChecked(const ProcessRequest &request)
@@ -398,4 +398,4 @@ std::string TrimTrailingNewline(std::string text)
   return text;
 }
 
-}  // namespace spio
+}  // namespace pafio

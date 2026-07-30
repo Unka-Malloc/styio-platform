@@ -82,7 +82,7 @@ install -m 0755 scripts/registry-v2-control-plane-server.py "$bundle_dir/scripts
 install -m 0755 scripts/registry-v2-static-read-server.py "$bundle_dir/scripts/registry-v2-static-read-server.py"
 install -m 0755 scripts/registry-v2-vm-smoke.py "$bundle_dir/scripts/registry-v2-vm-smoke.py"
 cp -R src/PlatformCloud/PackageRegistry "$bundle_dir/src/PlatformCloud/PackageRegistry"
-cp docs/operations/Spio-Registry-Server-Runbook.md "$bundle_dir/docs/Pafio-Registry-Server-Runbook.md"
+cp docs/operations/Pafio-Registry-Server-Runbook.md "$bundle_dir/docs/Pafio-Registry-Server-Runbook.md"
 
 cat >"$bundle_dir/README.md" <<EOF
 # Styio Platform Registry Server VM Bundle

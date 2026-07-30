@@ -7,7 +7,7 @@
 #include <string_view>
 #include <utility>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -69,7 +69,7 @@ std::optional<std::string> ValidatePlatformJobRequest(const nlohmann::json &job_
     return "job_request.source.origin is required";
   }
   if (const std::optional<std::string> violation =
-          spio::GitSourcePolicyViolation(source["origin"].get<std::string>(), spio::PublicGitSourcePolicy());
+          pafio::GitSourcePolicyViolation(source["origin"].get<std::string>(), pafio::PublicGitSourcePolicy());
       violation.has_value())
   {
     return "job_request.source.origin " + *violation;
@@ -197,4 +197,4 @@ PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const Plat
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

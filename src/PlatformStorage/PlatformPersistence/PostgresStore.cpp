@@ -9,7 +9,7 @@
 #include <libpq-fe.h>
 #endif
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -1964,4 +1964,4 @@ nlohmann::json PostgresStore::ListRegistryAuditEvents() const
 #endif
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

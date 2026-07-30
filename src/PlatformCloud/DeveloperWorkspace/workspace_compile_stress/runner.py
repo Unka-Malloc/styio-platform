@@ -382,7 +382,7 @@ class StressRunner:
         }
         return {
             "schema_version": 1,
-            "tool": "spio-cloud-compile-stress",
+            "tool": "pafio-cloud-compile-stress",
             "mode": "synthetic-container-scheduler",
             "scenario": self.config.scenario,
             "config": asdict(self.config),

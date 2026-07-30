@@ -45,7 +45,7 @@ protocols:
   owned:
     - contracts/registry-v2/v1
     - contracts/registry-control-plane/v1
-  spio_platform_protocols:
+  pafio_platform_protocols:
     - registry_descriptor
     - publish_release
     - verify_registry

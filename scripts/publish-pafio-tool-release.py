@@ -25,7 +25,7 @@ STYIO_RELEASE_TARGETS = {
 
 
 def die(message: str) -> None:
-    raise SystemExit(f"publish-spio-tool-release: {message}")
+    raise SystemExit(f"publish-pafio-tool-release: {message}")
 
 
 def sha256_file(path: Path) -> str:
@@ -212,15 +212,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--install-script",
         default="",
-        help="Optional install-spio.sh to publish at tools/spio/install-spio.sh.",
+        help="Optional install-pafio.sh to publish at tools/pafio/install-pafio.sh.",
     )
     parser.add_argument(
         "--channel",
         default="latest",
         help="Channel pointer to update under tools/<tool>/channel/<channel>/<platform>/version.",
     )
-    parser.add_argument("--tool", default="spio", help="Tool namespace under tools/.")
-    parser.add_argument("--binary-name", default="spio", help="Published executable filename.")
+    parser.add_argument("--tool", default="pafio", help="Tool namespace under tools/.")
+    parser.add_argument("--binary-name", default="pafio", help="Published executable filename.")
     return parser.parse_args()
 
 
@@ -246,7 +246,7 @@ def main() -> int:
         install_script = Path(args.install_script).expanduser().resolve()
         if not install_script.is_file():
             die(f"install script does not exist: {install_script}")
-        install_dest = tool_root / "install-spio.sh"
+        install_dest = tool_root / "install-pafio.sh"
         install_dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(install_script, install_dest)
         install_dest.chmod(0o755)

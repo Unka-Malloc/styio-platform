@@ -2,10 +2,10 @@
 
 #include <nlohmann/json.hpp>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 nlohmann::json DefaultEcosystemRepositories();
 nlohmann::json BuildEcosystemReleasePlan(const nlohmann::json &request);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

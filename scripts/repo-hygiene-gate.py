@@ -36,8 +36,8 @@ FORBIDDEN_GLOBS = [
     "build-*/*",
     "dist",
     "dist/*",
-    ".spio",
-    ".spio/*",
+    ".pafio",
+    ".pafio/*",
     "docs/audit/defects/*",
 ]
 REQUIRED_GITIGNORE_PATTERNS = [

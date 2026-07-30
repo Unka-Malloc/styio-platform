@@ -1,6 +1,6 @@
 #include "PlatformCloud/PackageRegistry/ControlPlane/RegistryControlPlaneSupport.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 HttpResponse
@@ -165,4 +165,4 @@ PlatformRouter::HandleRevokePublishToken(const RouteMatch &match, const HttpRequ
   return JsonResponse(200, SuccessEnvelope("revoked publish token", {{"token_id", token_id}, {"revoked", true}}));
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -12,7 +12,7 @@
 #include "PlatformCloud/PackageRegistry/ControlPlane/RegistryIdentifiers.hpp"
 #include "PlatformCore/Core/Sha256.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -224,7 +224,7 @@ DirectoryDigest(const fs::path &root) {
   for (const fs::path &path : paths) {
     files.push_back({
       {"path", fs::relative(path, root).generic_string()},
-      {"sha256", spio::Sha256File(path)},
+      {"sha256", pafio::Sha256File(path)},
     });
   }
   return "sha256:" + Sha256Bytes(CanonicalJson(files));
@@ -311,4 +311,4 @@ JsonText(const nlohmann::json &payload) {
 
 }  // namespace
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

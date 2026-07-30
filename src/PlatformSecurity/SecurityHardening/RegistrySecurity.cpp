@@ -36,9 +36,9 @@ bool IsFileRegistryRoot(const std::string &value)
 }
 
 using ReadSecurityHandler =
-    SecurityHandlerResult (*)(const spio::RegistryReadSecurityRequest &request, spio::RegistryReadSecurityDecision &decision);
+    SecurityHandlerResult (*)(const pafio::RegistryReadSecurityRequest &request, pafio::RegistryReadSecurityDecision &decision);
 using WriteSecurityHandler =
-    SecurityHandlerResult (*)(const spio::RegistryWriteSecurityRequest &request, spio::RegistryWriteSecurityDecision &decision);
+    SecurityHandlerResult (*)(const pafio::RegistryWriteSecurityRequest &request, pafio::RegistryWriteSecurityDecision &decision);
 
 template <typename Request, typename Decision, typename Handler, size_t N>
 Decision RunSecurityChain(
@@ -59,27 +59,27 @@ Decision RunSecurityChain(
 }
 
 SecurityHandlerResult NormalizeReadRegistryRoot(
-    const spio::RegistryReadSecurityRequest &request,
-    spio::RegistryReadSecurityDecision &decision)
+    const pafio::RegistryReadSecurityRequest &request,
+    pafio::RegistryReadSecurityDecision &decision)
 {
   decision.registry_root = NormalizeRegistryRoot(request.registry_root);
   return SecurityHandlerResult::kContinue;
 }
 
 SecurityHandlerResult ValidateReadRegistryRootScheme(
-    const spio::RegistryReadSecurityRequest &request,
-    spio::RegistryReadSecurityDecision &decision)
+    const pafio::RegistryReadSecurityRequest &request,
+    pafio::RegistryReadSecurityDecision &decision)
 {
   if (!IsFileRegistryRoot(decision.registry_root) && !IsHttpRegistryRoot(decision.registry_root))
   {
-    throw spio::FetchError("registry root must use file://, http://, or https://: " + request.registry_root);
+    throw pafio::FetchError("registry root must use file://, http://, or https://: " + request.registry_root);
   }
   return SecurityHandlerResult::kContinue;
 }
 
 SecurityHandlerResult ResolvePublicDefaultReadAccess(
-    const spio::RegistryReadSecurityRequest &request,
-    spio::RegistryReadSecurityDecision &decision)
+    const pafio::RegistryReadSecurityRequest &request,
+    pafio::RegistryReadSecurityDecision &decision)
 {
   (void) request;
   decision.request_headers.clear();
@@ -88,32 +88,32 @@ SecurityHandlerResult ResolvePublicDefaultReadAccess(
 }
 
 SecurityHandlerResult NormalizeWriteRegistryRoot(
-    const spio::RegistryWriteSecurityRequest &request,
-    spio::RegistryWriteSecurityDecision &decision)
+    const pafio::RegistryWriteSecurityRequest &request,
+    pafio::RegistryWriteSecurityDecision &decision)
 {
   decision.registry_root = NormalizeRegistryRoot(request.registry_root);
   return SecurityHandlerResult::kContinue;
 }
 
 SecurityHandlerResult ValidateWriteRegistryRootScheme(
-    const spio::RegistryWriteSecurityRequest &request,
-    spio::RegistryWriteSecurityDecision &decision)
+    const pafio::RegistryWriteSecurityRequest &request,
+    pafio::RegistryWriteSecurityDecision &decision)
 {
   if (!IsHttpRegistryRoot(decision.registry_root))
   {
-    throw spio::PublishError("remote registry publish requires an http:// or https:// registry root: " + request.registry_root);
+    throw pafio::PublishError("remote registry publish requires an http:// or https:// registry root: " + request.registry_root);
   }
   return SecurityHandlerResult::kContinue;
 }
 
 SecurityHandlerResult RejectOpenSourceWriteSecurityHooks(
-    const spio::RegistryWriteSecurityRequest &request,
-    spio::RegistryWriteSecurityDecision &decision)
+    const pafio::RegistryWriteSecurityRequest &request,
+    pafio::RegistryWriteSecurityDecision &decision)
 {
   (void) decision;
   if (request.profile_name.has_value() || request.policy_file.has_value() || !request.explicit_request_headers.empty())
   {
-    throw spio::PublishError(
+    throw pafio::PublishError(
         "registry write security hooks require a private module under src-private/PlatformSecurity and are not available "
         "in the open-source core");
   }
@@ -121,8 +121,8 @@ SecurityHandlerResult RejectOpenSourceWriteSecurityHooks(
 }
 
 SecurityHandlerResult ResolvePublicDefaultWriteAccess(
-    const spio::RegistryWriteSecurityRequest &request,
-    spio::RegistryWriteSecurityDecision &decision)
+    const pafio::RegistryWriteSecurityRequest &request,
+    pafio::RegistryWriteSecurityDecision &decision)
 {
   (void) request;
   decision.request_headers.clear();
@@ -145,21 +145,21 @@ const std::array<WriteSecurityHandler, 4> kDefaultWriteSecurityHandlers = {
     ResolvePublicDefaultWriteAccess,
 };
 
-spio::RegistryReadSecurityResolver &ReadSecurityResolverSlot()
+pafio::RegistryReadSecurityResolver &ReadSecurityResolverSlot()
 {
-  static spio::RegistryReadSecurityResolver resolver = spio::ResolveDefaultRegistryReadSecurity;
+  static pafio::RegistryReadSecurityResolver resolver = pafio::ResolveDefaultRegistryReadSecurity;
   return resolver;
 }
 
-spio::RegistryWriteSecurityResolver &WriteSecurityResolverSlot()
+pafio::RegistryWriteSecurityResolver &WriteSecurityResolverSlot()
 {
-  static spio::RegistryWriteSecurityResolver resolver = spio::ResolveDefaultRegistryWriteSecurity;
+  static pafio::RegistryWriteSecurityResolver resolver = pafio::ResolveDefaultRegistryWriteSecurity;
   return resolver;
 }
 
 }  // namespace
 
-namespace spio
+namespace pafio
 {
 
 RegistryReadSecurityDecision ResolveDefaultRegistryReadSecurity(const RegistryReadSecurityRequest &request)
@@ -206,4 +206,4 @@ RegistryWriteSecurityDecision ResolveRegistryWriteSecurity(const RegistryWriteSe
   return WriteSecurityResolverSlot()(request);
 }
 
-}  // namespace spio
+}  // namespace pafio

@@ -2,7 +2,7 @@
 #include "PlatformService/RouterSupport.hpp"
 #include "PlatformStorage/PlatformPersistence/ObjectStore.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 PlatformRouter::PlatformRouter(PlatformConfig config) :
@@ -395,4 +395,4 @@ PlatformRouter::HandleListWorkgroupClusters(const RouteMatch &match) const {
   );
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -22,7 +22,7 @@
 #include "PlatformCore/Core/Errors.hpp"
 #include "PlatformCore/Core/Sha256.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -96,14 +96,14 @@ ValidatePublishString(
   const size_t max_bytes
 ) {
   if (!object.contains(field) || !object.at(field).is_string()) {
-    throw spio::ValidationError(field + " must be a string");
+    throw pafio::ValidationError(field + " must be a string");
   }
   const std::string &value = object.at(field).get_ref<const std::string &>();
   if (value.empty()) {
-    throw spio::ValidationError(field + " must not be empty");
+    throw pafio::ValidationError(field + " must not be empty");
   }
   if (value.size() > max_bytes) {
-    throw spio::ValidationError(field + " exceeds the " + std::to_string(max_bytes) + "-byte limit");
+    throw pafio::ValidationError(field + " exceeds the " + std::to_string(max_bytes) + "-byte limit");
   }
 }
 
@@ -114,16 +114,16 @@ ValidateExactPublishFields(
   const std::string &context
 ) {
   if (!object.is_object()) {
-    throw spio::ValidationError(context + " must be a JSON object");
+    throw pafio::ValidationError(context + " must be a JSON object");
   }
   for (const std::string &field : required) {
     if (!object.contains(field)) {
-      throw spio::ValidationError(context + " is missing required field: " + field);
+      throw pafio::ValidationError(context + " is missing required field: " + field);
     }
   }
   for (auto field = object.begin(); field != object.end(); ++field) {
     if (!required.contains(field.key())) {
-      throw spio::ValidationError(context + " contains unknown field: " + field.key());
+      throw pafio::ValidationError(context + " contains unknown field: " + field.key());
     }
   }
 }
@@ -175,10 +175,10 @@ PublishBase64Value(const unsigned char ch) {
 uint64_t
 ValidateCanonicalPublishBase64(std::string_view encoded) {
   if (encoded.empty()) {
-    throw spio::ValidationError("archive_base64 must not be empty");
+    throw pafio::ValidationError("archive_base64 must not be empty");
   }
   if (encoded.size() > kMaxPublishArchiveBase64Bytes || encoded.size() % 4U != 0U) {
-    throw spio::ValidationError("archive_base64 is not canonical base64");
+    throw pafio::ValidationError("archive_base64 is not canonical base64");
   }
 
   size_t padding = 0;
@@ -192,32 +192,32 @@ ValidateCanonicalPublishBase64(std::string_view encoded) {
     const bool padding_position = index >= encoded.size() - padding;
     if (encoded[index] == '=') {
       if (!padding_position) {
-        throw spio::ValidationError("archive_base64 is not canonical base64");
+        throw pafio::ValidationError("archive_base64 is not canonical base64");
       }
       continue;
     }
     if (padding_position || PublishBase64Value(static_cast<unsigned char>(encoded[index])) < 0) {
-      throw spio::ValidationError("archive_base64 is not canonical base64");
+      throw pafio::ValidationError("archive_base64 is not canonical base64");
     }
   }
 
   if (padding == 2U) {
     const int second = PublishBase64Value(static_cast<unsigned char>(encoded[encoded.size() - 3U]));
     if ((second & 0x0F) != 0) {
-      throw spio::ValidationError("archive_base64 is not canonical base64");
+      throw pafio::ValidationError("archive_base64 is not canonical base64");
     }
   }
   else if (padding == 1U) {
     const int third = PublishBase64Value(static_cast<unsigned char>(encoded[encoded.size() - 2U]));
     if ((third & 0x03) != 0) {
-      throw spio::ValidationError("archive_base64 is not canonical base64");
+      throw pafio::ValidationError("archive_base64 is not canonical base64");
     }
   }
 
   const uint64_t decoded_size =
     static_cast<uint64_t>(encoded.size() / 4U) * 3U - static_cast<uint64_t>(padding);
   if (decoded_size == 0U || decoded_size > kMaxPublishArchiveBytes) {
-    throw spio::ValidationError("decoded archive must be nonempty and no larger than 67108864 bytes");
+    throw pafio::ValidationError("decoded archive must be nonempty and no larger than 67108864 bytes");
   }
   return decoded_size;
 }
@@ -240,7 +240,7 @@ DecodeCanonicalPublishBase64(std::string_view encoded, const uint64_t decoded_si
     }
   }
   if (decoded.size() != decoded_size) {
-    throw spio::ValidationError("archive_base64 decoded size does not match archive_size_bytes");
+    throw pafio::ValidationError("archive_base64 decoded size does not match archive_size_bytes");
   }
   return decoded;
 }
@@ -260,17 +260,17 @@ UstarBytesAreZero(std::string_view bytes) {
 uint64_t
 ParseCanonicalUstarOctal(std::string_view field, const std::string &name) {
   if (field.size() < 2U || field.back() != '\0') {
-    throw spio::ValidationError("source archive " + name + " must be canonical NUL-terminated octal");
+    throw pafio::ValidationError("source archive " + name + " must be canonical NUL-terminated octal");
   }
   uint64_t value = 0U;
   for (size_t index = 0; index + 1U < field.size(); ++index) {
     const unsigned char byte = static_cast<unsigned char>(field[index]);
     if (byte < '0' || byte > '7') {
-      throw spio::ValidationError("source archive " + name + " must be canonical NUL-terminated octal");
+      throw pafio::ValidationError("source archive " + name + " must be canonical NUL-terminated octal");
     }
     const uint64_t digit = static_cast<uint64_t>(byte - '0');
     if (value > (std::numeric_limits<uint64_t>::max() - digit) / 8U) {
-      throw spio::ValidationError("source archive " + name + " exceeds the supported numeric range");
+      throw pafio::ValidationError("source archive " + name + " exceeds the supported numeric range");
     }
     value = value * 8U + digit;
   }
@@ -280,7 +280,7 @@ ParseCanonicalUstarOctal(std::string_view field, const std::string &name) {
 uint64_t
 ParseCanonicalUstarChecksum(std::string_view field) {
   if (field.size() != 8U || field[6] != '\0' || field[7] != ' ') {
-    throw spio::ValidationError("source archive checksum field is not canonical ustar octal");
+    throw pafio::ValidationError("source archive checksum field is not canonical ustar octal");
   }
   return ParseCanonicalUstarOctal(field.substr(0U, 7U), "checksum");
 }
@@ -292,7 +292,7 @@ ParseCanonicalUstarText(std::string_view field, const std::string &name) {
     return std::string(field);
   }
   if (!UstarBytesAreZero(field.substr(terminator))) {
-    throw spio::ValidationError("source archive " + name + " has nonzero bytes after its terminator");
+    throw pafio::ValidationError("source archive " + name + " has nonzero bytes after its terminator");
   }
   return std::string(field.substr(0U, terminator));
 }
@@ -300,7 +300,7 @@ ParseCanonicalUstarText(std::string_view field, const std::string &name) {
 std::vector<std::string_view>
 ValidateCanonicalUstarPath(const std::string &path) {
   if (path.empty() || path.front() == '/' || path.find('\\') != std::string::npos) {
-    throw spio::ValidationError("source archive member path must be canonical POSIX-relative");
+    throw pafio::ValidationError("source archive member path must be canonical POSIX-relative");
   }
   std::vector<std::string_view> parts;
   size_t offset = 0U;
@@ -309,7 +309,7 @@ ValidateCanonicalUstarPath(const std::string &path) {
     const size_t end = separator == std::string::npos ? path.size() : separator;
     const std::string_view part(path.data() + offset, end - offset);
     if (part.empty() || part == "." || part == "..") {
-      throw spio::ValidationError("source archive member path must not contain empty, dot, or parent segments");
+      throw pafio::ValidationError("source archive member path must not contain empty, dot, or parent segments");
     }
     parts.push_back(part);
     if (separator == std::string::npos) {
@@ -318,7 +318,7 @@ ValidateCanonicalUstarPath(const std::string &path) {
     offset = separator + 1U;
   }
   if (parts.size() < 2U) {
-    throw spio::ValidationError("source archive members must belong to one top-level package prefix");
+    throw pafio::ValidationError("source archive members must belong to one top-level package prefix");
   }
   return parts;
 }
@@ -329,7 +329,7 @@ ValidateCanonicalUstarPath(const std::string &path) {
 std::string
 ValidateDeterministicPafioUstar(std::string_view archive) {
   if (archive.size() < 3U * kUstarBlockBytes || archive.size() % kUstarBlockBytes != 0U) {
-    throw spio::ValidationError("source archive must be 512-byte aligned canonical ustar");
+    throw pafio::ValidationError("source archive must be 512-byte aligned canonical ustar");
   }
 
   std::set<std::string> paths;
@@ -344,7 +344,7 @@ ValidateDeterministicPafioUstar(std::string_view archive) {
     if (UstarBytesAreZero(header)) {
       if (offset + 2U * kUstarBlockBytes != archive.size() ||
           !UstarBytesAreZero(archive.substr(offset + kUstarBlockBytes, kUstarBlockBytes))) {
-        throw spio::ValidationError("source archive must end with exactly two zero blocks and no trailing bytes");
+        throw pafio::ValidationError("source archive must end with exactly two zero blocks and no trailing bytes");
       }
       trailer_seen = true;
       offset += 2U * kUstarBlockBytes;
@@ -359,25 +359,25 @@ ValidateDeterministicPafioUstar(std::string_view archive) {
           : static_cast<uint64_t>(static_cast<unsigned char>(header[index]));
     }
     if (ParseCanonicalUstarChecksum(header.substr(148U, 8U)) != computed_checksum) {
-      throw spio::ValidationError("source archive header checksum mismatch");
+      throw pafio::ValidationError("source archive header checksum mismatch");
     }
     if (ParseCanonicalUstarOctal(header.substr(100U, 8U), "mode") != 0644U ||
         ParseCanonicalUstarOctal(header.substr(108U, 8U), "uid") != 0U ||
         ParseCanonicalUstarOctal(header.substr(116U, 8U), "gid") != 0U ||
         ParseCanonicalUstarOctal(header.substr(136U, 12U), "mtime") != 0U) {
-      throw spio::ValidationError("source archive members must use mode 0644 and zero uid, gid, and mtime");
+      throw pafio::ValidationError("source archive members must use mode 0644 and zero uid, gid, and mtime");
     }
     if (header[156] != '0') {
-      throw spio::ValidationError("source archive may contain regular files only");
+      throw pafio::ValidationError("source archive may contain regular files only");
     }
     if (header.substr(257U, 6U) != std::string_view("ustar\0", 6U) ||
         header.substr(263U, 2U) != "00") {
-      throw spio::ValidationError("source archive must use POSIX ustar magic and version");
+      throw pafio::ValidationError("source archive must use POSIX ustar magic and version");
     }
     if (!UstarBytesAreZero(header.substr(157U, 100U)) ||
         !UstarBytesAreZero(header.substr(265U, 80U)) ||
         !UstarBytesAreZero(header.substr(500U, 12U))) {
-      throw spio::ValidationError("source archive link, owner, device, and extension fields must be empty");
+      throw pafio::ValidationError("source archive link, owner, device, and extension fields must be empty");
     }
 
     const std::string name = ParseCanonicalUstarText(header.substr(0U, 100U), "name");
@@ -385,40 +385,40 @@ ValidateDeterministicPafioUstar(std::string_view archive) {
     const std::string path = prefix.empty() ? name : prefix + "/" + name;
     const std::vector<std::string_view> path_parts = ValidateCanonicalUstarPath(path);
     if (!paths.insert(path).second) {
-      throw spio::ValidationError("source archive contains a duplicate member path");
+      throw pafio::ValidationError("source archive contains a duplicate member path");
     }
     if (previous_path.has_value() && *previous_path >= path) {
-      throw spio::ValidationError("source archive member paths must be strictly increasing");
+      throw pafio::ValidationError("source archive member paths must be strictly increasing");
     }
     previous_path = path;
     if (!top_level_prefix.has_value()) {
       top_level_prefix = std::string(path_parts.front());
     }
     else if (*top_level_prefix != path_parts.front()) {
-      throw spio::ValidationError("source archive members must share one top-level package prefix");
+      throw pafio::ValidationError("source archive members must share one top-level package prefix");
     }
 
     const uint64_t file_size = ParseCanonicalUstarOctal(header.substr(124U, 12U), "size");
     const size_t data_offset = offset + kUstarBlockBytes;
     if (file_size > static_cast<uint64_t>(archive.size() - data_offset)) {
-      throw spio::ValidationError("source archive member size exceeds archive bounds");
+      throw pafio::ValidationError("source archive member size exceeds archive bounds");
     }
     const size_t file_size_native = static_cast<size_t>(file_size);
     const size_t padded_size =
       ((file_size_native + kUstarBlockBytes - 1U) / kUstarBlockBytes) * kUstarBlockBytes;
     if (padded_size > archive.size() - data_offset) {
-      throw spio::ValidationError("source archive member padding exceeds archive bounds");
+      throw pafio::ValidationError("source archive member padding exceeds archive bounds");
     }
     if (!UstarBytesAreZero(
           archive.substr(data_offset + file_size_native, padded_size - file_size_native)
         )) {
-      throw spio::ValidationError("source archive member data padding must be zero");
+      throw pafio::ValidationError("source archive member data padding must be zero");
     }
 
     if (path_parts.back() == "pafio.toml") {
       ++manifest_count;
       if (path_parts.size() != 2U || file_size > kMaxPafioManifestBytes) {
-        throw spio::ValidationError(
+        throw pafio::ValidationError(
           "source archive manifest must be exactly <prefix>/pafio.toml and no larger than 1048576 bytes"
         );
       }
@@ -428,10 +428,10 @@ ValidateDeterministicPafioUstar(std::string_view archive) {
   }
 
   if (!trailer_seen || offset != archive.size()) {
-    throw spio::ValidationError("source archive must end with exactly two zero blocks");
+    throw pafio::ValidationError("source archive must end with exactly two zero blocks");
   }
   if (manifest_count != 1U) {
-    throw spio::ValidationError("source archive must contain exactly one <prefix>/pafio.toml");
+    throw pafio::ValidationError("source archive must contain exactly one <prefix>/pafio.toml");
   }
   return manifest_bytes;
 }
@@ -444,7 +444,7 @@ RequirePafioManifestTable(
 ) {
   const toml::table *table = parent[field].as_table();
   if (table == nullptr) {
-    throw spio::ValidationError("archived pafio.toml is missing or has invalid [" +
+    throw pafio::ValidationError("archived pafio.toml is missing or has invalid [" +
                                 std::string(field) + "] in " + context);
   }
   return *table;
@@ -458,7 +458,7 @@ RequirePafioManifestString(
 ) {
   const std::optional<std::string> value = table[field].value<std::string>();
   if (!value.has_value() || value->empty()) {
-    throw spio::ValidationError("archived pafio.toml " + context + "." +
+    throw pafio::ValidationError("archived pafio.toml " + context + "." +
                                 std::string(field) + " must be a non-empty string");
   }
   return *value;
@@ -495,7 +495,7 @@ ParsePafioManifestDependencies(
   }
   const toml::table *dependencies = document[table_name].as_table();
   if (dependencies == nullptr) {
-    throw spio::ValidationError("archived pafio.toml [" + std::string(table_name) +
+    throw pafio::ValidationError("archived pafio.toml [" + std::string(table_name) +
                                 "] must be a table");
   }
 
@@ -510,18 +510,18 @@ ParsePafioManifestDependencies(
     const std::string alias(alias_key.str());
     const toml::table *dependency = node.as_table();
     if (dependency == nullptr || !dependency->is_inline()) {
-      throw spio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
+      throw pafio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
                                   std::string(table_name) + "] must be an inline table");
     }
     if (dependency->size() != allowed_fields.size()) {
-      throw spio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
+      throw pafio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
                                   std::string(table_name) +
                                   "] must contain exactly package, version, and registry");
     }
     for (const auto &[field_key, ignored] : *dependency) {
       (void) ignored;
       if (!allowed_fields.contains(field_key.str())) {
-        throw spio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
+        throw pafio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
                                     std::string(table_name) + "] contains unsupported field '" +
                                     std::string(field_key.str()) + "'");
       }
@@ -529,7 +529,7 @@ ParsePafioManifestDependencies(
     const std::string version =
       RequirePafioManifestString(*dependency, "version", "dependency '" + alias + "'");
     if (!IsStrictPafioVersion(version)) {
-      throw spio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
+      throw pafio::ValidationError("dependency '" + alias + "' in archived pafio.toml [" +
                                   std::string(table_name) + "] version must be strict x.y.z");
     }
     normalized.push_back({
@@ -565,46 +565,43 @@ ValidatePafioManifest(
     document = toml::parse(manifest_bytes, std::string_view("pafio.toml"));
   }
   catch (const toml::parse_error &) {
-    throw spio::ValidationError("archived pafio.toml must be valid UTF-8 TOML");
-  }
-  if (document.contains("spio")) {
-    throw spio::ValidationError("archived pafio.toml must not contain [spio]");
+    throw pafio::ValidationError("archived pafio.toml must be valid UTF-8 TOML");
   }
   const toml::table &pafio = RequirePafioManifestTable(document, "pafio", "manifest");
   const std::optional<int64_t> manifest_version = pafio["manifest-version"].value<int64_t>();
   if (!manifest_version.has_value() || *manifest_version != 1) {
-    throw spio::ValidationError("archived pafio.toml [pafio].manifest-version must be 1");
+    throw pafio::ValidationError("archived pafio.toml [pafio].manifest-version must be 1");
   }
   const toml::table &package = RequirePafioManifestTable(document, "package", "manifest");
   if (RequirePafioManifestString(package, "name", "package") != draft.package) {
-    throw spio::ValidationError("request package does not match archived pafio.toml");
+    throw pafio::ValidationError("request package does not match archived pafio.toml");
   }
   const std::string package_version = RequirePafioManifestString(package, "version", "package");
   if (!IsStrictPafioVersion(package_version)) {
-    throw spio::ValidationError("archived pafio.toml package.version must be strict x.y.z");
+    throw pafio::ValidationError("archived pafio.toml package.version must be strict x.y.z");
   }
   if (package_version != draft.version) {
-    throw spio::ValidationError("request version does not match archived pafio.toml");
+    throw pafio::ValidationError("request version does not match archived pafio.toml");
   }
   const std::optional<bool> publish = package["publish"].value<bool>();
   if (!publish.has_value() || !*publish) {
-    throw spio::ValidationError("archived pafio.toml package.publish must be true");
+    throw pafio::ValidationError("archived pafio.toml package.publish must be true");
   }
   if (ParsePafioManifestDependencies(document, "dependencies") != draft.dependencies) {
-    throw spio::ValidationError("request dependencies do not match archived pafio.toml");
+    throw pafio::ValidationError("request dependencies do not match archived pafio.toml");
   }
   if (ParsePafioManifestDependencies(document, "dev-dependencies") != draft.dev_dependencies) {
-    throw spio::ValidationError("request dev_dependencies do not match archived pafio.toml");
+    throw pafio::ValidationError("request dev_dependencies do not match archived pafio.toml");
   }
 }
 
 nlohmann::json
 ValidatePublishDependencies(const nlohmann::json &body, const std::string &field) {
   if (!body.contains(field) || !body.at(field).is_array()) {
-    throw spio::ValidationError(field + " must be an array");
+    throw pafio::ValidationError(field + " must be an array");
   }
   if (body.at(field).size() > kMaxPublishDependenciesPerTable) {
-    throw spio::ValidationError(field + " exceeds the 256-entry limit");
+    throw pafio::ValidationError(field + " exceeds the 256-entry limit");
   }
 
   static const std::set<std::string> dependency_fields = {
@@ -624,14 +621,14 @@ ValidatePublishDependencies(const nlohmann::json &body, const std::string &field
     ValidatePublishString(dependency, "registry", kMaxPublishRegistryBytes);
     const std::string package = dependency.at("package").get<std::string>();
     if (const std::optional<std::string> error = ValidatePackageName(package); error.has_value()) {
-      throw spio::ValidationError(field + " package is invalid: " + *error);
+      throw pafio::ValidationError(field + " package is invalid: " + *error);
     }
     const std::string alias = dependency.at("alias").get<std::string>();
     if (!IsStrictPafioVersion(dependency.at("version_req").get_ref<const std::string &>())) {
-      throw spio::ValidationError(field + " version_req must be strict x.y.z");
+      throw pafio::ValidationError(field + " version_req must be strict x.y.z");
     }
     if (!aliases.insert(alias).second) {
-      throw spio::ValidationError(field + " contains duplicate alias: " + alias);
+      throw pafio::ValidationError(field + " contains duplicate alias: " + alias);
     }
     ordered.push_back(dependency);
   }
@@ -678,37 +675,37 @@ BuildPublishDraft(const nlohmann::json &body, const std::string &publisher_actor
   draft.archive_name = body.at("archive_name").get<std::string>();
   draft.archive_sha256 = body.at("archive_sha256").get<std::string>();
   if (const std::optional<std::string> error = ValidatePackageName(draft.package); error.has_value()) {
-    throw spio::ValidationError(*error);
+    throw pafio::ValidationError(*error);
   }
   if (!IsStrictPafioVersion(draft.version)) {
-    throw spio::ValidationError("version must be strict x.y.z");
+    throw pafio::ValidationError("version must be strict x.y.z");
   }
   if (!IsSafePublishArchiveName(draft.archive_name)) {
-    throw spio::ValidationError("archive_name must be a safe basename ending in .pafio.src.tar");
+    throw pafio::ValidationError("archive_name must be a safe basename ending in .pafio.src.tar");
   }
   if (!IsLowerHexDigest(draft.archive_sha256)) {
-    throw spio::ValidationError("archive_sha256 must be a lowercase SHA-256 digest");
+    throw pafio::ValidationError("archive_sha256 must be a lowercase SHA-256 digest");
   }
   if (!body.at("archive_size_bytes").is_number_unsigned() &&
       !body.at("archive_size_bytes").is_number_integer()) {
-    throw spio::ValidationError("archive_size_bytes must be an integer");
+    throw pafio::ValidationError("archive_size_bytes must be an integer");
   }
   if (body.at("archive_size_bytes").is_number_integer() &&
       body.at("archive_size_bytes").get<int64_t>() <= 0) {
-    throw spio::ValidationError("archive_size_bytes must be greater than zero");
+    throw pafio::ValidationError("archive_size_bytes must be greater than zero");
   }
   try {
     draft.archive_size_bytes = body.at("archive_size_bytes").get<uint64_t>();
   }
   catch (const std::exception &) {
-    throw spio::ValidationError("archive_size_bytes must be a positive integer");
+    throw pafio::ValidationError("archive_size_bytes must be a positive integer");
   }
   if (draft.archive_size_bytes == 0U || draft.archive_size_bytes > kMaxPublishArchiveBytes) {
-    throw spio::ValidationError("archive_size_bytes must be between 1 and 67108864");
+    throw pafio::ValidationError("archive_size_bytes must be between 1 and 67108864");
   }
   const std::string &archive_base64 = body.at("archive_base64").get_ref<const std::string &>();
   if (ValidateCanonicalPublishBase64(archive_base64) != draft.archive_size_bytes) {
-    throw spio::ValidationError("archive_base64 decoded size does not match archive_size_bytes");
+    throw pafio::ValidationError("archive_base64 decoded size does not match archive_size_bytes");
   }
   draft.dependencies = ValidatePublishDependencies(body, "dependencies");
   draft.dev_dependencies = ValidatePublishDependencies(body, "dev_dependencies");
@@ -733,7 +730,7 @@ MaterializePublishArchive(
   const std::string &archive_base64 = body.at("archive_base64").get_ref<const std::string &>();
   const std::string decoded = DecodeCanonicalPublishBase64(archive_base64, draft.archive_size_bytes);
   if (Sha256Bytes(decoded) != draft.archive_sha256) {
-    throw spio::ValidationError("decoded archive SHA-256 does not match archive_sha256");
+    throw pafio::ValidationError("decoded archive SHA-256 does not match archive_sha256");
   }
   const std::string manifest_bytes = ValidateDeterministicPafioUstar(decoded);
   ValidatePafioManifest(manifest_bytes, draft);
@@ -865,7 +862,7 @@ AppendRegistryReleaseToLocal(
   const fs::path artifact_dest_path = registry_root / artifact_path;
   fs::create_directories(artifact_dest_path.parent_path());
   if (fs::exists(artifact_dest_path)) {
-    if (spio::Sha256File(artifact_dest_path) != release_record.at("source_artifact").at("sha256").get<std::string>()) {
+    if (pafio::Sha256File(artifact_dest_path) != release_record.at("source_artifact").at("sha256").get<std::string>()) {
       throw std::runtime_error("destination artifact already exists with different content");
     }
   }
@@ -907,4 +904,4 @@ AppendRegistryReleaseToLocal(
 
 }  // namespace
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

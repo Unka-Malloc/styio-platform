@@ -4,7 +4,7 @@
 
 #include <sstream>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -157,4 +157,4 @@ nlohmann::json SerializePublicConfig(const PlatformConfig &config)
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

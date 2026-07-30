@@ -6,7 +6,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 nlohmann::json BuildReleaseRolloutPlan(
@@ -66,4 +66,4 @@ nlohmann::json ListReleaseChannels(const fs::path &registry_root)
   return channels;
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

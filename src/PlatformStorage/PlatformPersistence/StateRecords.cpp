@@ -1,6 +1,6 @@
 #include "PlatformStorage/PlatformPersistence/StateRecords.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 nlohmann::json SerializeArtifact(const ArtifactRecord &artifact)
@@ -250,4 +250,4 @@ CompileContainerRecord CompileContainerRecordFactory::CreateFromRegistration(con
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

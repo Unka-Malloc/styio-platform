@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 struct MtlsIdentity
@@ -20,4 +20,4 @@ std::optional<MtlsIdentity> ParseMtlsUriSan(std::string_view value);
 bool IsPlatformServiceRole(std::string_view role);
 nlohmann::json SerializeMtlsIdentity(const MtlsIdentity &identity);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

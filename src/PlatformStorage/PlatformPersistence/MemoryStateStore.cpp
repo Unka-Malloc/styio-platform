@@ -4,7 +4,7 @@
 #include <sstream>
 #include <utility>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -636,4 +636,4 @@ nlohmann::json MemoryStateStore::ListRegistryAuditEvents() const
   return events;
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

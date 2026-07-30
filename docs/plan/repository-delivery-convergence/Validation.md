@@ -1,15 +1,17 @@
-# Validation
+# Styio Platform Owner Convergence Validation
 
-## Requirement Mapping
+**Purpose:** Freeze focused and final acceptance for the Platform cutover.
 
-- REQ-001: Check `docs/plan/Manifest.json`, this plan directory, and `Evidence.md` source inventory.
-- REQ-002: Run `python <better-plan>/scripts/manifest_tool.py validate docs/plan`.
-- REQ-003: Inspect the implementation checkpoint in `Checkpoints.json` and the Open Work Signals section in `Evidence.md`.
-- REQ-004: Run a repository search for old planning roots and plan marker directories outside `docs/plan`.
-- REQ-005: Inspect this validation matrix and final validation checkpoint acceptance criteria.
+**Last updated:** 2026-07-30
 
-## Final Checks
+- REQ-PLATFORM-CONV-001 is proven by hosted/control-plane contract tests and
+  service routing tests.
+- REQ-PLATFORM-CONV-002 is proven by registry v2/control-plane contracts.
+- REQ-PLATFORM-CONV-003 is proven by worker factory and job queue tests.
+- REQ-PLATFORM-CONV-004 is proven by repository hygiene, direct-import tests,
+  and a tracked-file identity search.
+- REQ-PLATFORM-CONV-005 is proven first by the focused Platform test selection,
+  then by exactly one full suite and the fixed-revision ecosystem verifier.
 
-1. Manifest validation passes for `docs/plan`.
-2. No old planning root remains at `docs/plan`, `docs/plan`, or `docs/plan`.
-3. Product implementation remains represented as open Better Plan work unless direct code and test evidence proves completion.
+Better Plan validation, generated documentation indexes, documentation audit,
+and repository hygiene must pass before the implementation revision is fixed.

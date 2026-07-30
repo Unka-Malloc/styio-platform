@@ -64,14 +64,14 @@ bool HasControlCharacter(std::string_view value)
   return false;
 }
 
-bool ResultFailed(const spio::ProcessResult &result)
+bool ResultFailed(const pafio::ProcessResult &result)
 {
   return result.exit_code != 0 || result.timed_out || result.terminated_by_signal;
 }
 
-std::string FailureMessage(const std::string &operation, const spio::ProcessResult &result)
+std::string FailureMessage(const std::string &operation, const pafio::ProcessResult &result)
 {
-  return operation + " failed: " + spio::DescribeProcessFailure(result);
+  return operation + " failed: " + pafio::DescribeProcessFailure(result);
 }
 
 std::optional<fs::path> FindVendoredSnapshot(
@@ -90,8 +90,8 @@ std::optional<fs::path> FindVendoredSnapshot(
     return std::nullopt;
   }
 
-  const fs::path ready_marker = snapshot_root / ".spio-snapshot-ready";
-  if (fs::exists(ready_marker) || fs::exists(snapshot_root / "spio.toml"))
+  const fs::path ready_marker = snapshot_root / ".pafio-snapshot-ready";
+  if (fs::exists(ready_marker) || fs::exists(snapshot_root / "pafio.toml"))
   {
     return CanonicalAbsolutePath(snapshot_root);
   }
@@ -100,7 +100,7 @@ std::optional<fs::path> FindVendoredSnapshot(
 
 }  // namespace
 
-namespace spio
+namespace pafio
 {
 
 GitSourcePolicy PublicGitSourcePolicy()
@@ -358,12 +358,12 @@ GitSnapshotResult GitSourceFetcher::MaterializeSnapshot(const GitSnapshotRequest
   {
     throw FetchError("git snapshot revision is required");
   }
-  if (request.spio_home.empty())
+  if (request.pafio_home.empty())
   {
     throw FetchError("git snapshot cache root is required");
   }
 
-  const fs::path spio_home = CanonicalAbsolutePath(request.spio_home);
+  const fs::path pafio_home = CanonicalAbsolutePath(request.pafio_home);
   const std::string repo_hash = SourceFetchIdentityHash(request.origin);
   if (const std::optional<fs::path> vendored_snapshot =
           FindVendoredSnapshot(request.vendor_root, repo_hash, request.revision);
@@ -378,14 +378,14 @@ GitSnapshotResult GitSourceFetcher::MaterializeSnapshot(const GitSnapshotRequest
     };
   }
 
-  fs::create_directories(spio_home / "git" / "repos");
-  fs::create_directories(spio_home / "git" / "checkouts");
-  const fs::path repo_dir = spio_home / "git" / "repos" / (repo_hash + ".git");
+  fs::create_directories(pafio_home / "git" / "repos");
+  fs::create_directories(pafio_home / "git" / "checkouts");
+  const fs::path repo_dir = pafio_home / "git" / "repos" / (repo_hash + ".git");
   GitSnapshotResult snapshot{
       .origin = request.origin,
       .revision = request.revision,
       .repo_hash = repo_hash,
-      .snapshot_root = spio_home / "git" / "checkouts" / repo_hash / request.revision,
+      .snapshot_root = pafio_home / "git" / "checkouts" / repo_hash / request.revision,
   };
 
   if (!fs::exists(repo_dir))
@@ -433,7 +433,7 @@ GitSnapshotResult GitSourceFetcher::MaterializeSnapshot(const GitSnapshotRequest
     }
   }
 
-  const fs::path ready_marker = snapshot.snapshot_root / ".spio-snapshot-ready";
+  const fs::path ready_marker = snapshot.snapshot_root / ".pafio-snapshot-ready";
   if (fs::exists(ready_marker))
   {
     return snapshot;
@@ -474,4 +474,4 @@ GitSnapshotResult GitSourceFetcher::MaterializeSnapshot(const GitSnapshotRequest
   return snapshot;
 }
 
-}  // namespace spio
+}  // namespace pafio

@@ -4,9 +4,9 @@
 
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 std::vector<RouteSpec> BuildRegistryControlPlaneRoutes();
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

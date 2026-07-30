@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -187,4 +187,4 @@ nlohmann::json BuildEcosystemReleasePlan(const nlohmann::json &request)
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

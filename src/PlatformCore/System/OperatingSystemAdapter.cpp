@@ -14,7 +14,7 @@
 
 namespace fs = std::filesystem;
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -58,9 +58,9 @@ public:
     out.write(text.data(), static_cast<std::streamsize>(text.size()));
   }
 
-  spio::ProcessResult RunProcess(const spio::ProcessRequest &request) const override
+  pafio::ProcessResult RunProcess(const pafio::ProcessRequest &request) const override
   {
-    return spio::RunProcessChecked(request);
+    return pafio::RunProcessChecked(request);
   }
 
   std::string SendTcpRequest(const TcpRequest &request) const override
@@ -164,4 +164,4 @@ const OperatingSystemAdapter &DefaultOperatingSystemAdapter()
   return adapter;
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

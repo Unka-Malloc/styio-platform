@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 struct MtlsConfig
@@ -74,4 +74,4 @@ std::vector<std::string> SplitCsv(std::string value);
 PlatformConfig LoadPlatformConfigFromEnvironment();
 nlohmann::json SerializePublicConfig(const PlatformConfig &config);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

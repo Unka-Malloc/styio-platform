@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 struct PlatformCertificateAuthorityConfig
@@ -48,4 +48,4 @@ PlatformCertificateBundle EnsurePlatformMtlsCertificate(
     const PlatformCertificateAuthorityConfig &config,
     const PlatformCertificateSubject &subject);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

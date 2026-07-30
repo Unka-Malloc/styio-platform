@@ -38,17 +38,17 @@
 
 using json = nlohmann::json;
 
-using spio::testsupport::MakeTempDir;
-using spio::testsupport::ReadFile;
-using spio::testsupport::WriteFile;
+using pafio::testsupport::MakeTempDir;
+using pafio::testsupport::ReadFile;
+using pafio::testsupport::WriteFile;
 
 namespace
 {
 
-class RecordingOperatingSystemAdapter final : public spio::platform::OperatingSystemAdapter
+class RecordingOperatingSystemAdapter final : public pafio::platform::OperatingSystemAdapter
 {
 public:
-  mutable std::vector<spio::ProcessRequest> requests;
+  mutable std::vector<pafio::ProcessRequest> requests;
   std::map<std::string, std::string> environment;
 
   std::optional<std::string> GetEnv(std::string_view name) const override
@@ -76,7 +76,7 @@ public:
     WriteFile(path, std::string(text));
   }
 
-  spio::ProcessResult RunProcess(const spio::ProcessRequest &request) const override
+  pafio::ProcessResult RunProcess(const pafio::ProcessRequest &request) const override
   {
     requests.push_back(request);
     if (request.args.size() >= 2 && request.args[0] == "rev-parse" && request.args[1] == "HEAD")
@@ -86,7 +86,7 @@ public:
     return {};
   }
 
-  std::string SendTcpRequest(const spio::platform::TcpRequest &) const override
+  std::string SendTcpRequest(const pafio::platform::TcpRequest &) const override
   {
     return {};
   }
@@ -94,7 +94,7 @@ public:
   void SleepFor(std::chrono::milliseconds) const override {}
 };
 
-spio::platform::MtlsIdentity WorkerIdentity()
+pafio::platform::MtlsIdentity WorkerIdentity()
 {
   return {
       .role = "worker",
@@ -103,7 +103,7 @@ spio::platform::MtlsIdentity WorkerIdentity()
   };
 }
 
-spio::platform::MtlsIdentity RegistryWriterIdentity()
+pafio::platform::MtlsIdentity RegistryWriterIdentity()
 {
   return {
       .role = "registry-writer",
@@ -112,7 +112,7 @@ spio::platform::MtlsIdentity RegistryWriterIdentity()
   };
 }
 
-spio::platform::MtlsIdentity MirrorIdentity()
+pafio::platform::MtlsIdentity MirrorIdentity()
 {
   return {
       .role = "mirror",
@@ -121,7 +121,7 @@ spio::platform::MtlsIdentity MirrorIdentity()
   };
 }
 
-spio::platform::MtlsIdentity OperatorIdentity()
+pafio::platform::MtlsIdentity OperatorIdentity()
 {
   return {
       .role = "operator",
@@ -150,8 +150,8 @@ nlohmann::json MinimalJobRequest()
   };
 }
 
-spio::platform::HttpRequest Request(
-    spio::platform::HttpMethod method,
+pafio::platform::HttpRequest Request(
+    pafio::platform::HttpMethod method,
     std::string path,
     nlohmann::json body = nlohmann::json::object())
 {
@@ -163,10 +163,10 @@ spio::platform::HttpRequest Request(
   };
 }
 
-spio::platform::HttpRequest RequestWithIdentity(
-    spio::platform::HttpMethod method,
+pafio::platform::HttpRequest RequestWithIdentity(
+    pafio::platform::HttpMethod method,
     std::string path,
-    spio::platform::MtlsIdentity identity,
+    pafio::platform::MtlsIdentity identity,
     nlohmann::json body = nlohmann::json::object())
 {
   return {
@@ -177,8 +177,8 @@ spio::platform::HttpRequest RequestWithIdentity(
   };
 }
 
-spio::platform::HttpRequest RequestWithToken(
-    spio::platform::HttpMethod method,
+pafio::platform::HttpRequest RequestWithToken(
+    pafio::platform::HttpMethod method,
     std::string path,
     std::string token,
     nlohmann::json body = nlohmann::json::object())
@@ -191,9 +191,9 @@ spio::platform::HttpRequest RequestWithToken(
   };
 }
 
-spio::platform::PlatformConfig TestPlatformConfig(const fs::path &root)
+pafio::platform::PlatformConfig TestPlatformConfig(const fs::path &root)
 {
-  spio::platform::PlatformConfig config;
+  pafio::platform::PlatformConfig config;
   config.region = "local-dev";
   config.node_id = "node-test";
   config.postgres_dsn = "postgres://platform@localhost/styio";
@@ -434,26 +434,26 @@ bool DirectoryHasEntries(const fs::path &path)
 
 TEST(PlatformSourceFetchTests, AllowsStandardGitTransports)
 {
-  const spio::GitSourcePolicy policy = spio::PublicGitSourcePolicy();
+  const pafio::GitSourcePolicy policy = pafio::PublicGitSourcePolicy();
 
-  EXPECT_FALSE(spio::GitSourcePolicyViolation("https://github.com/acme/demo.git", policy).has_value());
-  EXPECT_FALSE(spio::GitSourcePolicyViolation("http://git.local/acme/demo.git", policy).has_value());
-  EXPECT_FALSE(spio::GitSourcePolicyViolation("git@github.com:acme/demo.git", policy).has_value());
-  EXPECT_FALSE(spio::GitSourcePolicyViolation("ssh://github.com/acme/demo.git", policy).has_value());
-  EXPECT_FALSE(spio::GitSourcePolicyViolation("git://github.com/acme/demo.git", policy).has_value());
-  EXPECT_FALSE(spio::GitSourcePolicyViolation("file:///tmp/demo.git", policy).has_value());
-  EXPECT_FALSE(spio::GitSourcePolicyViolation("../demo.git", policy).has_value());
-  EXPECT_TRUE(spio::GitSourcePolicyViolation("ftp://example.test/demo.git", policy).has_value());
-  EXPECT_TRUE(spio::GitSourcePolicyViolation("https://github.com/acme/demo.git\n", policy).has_value());
+  EXPECT_FALSE(pafio::GitSourcePolicyViolation("https://github.com/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(pafio::GitSourcePolicyViolation("http://git.local/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(pafio::GitSourcePolicyViolation("git@github.com:acme/demo.git", policy).has_value());
+  EXPECT_FALSE(pafio::GitSourcePolicyViolation("ssh://github.com/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(pafio::GitSourcePolicyViolation("git://github.com/acme/demo.git", policy).has_value());
+  EXPECT_FALSE(pafio::GitSourcePolicyViolation("file:///tmp/demo.git", policy).has_value());
+  EXPECT_FALSE(pafio::GitSourcePolicyViolation("../demo.git", policy).has_value());
+  EXPECT_TRUE(pafio::GitSourcePolicyViolation("ftp://example.test/demo.git", policy).has_value());
+  EXPECT_TRUE(pafio::GitSourcePolicyViolation("https://github.com/acme/demo.git\n", policy).has_value());
 }
 
 TEST(PlatformSourceFetchTests, ClonesPublicWorktreeThroughSharedFetcher)
 {
   const fs::path root = MakeTempDir("platform-source-fetch-worktree");
   RecordingOperatingSystemAdapter os;
-  const spio::GitSourceFetcher fetcher(os);
+  const pafio::GitSourceFetcher fetcher(os);
 
-  const spio::GitWorktreeResult result = fetcher.EnsureWorktree({
+  const pafio::GitWorktreeResult result = fetcher.EnsureWorktree({
       .origin = "https://github.com/acme/demo.git",
       .checkout_root = root / "checkout",
       .revision = std::string("main"),
@@ -461,7 +461,7 @@ TEST(PlatformSourceFetchTests, ClonesPublicWorktreeThroughSharedFetcher)
       .shallow = true,
       .depth = 1,
       .clone_revision_as_branch = false,
-      .policy = spio::PublicGitSourcePolicy(),
+      .policy = pafio::PublicGitSourcePolicy(),
       .error_context = "test source fetch",
   });
 
@@ -487,16 +487,16 @@ TEST(PlatformSourceFetchTests, ClonesPublicWorktreeThroughSharedFetcher)
 
 TEST(PlatformClientAuthTests, ParsesMtlsUriSanIntoRoleTenantAndNode)
 {
-  const std::optional<spio::platform::MtlsIdentity> identity =
-      spio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/tenant-acme/role/worker/node/worker-01");
+  const std::optional<pafio::platform::MtlsIdentity> identity =
+      pafio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/tenant-acme/role/worker/node/worker-01");
 
   ASSERT_TRUE(identity.has_value());
   EXPECT_EQ(identity->role, "worker");
   EXPECT_EQ(identity->tenant_id, "tenant-acme");
   EXPECT_EQ(identity->node_id, "worker-01");
-  EXPECT_TRUE(spio::platform::IsPlatformServiceRole(identity->role));
+  EXPECT_TRUE(pafio::platform::IsPlatformServiceRole(identity->role));
 
-  const json serialized = spio::platform::SerializeMtlsIdentity(*identity);
+  const json serialized = pafio::platform::SerializeMtlsIdentity(*identity);
   EXPECT_EQ(serialized.at("role").get<std::string>(), "worker");
   EXPECT_EQ(serialized.at("tenant_id").get<std::string>(), "tenant-acme");
   EXPECT_EQ(serialized.at("node_id").get<std::string>(), "worker-01");
@@ -504,34 +504,34 @@ TEST(PlatformClientAuthTests, ParsesMtlsUriSanIntoRoleTenantAndNode)
 
 TEST(PlatformClientAuthTests, RejectsUnknownMtlsUriSanRoleOrMissingNode)
 {
-  EXPECT_FALSE(spio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/acme/role/browser/node/client").has_value());
-  EXPECT_FALSE(spio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/acme/role/worker").has_value());
-  EXPECT_FALSE(spio::platform::ParseMtlsUriSan("https://styio-platform/tenant/acme/role/worker/node/worker-01").has_value());
+  EXPECT_FALSE(pafio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/acme/role/browser/node/client").has_value());
+  EXPECT_FALSE(pafio::platform::ParseMtlsUriSan("spiffe://styio-platform/tenant/acme/role/worker").has_value());
+  EXPECT_FALSE(pafio::platform::ParseMtlsUriSan("https://styio-platform/tenant/acme/role/worker/node/worker-01").has_value());
 }
 
 TEST(PlatformClientAuthTests, AppliesOperationAuthorizationPolicy)
 {
-  const spio::platform::MtlsIdentity registry_writer{
+  const pafio::platform::MtlsIdentity registry_writer{
       .role = "registry-writer",
       .tenant_id = "tenant-acme",
       .node_id = "registry-writer-01",
   };
-  const spio::platform::MtlsIdentity worker{
+  const pafio::platform::MtlsIdentity worker{
       .role = "worker",
       .tenant_id = "tenant-acme",
       .node_id = "worker-01",
   };
 
-  EXPECT_TRUE(spio::platform::IsInternalRole(worker));
-  EXPECT_TRUE(spio::platform::IsAuthorizedForOperation("publishRelease", registry_writer));
-  EXPECT_FALSE(spio::platform::IsAuthorizedForOperation("publishRelease", worker));
-  EXPECT_FALSE(spio::platform::IsAuthorizedForOperation("registerWorkgroupCluster", registry_writer));
-  EXPECT_TRUE(spio::platform::IsAuthorizedForOperation("claimJob", worker));
+  EXPECT_TRUE(pafio::platform::IsInternalRole(worker));
+  EXPECT_TRUE(pafio::platform::IsAuthorizedForOperation("publishRelease", registry_writer));
+  EXPECT_FALSE(pafio::platform::IsAuthorizedForOperation("publishRelease", worker));
+  EXPECT_FALSE(pafio::platform::IsAuthorizedForOperation("registerWorkgroupCluster", registry_writer));
+  EXPECT_TRUE(pafio::platform::IsAuthorizedForOperation("claimJob", worker));
 }
 
 TEST(PlatformExternalIdentityTests, NormalizesSupportedProviders)
 {
-  const spio::platform::ExternalIdentityRecord google = spio::platform::NormalizeExternalIdentity({
+  const pafio::platform::ExternalIdentityRecord google = pafio::platform::NormalizeExternalIdentity({
       {"provider", "google"},
       {"tenant_id", "tenant-acme"},
       {"roles", json::array({"developer"})},
@@ -540,7 +540,7 @@ TEST(PlatformExternalIdentityTests, NormalizesSupportedProviders)
   EXPECT_EQ(google.actor_id, "external:google:google-subject-01");
   EXPECT_EQ(google.email, "alice@example.test");
 
-  const spio::platform::ExternalIdentityRecord telegram = spio::platform::NormalizeExternalIdentity({
+  const pafio::platform::ExternalIdentityRecord telegram = pafio::platform::NormalizeExternalIdentity({
       {"provider", "telegram"},
       {"claims", {{"id", 100200300}, {"username", "alice_dev"}}},
   });
@@ -548,22 +548,22 @@ TEST(PlatformExternalIdentityTests, NormalizesSupportedProviders)
   EXPECT_EQ(telegram.email, "alice_dev");
 
   EXPECT_THROW(
-      spio::platform::NormalizeExternalIdentity({{"provider", "unknown"}, {"claims", {{"sub", "x"}}}}),
+      pafio::platform::NormalizeExternalIdentity({{"provider", "unknown"}, {"claims", {{"sub", "x"}}}}),
       std::runtime_error);
 }
 
 TEST(PlatformCATests, InitializesLocalCaAndIssuesMtlsCertificate)
 {
   const fs::path root = MakeTempDir("platform-local-ca");
-  spio::platform::PlatformCertificateAuthorityConfig config;
+  pafio::platform::PlatformCertificateAuthorityConfig config;
   config.root_dir = root / "mtls";
   config.ca_valid_days = 30;
   config.leaf_valid_days = 7;
 
-  const spio::platform::PlatformCertificateSubject subject =
-      spio::platform::BuildPlatformNodeCertificateSubject("worker", "tenant-acme", "worker-01");
-  const spio::platform::PlatformCertificateBundle bundle =
-      spio::platform::EnsurePlatformMtlsCertificate(config, subject);
+  const pafio::platform::PlatformCertificateSubject subject =
+      pafio::platform::BuildPlatformNodeCertificateSubject("worker", "tenant-acme", "worker-01");
+  const pafio::platform::PlatformCertificateBundle bundle =
+      pafio::platform::EnsurePlatformMtlsCertificate(config, subject);
 
   EXPECT_TRUE(fs::is_regular_file(bundle.ca_certificate_path));
   EXPECT_TRUE(fs::is_regular_file(bundle.ca_private_key_path));
@@ -573,8 +573,8 @@ TEST(PlatformCATests, InitializesLocalCaAndIssuesMtlsCertificate)
       bundle.identity_uri_san,
       "spiffe://styio-platform/tenant/tenant-acme/role/worker/node/worker-01");
 
-  const std::optional<spio::platform::MtlsIdentity> identity =
-      spio::platform::ParseMtlsUriSan(bundle.identity_uri_san);
+  const std::optional<pafio::platform::MtlsIdentity> identity =
+      pafio::platform::ParseMtlsUriSan(bundle.identity_uri_san);
   ASSERT_TRUE(identity.has_value());
   EXPECT_EQ(identity->role, "worker");
   EXPECT_EQ(identity->tenant_id, "tenant-acme");
@@ -585,118 +585,118 @@ TEST(PlatformCATests, InitializesLocalCaAndIssuesMtlsCertificate)
 
 TEST(PlatformServiceRouterTests, MatchesRouteParametersForJobsAndMirrors)
 {
-  const std::vector<spio::platform::RouteSpec> routes = spio::platform::BuildPlatformControlPlaneRoutes();
+  const std::vector<pafio::platform::RouteSpec> routes = pafio::platform::BuildPlatformControlPlaneRoutes();
 
-  const std::optional<spio::platform::RouteMatch> job =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/jobs/job-abc/events");
+  const std::optional<pafio::platform::RouteMatch> job =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Get, "/jobs/job-abc/events");
   ASSERT_TRUE(job.has_value());
   EXPECT_EQ(job->route.operation_id, "getJobEvents");
   EXPECT_EQ(job->parameters.at("job_id"), "job-abc");
 
-  const std::optional<spio::platform::RouteMatch> mirror =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/mirrors/registry-primary/status");
+  const std::optional<pafio::platform::RouteMatch> mirror =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Get, "/mirrors/registry-primary/status");
   ASSERT_TRUE(mirror.has_value());
   EXPECT_EQ(mirror->route.operation_id, "mirrorStatus");
   EXPECT_EQ(mirror->parameters.at("mirror_id"), "registry-primary");
 
-  const std::optional<spio::platform::RouteMatch> docs_governance =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/docs/governance");
+  const std::optional<pafio::platform::RouteMatch> docs_governance =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Get, "/docs/governance");
   ASSERT_TRUE(docs_governance.has_value());
   EXPECT_EQ(docs_governance->route.operation_id, "listDocumentationGovernance");
   EXPECT_TRUE(docs_governance->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> docs_plan =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/docs/change-plan");
+  const std::optional<pafio::platform::RouteMatch> docs_plan =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/docs/change-plan");
   ASSERT_TRUE(docs_plan.has_value());
   EXPECT_EQ(docs_plan->route.operation_id, "planDocumentationChange");
   EXPECT_TRUE(docs_plan->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> ecosystem =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/ecosystem/repositories");
+  const std::optional<pafio::platform::RouteMatch> ecosystem =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Get, "/ecosystem/repositories");
   ASSERT_TRUE(ecosystem.has_value());
   EXPECT_EQ(ecosystem->route.operation_id, "listEcosystemRepositories");
   EXPECT_TRUE(ecosystem->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> release_plan =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/ecosystem/releases/plan");
+  const std::optional<pafio::platform::RouteMatch> release_plan =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/ecosystem/releases/plan");
   ASSERT_TRUE(release_plan.has_value());
   EXPECT_EQ(release_plan->route.operation_id, "planEcosystemRelease");
   EXPECT_TRUE(release_plan->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> register_cluster =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/workgroups/local-dev/clusters/register");
+  const std::optional<pafio::platform::RouteMatch> register_cluster =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/workgroups/local-dev/clusters/register");
   ASSERT_TRUE(register_cluster.has_value());
   EXPECT_EQ(register_cluster->route.operation_id, "registerWorkgroupCluster");
   EXPECT_EQ(register_cluster->parameters.at("workgroup_id"), "local-dev");
 
-  const std::optional<spio::platform::RouteMatch> list_clusters =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/workgroups/local-dev/clusters");
+  const std::optional<pafio::platform::RouteMatch> list_clusters =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Get, "/workgroups/local-dev/clusters");
   ASSERT_TRUE(list_clusters.has_value());
   EXPECT_EQ(list_clusters->route.operation_id, "listWorkgroupClusters");
   EXPECT_TRUE(list_clusters->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> register_container =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/compile-containers/register");
+  const std::optional<pafio::platform::RouteMatch> register_container =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/compile-containers/register");
   ASSERT_TRUE(register_container.has_value());
   EXPECT_EQ(register_container->route.operation_id, "registerCompileContainer");
   EXPECT_TRUE(register_container->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> switch_container =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/compile-containers/container-01/switch-workspace");
+  const std::optional<pafio::platform::RouteMatch> switch_container =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/compile-containers/container-01/switch-workspace");
   ASSERT_TRUE(switch_container.has_value());
   EXPECT_EQ(switch_container->route.operation_id, "switchCompileContainerWorkspace");
   EXPECT_EQ(switch_container->parameters.at("container_id"), "container-01");
 
-  const std::optional<spio::platform::RouteMatch> snapshot =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/ops/recovery/snapshots");
+  const std::optional<pafio::platform::RouteMatch> snapshot =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/ops/recovery/snapshots");
   ASSERT_TRUE(snapshot.has_value());
   EXPECT_EQ(snapshot->route.operation_id, "createRecoverySnapshot");
 
-  const std::optional<spio::platform::RouteMatch> restore =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/ops/recovery/snapshots/snap-000001/restore");
+  const std::optional<pafio::platform::RouteMatch> restore =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/ops/recovery/snapshots/snap-000001/restore");
   ASSERT_TRUE(restore.has_value());
   EXPECT_EQ(restore->route.operation_id, "restoreRecoverySnapshot");
   EXPECT_EQ(restore->parameters.at("snapshot_id"), "snap-000001");
 
-  const std::optional<spio::platform::RouteMatch> external_identity =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/identity/external/exchange");
+  const std::optional<pafio::platform::RouteMatch> external_identity =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/identity/external/exchange");
   ASSERT_TRUE(external_identity.has_value());
   EXPECT_EQ(external_identity->route.operation_id, "exchangeExternalIdentity");
   EXPECT_FALSE(external_identity->route.internal);
 
-  EXPECT_FALSE(spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/jobs/job-abc/events").has_value());
+  EXPECT_FALSE(pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/jobs/job-abc/events").has_value());
 }
 
 TEST(PlatformServiceRouterTests, MatchesRegistryControlPlaneRoutesWithContractBasePath)
 {
-  const std::vector<spio::platform::RouteSpec> routes = spio::platform::BuildRegistryControlPlaneRoutes();
+  const std::vector<pafio::platform::RouteSpec> routes = pafio::platform::BuildRegistryControlPlaneRoutes();
 
-  const std::optional<spio::platform::RouteMatch> status =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/api/pafio-registry-control/v1/status");
+  const std::optional<pafio::platform::RouteMatch> status =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Get, "/api/pafio-registry-control/v1/status");
   ASSERT_TRUE(status.has_value());
   EXPECT_EQ(status->route.operation_id, "registryStatus");
   EXPECT_TRUE(status->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> descriptor =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Get, "/api/pafio-registry-control/v1/descriptor");
+  const std::optional<pafio::platform::RouteMatch> descriptor =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Get, "/api/pafio-registry-control/v1/descriptor");
   ASSERT_TRUE(descriptor.has_value());
   EXPECT_EQ(descriptor->route.operation_id, "registryDescriptor");
   EXPECT_TRUE(descriptor->route.internal);
 
-  const std::optional<spio::platform::RouteMatch> publish =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/api/pafio-registry-control/v1/publish");
+  const std::optional<pafio::platform::RouteMatch> publish =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/api/pafio-registry-control/v1/publish");
   ASSERT_TRUE(publish.has_value());
   EXPECT_EQ(publish->route.operation_id, "publishRelease");
 
-  const std::optional<spio::platform::RouteMatch> verify =
-      spio::platform::MatchRoute(routes, spio::platform::HttpMethod::Post, "/api/pafio-registry-control/v1/verify");
+  const std::optional<pafio::platform::RouteMatch> verify =
+      pafio::platform::MatchRoute(routes, pafio::platform::HttpMethod::Post, "/api/pafio-registry-control/v1/verify");
   ASSERT_TRUE(verify.has_value());
   EXPECT_EQ(verify->route.operation_id, "verifyRegistry");
 
-  const std::optional<spio::platform::RouteMatch> release =
-      spio::platform::MatchRoute(
+  const std::optional<pafio::platform::RouteMatch> release =
+      pafio::platform::MatchRoute(
           routes,
-          spio::platform::HttpMethod::Get,
+          pafio::platform::HttpMethod::Get,
           "/api/pafio-registry-control/v1/packages/demo/app/releases/0.1.0");
   ASSERT_TRUE(release.has_value());
   EXPECT_EQ(release->route.operation_id, "getPackageRelease");
@@ -704,18 +704,18 @@ TEST(PlatformServiceRouterTests, MatchesRegistryControlPlaneRoutesWithContractBa
   EXPECT_EQ(release->parameters.at("name"), "app");
   EXPECT_EQ(release->parameters.at("version"), "0.1.0");
 
-  const std::optional<spio::platform::RouteMatch> remove_owner =
-      spio::platform::MatchRoute(
+  const std::optional<pafio::platform::RouteMatch> remove_owner =
+      pafio::platform::MatchRoute(
           routes,
-          spio::platform::HttpMethod::Delete,
+          pafio::platform::HttpMethod::Delete,
           "/api/pafio-registry-control/v1/packages/demo/app/owners/user-bob");
   ASSERT_TRUE(remove_owner.has_value());
   EXPECT_EQ(remove_owner->route.operation_id, "removePackageOwner");
 
-  const std::optional<spio::platform::RouteMatch> rollout =
-      spio::platform::MatchRoute(
+  const std::optional<pafio::platform::RouteMatch> rollout =
+      pafio::platform::MatchRoute(
           routes,
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/api/pafio-registry-control/v1/release-channels/canary/rollout");
   ASSERT_TRUE(rollout.has_value());
   EXPECT_EQ(rollout->route.operation_id, "rolloutReleaseChannel");
@@ -724,47 +724,47 @@ TEST(PlatformServiceRouterTests, MatchesRegistryControlPlaneRoutesWithContractBa
 
 TEST(PlatformHttpAdapterTests, AppliesLargeBodyLimitOnlyToPafioPublishTarget)
 {
-  using spio::platform::kDefaultHttpRequestBodyLimitBytes;
-  using spio::platform::kPublishHttpRequestBodyLimitBytes;
+  using pafio::platform::kDefaultHttpRequestBodyLimitBytes;
+  using pafio::platform::kPublishHttpRequestBodyLimitBytes;
 
   EXPECT_EQ(
-      spio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/publish"),
+      pafio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/publish"),
       kPublishHttpRequestBodyLimitBytes);
   EXPECT_EQ(
-      spio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/publish?request_id=1"),
+      pafio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/publish?request_id=1"),
       kPublishHttpRequestBodyLimitBytes);
   EXPECT_EQ(
-      spio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/verify"),
+      pafio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/verify"),
       kDefaultHttpRequestBodyLimitBytes);
   EXPECT_EQ(
-      spio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/publish/extra"),
+      pafio::platform::HttpRequestBodyLimitForTarget("/api/pafio-registry-control/v1/publish/extra"),
       kDefaultHttpRequestBodyLimitBytes);
 
-  EXPECT_TRUE(spio::platform::HttpRequestBodySizeAllowed(
+  EXPECT_TRUE(pafio::platform::HttpRequestBodySizeAllowed(
       "/api/pafio-registry-control/v1/publish",
       kPublishHttpRequestBodyLimitBytes));
-  EXPECT_FALSE(spio::platform::HttpRequestBodySizeAllowed(
+  EXPECT_FALSE(pafio::platform::HttpRequestBodySizeAllowed(
       "/api/pafio-registry-control/v1/publish",
       static_cast<uint64_t>(kPublishHttpRequestBodyLimitBytes) + 1U));
-  EXPECT_TRUE(spio::platform::HttpRequestBodySizeAllowed(
+  EXPECT_TRUE(pafio::platform::HttpRequestBodySizeAllowed(
       "/api/pafio-registry-control/v1/verify",
       kDefaultHttpRequestBodyLimitBytes));
-  EXPECT_FALSE(spio::platform::HttpRequestBodySizeAllowed(
+  EXPECT_FALSE(pafio::platform::HttpRequestBodySizeAllowed(
       "/api/pafio-registry-control/v1/verify",
       static_cast<uint64_t>(kDefaultHttpRequestBodyLimitBytes) + 1U));
 }
 
 TEST(PlatformHttpAdapterTests, RejectsOverflowWhenPlanningBoundedRequestSize)
 {
-  const std::optional<size_t> ordinary = spio::platform::CheckedHttpRequestSize(128U, 256U);
+  const std::optional<size_t> ordinary = pafio::platform::CheckedHttpRequestSize(128U, 256U);
   ASSERT_TRUE(ordinary.has_value());
   EXPECT_EQ(*ordinary, 384U);
-  EXPECT_FALSE(spio::platform::CheckedHttpRequestSize(
+  EXPECT_FALSE(pafio::platform::CheckedHttpRequestSize(
       std::numeric_limits<size_t>::max(),
       1U).has_value());
   if constexpr (sizeof(size_t) < sizeof(uint64_t))
   {
-    EXPECT_FALSE(spio::platform::CheckedHttpRequestSize(
+    EXPECT_FALSE(pafio::platform::CheckedHttpRequestSize(
         0U,
         static_cast<uint64_t>(std::numeric_limits<size_t>::max()) + 1U).has_value());
   }
@@ -772,7 +772,7 @@ TEST(PlatformHttpAdapterTests, RejectsOverflowWhenPlanningBoundedRequestSize)
 
 TEST(PlatformPersistenceObjectStoreTests, SanitizesArtifactObjectKeyParts)
 {
-  const std::string key = spio::platform::BuildArtifactObjectKey(
+  const std::string key = pafio::platform::BuildArtifactObjectKey(
       "tenant/acme",
       "workspace main",
       "job:42",
@@ -787,11 +787,11 @@ TEST(PlatformPersistenceObjectStoreTests, SanitizesArtifactObjectKeyParts)
 
 TEST(PlatformPersistenceObjectStoreTests, NormalizesObjectKeysAsCanonicalRelativePaths)
 {
-  EXPECT_EQ(spio::platform::NormalizeObjectKey("/index/demo/app.jsonl"), "index/demo/app.jsonl");
-  EXPECT_THROW(spio::platform::NormalizeObjectKey(""), std::runtime_error);
-  EXPECT_THROW(spio::platform::NormalizeObjectKey("index/../root.json"), std::runtime_error);
-  EXPECT_THROW(spio::platform::NormalizeObjectKey("index//root.json"), std::runtime_error);
-  EXPECT_THROW(spio::platform::NormalizeObjectKey("index\\root.json"), std::runtime_error);
+  EXPECT_EQ(pafio::platform::NormalizeObjectKey("/index/demo/app.jsonl"), "index/demo/app.jsonl");
+  EXPECT_THROW(pafio::platform::NormalizeObjectKey(""), std::runtime_error);
+  EXPECT_THROW(pafio::platform::NormalizeObjectKey("index/../root.json"), std::runtime_error);
+  EXPECT_THROW(pafio::platform::NormalizeObjectKey("index//root.json"), std::runtime_error);
+  EXPECT_THROW(pafio::platform::NormalizeObjectKey("index\\root.json"), std::runtime_error);
 }
 
 TEST(PlatformRecoveryTests, CreatesAndRestoresFilesystemSnapshots)
@@ -800,7 +800,7 @@ TEST(PlatformRecoveryTests, CreatesAndRestoresFilesystemSnapshots)
   WriteFile(root / "registry/config.json", "{\"registry\":\"test\"}\n");
   WriteFile(root / "registry/index/demo/app.jsonl", "{\"version\":\"0.1.0\"}\n");
 
-  const json snapshot = spio::platform::CreateFilesystemSnapshot({
+  const json snapshot = pafio::platform::CreateFilesystemSnapshot({
       .source_root = root / "registry",
       .snapshots_root = root / "snapshots",
       .snapshot_id = "snap-000001",
@@ -811,7 +811,7 @@ TEST(PlatformRecoveryTests, CreatesAndRestoresFilesystemSnapshots)
   EXPECT_EQ(snapshot.at("file_count").get<int>(), 2);
 
   WriteFile(root / "registry/config.json", "{\"registry\":\"changed\"}\n");
-  const json restored = spio::platform::RestoreFilesystemSnapshot(
+  const json restored = pafio::platform::RestoreFilesystemSnapshot(
       root / "snapshots",
       "snap-000001",
       root / "registry",
@@ -822,13 +822,13 @@ TEST(PlatformRecoveryTests, CreatesAndRestoresFilesystemSnapshots)
 
 TEST(PlatformOpsTests, RateLimiterAndMetricsTrackRequests)
 {
-  spio::platform::PlatformRateLimiter limiter;
+  pafio::platform::PlatformRateLimiter limiter;
   EXPECT_TRUE(limiter.Allow("actor", "publishRelease", 2, 60, 10));
   EXPECT_TRUE(limiter.Allow("actor", "publishRelease", 2, 60, 11));
   EXPECT_FALSE(limiter.Allow("actor", "publishRelease", 2, 60, 12));
   EXPECT_TRUE(limiter.Allow("actor", "publishRelease", 2, 60, 75));
 
-  spio::platform::PlatformRequestMetrics metrics;
+  pafio::platform::PlatformRequestMetrics metrics;
   metrics.Record("publishRelease", 200);
   metrics.Record("publishRelease", 409);
   const json snapshot = metrics.Snapshot();
@@ -839,7 +839,7 @@ TEST(PlatformOpsTests, RateLimiterAndMetricsTrackRequests)
 
 TEST(PlatformPersistencePostgresTests, DefinesCloudKernelMigrationAndClaimSql)
 {
-  const std::vector<spio::platform::SqlMigration> migrations = spio::platform::CloudKernelMigrations();
+  const std::vector<pafio::platform::SqlMigration> migrations = pafio::platform::CloudKernelMigrations();
 
   ASSERT_FALSE(migrations.empty());
   EXPECT_EQ(migrations.front().id, "001_cloud_kernel");
@@ -861,19 +861,19 @@ TEST(PlatformPersistencePostgresTests, DefinesCloudKernelMigrationAndClaimSql)
   EXPECT_NE(migrations.at(2).sql.find("CREATE SEQUENCE IF NOT EXISTS platform_publish_token_id_seq"), std::string::npos);
   EXPECT_NE(migrations.at(2).sql.find("CREATE SEQUENCE IF NOT EXISTS platform_registry_audit_event_id_seq"), std::string::npos);
 
-  const std::string claim_sql = spio::platform::ClaimJobSql();
+  const std::string claim_sql = pafio::platform::ClaimJobSql();
   EXPECT_NE(claim_sql.find("FOR UPDATE SKIP LOCKED"), std::string::npos);
   EXPECT_NE(claim_sql.find("worker_pool_key = $2"), std::string::npos);
   EXPECT_NE(claim_sql.find("RETURNING *"), std::string::npos);
 
-  const std::string complete_sql = spio::platform::CompleteJobSql();
+  const std::string complete_sql = pafio::platform::CompleteJobSql();
   EXPECT_NE(complete_sql.find("status = 'running'"), std::string::npos);
   EXPECT_NE(complete_sql.find("worker_id = $4"), std::string::npos);
 }
 
 TEST(PlatformPersistenceRegistryTests, SerializesPackageRegistryDomainRecords)
 {
-  const spio::platform::RegistryPackageRecord package{
+  const pafio::platform::RegistryPackageRecord package{
       .package_id = "demo/app",
       .package_namespace = "demo",
       .name = "app",
@@ -881,9 +881,9 @@ TEST(PlatformPersistenceRegistryTests, SerializesPackageRegistryDomainRecords)
       .created_by = "user-alice",
       .visibility = "public",
   };
-  EXPECT_EQ(spio::platform::SerializeRegistryPackageRecord(package).at("namespace").get<std::string>(), "demo");
+  EXPECT_EQ(pafio::platform::SerializeRegistryPackageRecord(package).at("namespace").get<std::string>(), "demo");
 
-  const spio::platform::RegistryPackageReleaseRecord release{
+  const pafio::platform::RegistryPackageReleaseRecord release{
       .package_id = "demo/app",
       .version = "0.1.0",
       .edition = "2026",
@@ -895,9 +895,9 @@ TEST(PlatformPersistenceRegistryTests, SerializesPackageRegistryDomainRecords)
       .yanked = true,
       .yanked_reason = "metadata correction",
   };
-  EXPECT_TRUE(spio::platform::SerializeRegistryPackageReleaseRecord(release).at("yanked").get<bool>());
+  EXPECT_TRUE(pafio::platform::SerializeRegistryPackageReleaseRecord(release).at("yanked").get<bool>());
 
-  const spio::platform::RegistryPublishTokenRecord token{
+  const pafio::platform::RegistryPublishTokenRecord token{
       .token_id = "tok-000000000001",
       .token_hash = std::string(64, 'a'),
       .owner_id = "user-alice",
@@ -907,10 +907,10 @@ TEST(PlatformPersistenceRegistryTests, SerializesPackageRegistryDomainRecords)
       .revoked_at = "",
       .created_at = "2026-05-09T00:00:00Z",
   };
-  EXPECT_FALSE(spio::platform::SerializeRegistryPublishTokenRecord(token).contains("token_hash"));
-  EXPECT_TRUE(spio::platform::SerializeRegistryPublishTokenRecord(token, true).contains("token_hash"));
+  EXPECT_FALSE(pafio::platform::SerializeRegistryPublishTokenRecord(token).contains("token_hash"));
+  EXPECT_TRUE(pafio::platform::SerializeRegistryPublishTokenRecord(token, true).contains("token_hash"));
 
-  const spio::platform::RegistryPublicationRecord publication{
+  const pafio::platform::RegistryPublicationRecord publication{
       .publication_id = "pub-000001",
       .repository_version_id = "rv-000001",
       .layout_version = 2,
@@ -920,9 +920,9 @@ TEST(PlatformPersistenceRegistryTests, SerializesPackageRegistryDomainRecords)
       .created_at = "2026-05-09T00:00:00Z",
       .verified = true,
   };
-  EXPECT_EQ(spio::platform::SerializeRegistryPublicationRecord(publication).at("layout_version").get<int>(), 2);
+  EXPECT_EQ(pafio::platform::SerializeRegistryPublicationRecord(publication).at("layout_version").get<int>(), 2);
 
-  const spio::platform::RegistryAuditEventRecord audit{
+  const pafio::platform::RegistryAuditEventRecord audit{
       .event_id = "audit-000000000001",
       .actor_id = "user-alice",
       .operation = "publishRelease",
@@ -931,13 +931,13 @@ TEST(PlatformPersistenceRegistryTests, SerializesPackageRegistryDomainRecords)
       .result = "success",
       .created_at = "2026-05-09T00:00:00Z",
   };
-  EXPECT_EQ(spio::platform::SerializeRegistryAuditEventRecord(audit).at("operation").get<std::string>(), "publishRelease");
+  EXPECT_EQ(pafio::platform::SerializeRegistryAuditEventRecord(audit).at("operation").get<std::string>(), "publishRelease");
 }
 
 TEST(PlatformPersistenceFactoryTests, BuildsCompileContainerRecordFromRegistrationPayload)
 {
-  const spio::platform::CompileContainerRecordFactory factory;
-  const spio::platform::CompileContainerRecord record = factory.CreateFromRegistration({
+  const pafio::platform::CompileContainerRecordFactory factory;
+  const pafio::platform::CompileContainerRecord record = factory.CreateFromRegistration({
       {"container_id", "container-01"},
       {"worker_id", "worker-01"},
       {"tenant_id", "tenant-acme"},
@@ -957,10 +957,10 @@ TEST(PlatformPersistenceFactoryTests, BuildsCompileContainerRecordFromRegistrati
 
 TEST(PlatformCloudWorkerFactoryTests, CreatesCompileContainerRegistrationPayload)
 {
-  spio::platform::PlatformConfig platform;
+  pafio::platform::PlatformConfig platform;
   platform.region = "local-dev";
 
-  spio::platform::WorkerRuntimeConfig worker;
+  pafio::platform::WorkerRuntimeConfig worker;
   worker.worker_id = "worker-01";
   worker.worker_pool_key = "default";
   worker.compile_container_id = "container-01";
@@ -969,8 +969,8 @@ TEST(PlatformCloudWorkerFactoryTests, CreatesCompileContainerRegistrationPayload
   worker.compile_container_workspace_id = "workspace-main";
   worker.compile_container_capacity = 2;
 
-  const spio::platform::WorkerCompileContainerFactory factory;
-  const spio::platform::WorkerCompileContainerSpec spec = factory.Create(worker, platform);
+  const pafio::platform::WorkerCompileContainerFactory factory;
+  const pafio::platform::WorkerCompileContainerSpec spec = factory.Create(worker, platform);
 
   ASSERT_TRUE(spec.enabled);
   const json payload = spec.RegistrationRequest();
@@ -992,8 +992,8 @@ TEST(PlatformCloudWorkerFactoryTests, LoadsPafioAndSystemStyioRuntimeEntrypoints
       {"STYIO_PLATFORM_WORKER_STYIO_BIN", "/usr/bin/styio"},
   };
 
-  const spio::platform::WorkerRuntimeConfig worker =
-      spio::platform::LoadWorkerRuntimeConfig(os);
+  const pafio::platform::WorkerRuntimeConfig worker =
+      pafio::platform::LoadWorkerRuntimeConfig(os);
 
   EXPECT_EQ(worker.pafio_bin, "/opt/pafio/bin/pafio");
   EXPECT_EQ(worker.styio_bin, "/usr/bin/styio");
@@ -1001,15 +1001,15 @@ TEST(PlatformCloudWorkerFactoryTests, LoadsPafioAndSystemStyioRuntimeEntrypoints
 
 TEST(PlatformCloudWorkerFactoryTests, BuildsPafioCommandWithSystemStyioEnvironment)
 {
-  spio::platform::PlatformConfig platform;
+  pafio::platform::PlatformConfig platform;
   platform.region = "eu-test-1";
 
-  spio::platform::WorkerRuntimeConfig worker;
+  pafio::platform::WorkerRuntimeConfig worker;
   worker.pafio_bin = "/usr/local/bin/pafio";
   worker.styio_bin = "/usr/local/bin/styio";
   worker.compile_container_id = "container-01";
 
-  const spio::platform::WorkerWorkspace workspace{
+  const pafio::platform::WorkerWorkspace workspace{
       .manifest_path = "pafio.toml",
       .checkout_root = "/workspace/source",
   };
@@ -1019,8 +1019,8 @@ TEST(PlatformCloudWorkerFactoryTests, BuildsPafioCommandWithSystemStyioEnvironme
       {"workflow", {{"dry_run", true}, {"frozen", true}}},
   };
 
-  const spio::ProcessRequest request =
-      spio::platform::BuildWorkerPafioProcessRequest(
+  const pafio::ProcessRequest request =
+      pafio::platform::BuildWorkerPafioProcessRequest(
           worker,
           platform,
           workspace,
@@ -1057,7 +1057,7 @@ TEST(PlatformCloudWorkerFactoryTests, CreatesWorkspaceUnderContainerRoot)
 {
   const fs::path root = MakeTempDir("platform-worker-workspace-factory");
 
-  spio::platform::WorkerRuntimeConfig worker;
+  pafio::platform::WorkerRuntimeConfig worker;
   worker.workspace_root = root / "workspaces";
   worker.artifact_root = root / "artifacts";
   worker.compile_container_id = "container-01";
@@ -1069,8 +1069,8 @@ TEST(PlatformCloudWorkerFactoryTests, CreatesWorkspaceUnderContainerRoot)
       {"job_request", {{"manifest_path", "pafio.toml"}}},
   };
 
-  const spio::platform::WorkerWorkspaceFactory factory(spio::platform::DefaultOperatingSystemAdapter());
-  const spio::platform::WorkerWorkspace workspace = factory.Create(worker, job);
+  const pafio::platform::WorkerWorkspaceFactory factory(pafio::platform::DefaultOperatingSystemAdapter());
+  const pafio::platform::WorkerWorkspace workspace = factory.Create(worker, job);
 
   EXPECT_EQ(workspace.manifest_path, fs::path("pafio.toml"));
   EXPECT_EQ(workspace.checkout_root, worker.workspace_root / "containers" / "container-01" / "source");
@@ -1085,17 +1085,17 @@ TEST(PlatformCloudWorkerFactoryTests, CreatesWorkspaceUnderContainerRoot)
 
 TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelopes)
 {
-  spio::platform::PlatformConfig config;
+  pafio::platform::PlatformConfig config;
   config.region = "local-dev";
   config.node_id = "node-test";
   config.postgres_dsn = "postgres://platform@localhost/styio";
   config.object_store.provider = "memory";
   config.mtls.required = true;
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
 
-  const spio::platform::HttpResponse submit =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  const pafio::platform::HttpResponse submit =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
   ASSERT_EQ(submit.status_code, 200);
   ASSERT_EQ(submit.body.at("returncode").get<int>(), 0);
   EXPECT_EQ(submit.body.at("message").get<std::string>(), "queued platform job");
@@ -1105,9 +1105,9 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   EXPECT_EQ(queued.at("user_id").get<std::string>(), "user-alice");
   EXPECT_EQ(queued.at("worker_pool_key").get<std::string>(), "default");
 
-  const spio::platform::HttpResponse register_worker =
+  const pafio::platform::HttpResponse register_worker =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/workers/register",
           {
               {"worker_id", "worker-01"},
@@ -1118,9 +1118,9 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   ASSERT_EQ(register_worker.status_code, 200);
   EXPECT_EQ(register_worker.body.at("payload").at("status").get<std::string>(), "registered");
 
-  const spio::platform::HttpResponse claim =
+  const pafio::platform::HttpResponse claim =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/jobs/claim",
           {
               {"worker_id", "worker-01"},
@@ -1134,10 +1134,10 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   EXPECT_EQ(claim.body.at("payload").at("job").at("worker_id").get<std::string>(), "worker-01");
   EXPECT_EQ(claim.body.at("payload").at("job").at("job_request").at("manifest_path").get<std::string>(), "pafio.toml");
 
-  const std::string artifact_key = spio::platform::BuildArtifactObjectKey("tenant-acme", "workspace-main", job_id, "stdout.log");
-  const spio::platform::HttpResponse complete =
+  const std::string artifact_key = pafio::platform::BuildArtifactObjectKey("tenant-acme", "workspace-main", job_id, "stdout.log");
+  const pafio::platform::HttpResponse complete =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/jobs/" + job_id + "/complete",
           {
               {"worker_id", "worker-01"},
@@ -1157,8 +1157,8 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
   EXPECT_EQ(complete.body.at("payload").at("status").get<std::string>(), "succeeded");
   EXPECT_EQ(complete.body.at("payload").at("artifacts").at(0).at("object_key").get<std::string>(), artifact_key);
 
-  const spio::platform::HttpResponse events =
-      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/" + job_id + "/events"));
+  const pafio::platform::HttpResponse events =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Get, "/jobs/" + job_id + "/events"));
   ASSERT_EQ(events.status_code, 200);
   const json event_list = events.body.at("payload").at("events");
   ASSERT_EQ(event_list.size(), 3U);
@@ -1169,18 +1169,18 @@ TEST(PlatformServiceJobQueueTests, SubmitClaimCompleteLifecycleUsesSuccessEnvelo
 
 TEST(PlatformServiceJobQueueTests, UsesPlatformPoolDefaultAndRejectsUnknownJobFields)
 {
-  spio::platform::PlatformConfig config;
+  pafio::platform::PlatformConfig config;
   config.region = "local-dev";
   config.node_id = "node-test";
   config.object_store.provider = "memory";
   config.mtls.required = true;
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
   json default_pool_request = MinimalJobRequest();
   default_pool_request.erase("preferred_worker_pool");
-  const spio::platform::HttpResponse accepted =
+  const pafio::platform::HttpResponse accepted =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/jobs",
           default_pool_request));
   ASSERT_EQ(accepted.status_code, 200);
@@ -1190,9 +1190,9 @@ TEST(PlatformServiceJobQueueTests, UsesPlatformPoolDefaultAndRejectsUnknownJobFi
 
   json unknown_field_request = MinimalJobRequest();
   unknown_field_request["job_request"]["unsupported"] = json::object();
-  const spio::platform::HttpResponse rejected =
+  const pafio::platform::HttpResponse rejected =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/jobs",
           unknown_field_request));
   ASSERT_EQ(rejected.status_code, 400);
@@ -1203,17 +1203,17 @@ TEST(PlatformServiceJobQueueTests, UsesPlatformPoolDefaultAndRejectsUnknownJobFi
 
 TEST(PlatformServiceJobQueueTests, CompileContainerHotSwitchesWorkspaceWithinUserBinding)
 {
-  spio::platform::PlatformConfig config;
+  pafio::platform::PlatformConfig config;
   config.region = "local-dev";
   config.node_id = "node-test";
   config.object_store.provider = "memory";
   config.mtls.required = true;
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
 
-  const spio::platform::HttpResponse register_worker =
+  const pafio::platform::HttpResponse register_worker =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/workers/register",
           {
               {"worker_id", "worker-01"},
@@ -1223,9 +1223,9 @@ TEST(PlatformServiceJobQueueTests, CompileContainerHotSwitchesWorkspaceWithinUse
           }));
   ASSERT_EQ(register_worker.status_code, 200);
 
-  const spio::platform::HttpResponse register_container =
+  const pafio::platform::HttpResponse register_container =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/compile-containers/register",
           {
               {"container_id", "container-01"},
@@ -1241,22 +1241,22 @@ TEST(PlatformServiceJobQueueTests, CompileContainerHotSwitchesWorkspaceWithinUse
   EXPECT_EQ(register_container.body.at("payload").at("user_id").get<std::string>(), "user-alice");
   EXPECT_EQ(register_container.body.at("payload").at("current_workspace_id").get<std::string>(), "workspace-main");
 
-  const spio::platform::HttpResponse first_submit =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  const pafio::platform::HttpResponse first_submit =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
   ASSERT_EQ(first_submit.status_code, 200);
   const std::string first_job_id = first_submit.body.at("payload").at("job_id").get<std::string>();
 
   json other_user_request = MinimalJobRequest();
   other_user_request["user_id"] = "user-bob";
   other_user_request["workspace_id"] = "workspace-other";
-  const spio::platform::HttpResponse other_submit =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", other_user_request));
+  const pafio::platform::HttpResponse other_submit =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs", other_user_request));
   ASSERT_EQ(other_submit.status_code, 200);
 
   json second_workspace_request = MinimalJobRequest();
   second_workspace_request["workspace_id"] = "workspace-feature";
-  const spio::platform::HttpResponse second_submit =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", second_workspace_request));
+  const pafio::platform::HttpResponse second_submit =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs", second_workspace_request));
   ASSERT_EQ(second_submit.status_code, 200);
   const std::string second_job_id = second_submit.body.at("payload").at("job_id").get<std::string>();
 
@@ -1267,16 +1267,16 @@ TEST(PlatformServiceJobQueueTests, CompileContainerHotSwitchesWorkspaceWithinUse
       {"compile_container_id", "container-01"},
   };
 
-  const spio::platform::HttpResponse first_claim =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs/claim", claim_body));
+  const pafio::platform::HttpResponse first_claim =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs/claim", claim_body));
   ASSERT_EQ(first_claim.status_code, 200);
   ASSERT_TRUE(first_claim.body.at("payload").at("claimed").get<bool>());
   EXPECT_EQ(first_claim.body.at("payload").at("job").at("job_id").get<std::string>(), first_job_id);
   EXPECT_EQ(first_claim.body.at("payload").at("compile_container").at("workspace_generation").get<int>(), 1);
 
-  const spio::platform::HttpResponse first_complete =
+  const pafio::platform::HttpResponse first_complete =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/jobs/" + first_job_id + "/complete",
           {
               {"worker_id", "worker-01"},
@@ -1285,8 +1285,8 @@ TEST(PlatformServiceJobQueueTests, CompileContainerHotSwitchesWorkspaceWithinUse
           }));
   ASSERT_EQ(first_complete.status_code, 200);
 
-  const spio::platform::HttpResponse second_claim =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs/claim", claim_body));
+  const pafio::platform::HttpResponse second_claim =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs/claim", claim_body));
   ASSERT_EQ(second_claim.status_code, 200);
   ASSERT_TRUE(second_claim.body.at("payload").at("claimed").get<bool>());
   EXPECT_EQ(second_claim.body.at("payload").at("job").at("job_id").get<std::string>(), second_job_id);
@@ -1294,16 +1294,16 @@ TEST(PlatformServiceJobQueueTests, CompileContainerHotSwitchesWorkspaceWithinUse
   EXPECT_EQ(second_claim.body.at("payload").at("compile_container").at("current_workspace_id").get<std::string>(), "workspace-feature");
   EXPECT_EQ(second_claim.body.at("payload").at("compile_container").at("workspace_generation").get<int>(), 2);
 
-  const spio::platform::HttpResponse switched_events =
-      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/" + second_job_id + "/events"));
+  const pafio::platform::HttpResponse switched_events =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Get, "/jobs/" + second_job_id + "/events"));
   ASSERT_EQ(switched_events.status_code, 200);
   ASSERT_GE(switched_events.body.at("payload").at("events").size(), 2U);
   EXPECT_EQ(switched_events.body.at("payload").at("events").at(0).at("message").get<std::string>(), "job queued");
   EXPECT_EQ(switched_events.body.at("payload").at("events").at(1).at("message").get<std::string>(), "compile container switched workspace");
 
-  const spio::platform::HttpResponse wrong_user_switch =
+  const pafio::platform::HttpResponse wrong_user_switch =
       router.Dispatch(Request(
-          spio::platform::HttpMethod::Post,
+          pafio::platform::HttpMethod::Post,
           "/compile-containers/container-01/switch-workspace",
           {
               {"worker_id", "worker-01"},
@@ -1313,62 +1313,62 @@ TEST(PlatformServiceJobQueueTests, CompileContainerHotSwitchesWorkspaceWithinUse
           }));
   EXPECT_EQ(wrong_user_switch.status_code, 403);
 
-  const spio::platform::HttpResponse no_more_matching_work =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs/claim", claim_body));
+  const pafio::platform::HttpResponse no_more_matching_work =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs/claim", claim_body));
   ASSERT_EQ(no_more_matching_work.status_code, 200);
   EXPECT_FALSE(no_more_matching_work.body.at("payload").at("claimed").get<bool>());
 }
 
 TEST(PlatformServiceJobQueueTests, RepeatedSubmissionsUseMonotonicIdsAndMissingMutationsDoNotCreateJobs)
 {
-  spio::platform::PlatformConfig config;
+  pafio::platform::PlatformConfig config;
   config.region = "local-dev";
   config.node_id = "node-test";
   config.object_store.provider = "memory";
   config.mtls.required = true;
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
 
-  const spio::platform::HttpResponse first =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
-  const spio::platform::HttpResponse second =
-      router.Dispatch(Request(spio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  const pafio::platform::HttpResponse first =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
+  const pafio::platform::HttpResponse second =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Post, "/jobs", MinimalJobRequest()));
 
   ASSERT_EQ(first.status_code, 200);
   ASSERT_EQ(second.status_code, 200);
   EXPECT_EQ(first.body.at("payload").at("job_id").get<std::string>(), "job-000000000001");
   EXPECT_EQ(second.body.at("payload").at("job_id").get<std::string>(), "job-000000000002");
 
-  const spio::platform::HttpResponse cancel_missing = router.Dispatch(Request(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse cancel_missing = router.Dispatch(Request(
+      pafio::platform::HttpMethod::Post,
       "/jobs/job-000000999999/cancel",
       {{"reason", "missing"}}));
   EXPECT_EQ(cancel_missing.status_code, 404);
 
-  const spio::platform::HttpResponse heartbeat_missing = router.Dispatch(Request(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse heartbeat_missing = router.Dispatch(Request(
+      pafio::platform::HttpMethod::Post,
       "/jobs/job-000000999999/heartbeat",
       {{"worker_id", "worker-01"}}));
   EXPECT_EQ(heartbeat_missing.status_code, 404);
 
-  const spio::platform::HttpResponse complete_missing = router.Dispatch(Request(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse complete_missing = router.Dispatch(Request(
+      pafio::platform::HttpMethod::Post,
       "/jobs/job-000000999999/complete",
       {{"worker_id", "worker-01"}, {"status", "succeeded"}}));
   EXPECT_EQ(complete_missing.status_code, 404);
 
-  const spio::platform::HttpResponse lookup_missing =
-      router.Dispatch(Request(spio::platform::HttpMethod::Get, "/jobs/job-000000999999"));
+  const pafio::platform::HttpResponse lookup_missing =
+      router.Dispatch(Request(pafio::platform::HttpMethod::Get, "/jobs/job-000000999999"));
   EXPECT_EQ(lookup_missing.status_code, 404);
 }
 
 TEST(PlatformServiceWorkgroupTests, RegistersAndListsClustersWithDefaultPolicy)
 {
   const fs::path root = MakeTempDir("platform-workgroup-register");
-  spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  pafio::platform::PlatformConfig config = TestPlatformConfig(root);
   config.workgroup.registration_token = "local-token";
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
   const json registration = {
       {"cluster_id", "dev-a"},
       {"region", "local-dev"},
@@ -1382,8 +1382,8 @@ TEST(PlatformServiceWorkgroupTests, RegistersAndListsClustersWithDefaultPolicy)
       {"labels", {{"source", "dev-env"}, {"namespace", "styio-platform-dev"}}},
   };
 
-  const spio::platform::HttpResponse registered = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse registered = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/workgroups/local-dev/clusters/register",
       OperatorIdentity(),
       registration));
@@ -1396,8 +1396,8 @@ TEST(PlatformServiceWorkgroupTests, RegistersAndListsClustersWithDefaultPolicy)
   EXPECT_EQ(cluster.at("registered_by").at("role").get<std::string>(), "operator");
   EXPECT_FALSE(cluster.contains("registration_token"));
 
-  const spio::platform::HttpResponse listed = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse listed = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/workgroups/local-dev/clusters",
       OperatorIdentity()));
   ASSERT_EQ(listed.status_code, 200);
@@ -1410,10 +1410,10 @@ TEST(PlatformServiceWorkgroupTests, RegistersAndListsClustersWithDefaultPolicy)
 TEST(PlatformServiceWorkgroupTests, RejectsUnauthorizedOrInvalidClusterRegistration)
 {
   const fs::path root = MakeTempDir("platform-workgroup-deny");
-  spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  pafio::platform::PlatformConfig config = TestPlatformConfig(root);
   config.workgroup.registration_token = "local-token";
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
   const json registration = {
       {"cluster_id", "dev-a"},
       {"region", "local-dev"},
@@ -1422,15 +1422,15 @@ TEST(PlatformServiceWorkgroupTests, RejectsUnauthorizedOrInvalidClusterRegistrat
       {"registration_token", "wrong-token"},
   };
 
-  const spio::platform::HttpResponse worker_denied = router.Dispatch(Request(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse worker_denied = router.Dispatch(Request(
+      pafio::platform::HttpMethod::Post,
       "/workgroups/local-dev/clusters/register",
       registration));
   ASSERT_EQ(worker_denied.status_code, 403);
   EXPECT_EQ(worker_denied.body.at("error_payload").at("category").get<std::string>(), "AuthError");
 
-  const spio::platform::HttpResponse token_denied = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse token_denied = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/workgroups/local-dev/clusters/register",
       OperatorIdentity(),
       registration));
@@ -1441,11 +1441,11 @@ TEST(PlatformServiceWorkgroupTests, RejectsUnauthorizedOrInvalidClusterRegistrat
 TEST(PlatformEcosystemManagementTests, ListsRepositoriesAndPlansStableRelease)
 {
   const fs::path root = MakeTempDir("platform-ecosystem-management");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
-  spio::platform::PlatformRouter router(config);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
+  pafio::platform::PlatformRouter router(config);
 
-  const spio::platform::HttpResponse list = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse list = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/ecosystem/repositories",
       OperatorIdentity()));
   ASSERT_EQ(list.status_code, 200);
@@ -1460,8 +1460,8 @@ TEST(PlatformEcosystemManagementTests, ListsRepositoriesAndPlansStableRelease)
   EXPECT_EQ(repositories.at(3).at("branch").get<std::string>(), "stable");
   EXPECT_EQ(repositories.at(3).at("runtime").at("adapter").get<std::string>(), "cmake-server");
 
-  const spio::platform::HttpResponse plan = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse plan = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/ecosystem/releases/plan",
       OperatorIdentity(),
       {
@@ -1476,8 +1476,8 @@ TEST(PlatformEcosystemManagementTests, ListsRepositoriesAndPlansStableRelease)
   EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(2).at("fetch").at("ref").get<std::string>(), "v0.1.1-vityo");
   EXPECT_EQ(plan.body.at("payload").at("execution_plan").at(3).at("fetch").at("ref").get<std::string>(), "v0.1.0");
 
-  const spio::platform::HttpResponse invalid = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse invalid = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/ecosystem/releases/plan",
       OperatorIdentity(),
       {{"components", {{"unknown", "v0.1.0"}}}}));
@@ -1488,11 +1488,11 @@ TEST(PlatformEcosystemManagementTests, ListsRepositoriesAndPlansStableRelease)
 TEST(PlatformDocumentationGovernanceTests, ListsGovernanceAndPlansDocumentationChange)
 {
   const fs::path root = MakeTempDir("platform-documentation-governance");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
-  spio::platform::PlatformRouter router(config);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
+  pafio::platform::PlatformRouter router(config);
 
-  const spio::platform::HttpResponse list = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse list = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/docs/governance",
       OperatorIdentity()));
   ASSERT_EQ(list.status_code, 200);
@@ -1501,8 +1501,8 @@ TEST(PlatformDocumentationGovernanceTests, ListsGovernanceAndPlansDocumentationC
   ASSERT_GE(payload.at("collections").size(), 5U);
   EXPECT_EQ(payload.at("branch_policy").at("single_branch").get<std::string>(), "stable");
 
-  const spio::platform::HttpResponse plan = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse plan = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/docs/change-plan",
       OperatorIdentity(),
       {
@@ -1530,8 +1530,8 @@ TEST(PlatformDocumentationGovernanceTests, ListsGovernanceAndPlansDocumentationC
       std::find(required_runbooks.begin(), required_runbooks.end(), "docs/teams/DOC-STATS.md"),
       required_runbooks.end());
 
-  const spio::platform::HttpResponse invalid = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse invalid = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/docs/change-plan",
       OperatorIdentity(),
       {{"changed_paths", {"/absolute/path"}}}));
@@ -1542,13 +1542,13 @@ TEST(PlatformDocumentationGovernanceTests, ListsGovernanceAndPlansDocumentationC
 TEST(PlatformProductionOpsTests, RecoveryOpsReleaseChannelsStorageAndExternalIdentityApisWork)
 {
   const fs::path root = MakeTempDir("platform-production-ops");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
   WriteFile(fs::path(config.registry.root) / "config.json", "{\"registry\":\"test\"}\n");
   WriteFile(fs::path(config.registry.root) / "_publications/pub-000001/publication.json", "{\"publication_id\":\"pub-000001\"}\n");
 
-  spio::platform::PlatformRouter router(config);
-  const spio::platform::HttpResponse snapshot = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  pafio::platform::PlatformRouter router(config);
+  const pafio::platform::HttpResponse snapshot = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/ops/recovery/snapshots",
       OperatorIdentity(),
       {{"snapshot_id", "snap-000001"}, {"label", "before-rollout"}}));
@@ -1556,16 +1556,16 @@ TEST(PlatformProductionOpsTests, RecoveryOpsReleaseChannelsStorageAndExternalIde
   EXPECT_EQ(snapshot.body.at("payload").at("snapshot_id").get<std::string>(), "snap-000001");
 
   WriteFile(fs::path(config.registry.root) / "config.json", "{\"registry\":\"changed\"}\n");
-  const spio::platform::HttpResponse restore = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse restore = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/ops/recovery/snapshots/snap-000001/restore",
       OperatorIdentity()));
   ASSERT_EQ(restore.status_code, 200);
   EXPECT_TRUE(restore.body.at("payload").at("verified").get<bool>());
   EXPECT_NE(ReadFile(fs::path(config.registry.root) / "config.json").find("\"test\""), std::string::npos);
 
-  const spio::platform::HttpResponse rollout = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse rollout = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/release-channels/canary/rollout",
       OperatorIdentity(),
       {{"publication_id", "pub-000001"}, {"percentage", 10}, {"ring", "internal"}}));
@@ -1573,29 +1573,29 @@ TEST(PlatformProductionOpsTests, RecoveryOpsReleaseChannelsStorageAndExternalIde
   EXPECT_EQ(rollout.body.at("payload").at("channel").get<std::string>(), "canary");
   EXPECT_EQ(rollout.body.at("payload").at("percentage").get<int>(), 10);
 
-  const spio::platform::HttpResponse storage = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse storage = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/storage/status",
       OperatorIdentity()));
   ASSERT_EQ(storage.status_code, 200);
   EXPECT_EQ(storage.body.at("payload").at("object_store_provider").get<std::string>(), "memory");
 
-  const spio::platform::HttpResponse audit = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse audit = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/ops/audit-events",
       OperatorIdentity()));
   ASSERT_EQ(audit.status_code, 200);
   EXPECT_GE(audit.body.at("payload").at("events").size(), 2U);
 
-  const spio::platform::HttpResponse metrics = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse metrics = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/ops/metrics",
       OperatorIdentity()));
   ASSERT_EQ(metrics.status_code, 200);
   EXPECT_GE(metrics.body.at("payload").at("requests").at("total_requests").get<int>(), 4);
 
-  const spio::platform::HttpResponse external = router.Dispatch({
-      .method = spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse external = router.Dispatch({
+      .method = pafio::platform::HttpMethod::Post,
       .path = "/identity/external/exchange",
       .body = {
           {"provider", "microsoft"},
@@ -1611,14 +1611,14 @@ TEST(PlatformProductionOpsTests, RecoveryOpsReleaseChannelsStorageAndExternalIde
 TEST(PlatformRegistryControlPlaneTests, StatusUsesRedactedPathsAndFilesystemReadiness)
 {
   const fs::path root = MakeTempDir("platform-registry-status");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
   WriteFile(fs::path(config.registry.root) / "config.json", "{}\n");
   WriteFile(fs::path(config.registry.root) / "trust/root.json", "{}\n");
   fs::create_directories(config.registry.key_dir);
 
-  spio::platform::PlatformRouter router(config);
-  const spio::platform::HttpResponse status = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  pafio::platform::PlatformRouter router(config);
+  const pafio::platform::HttpResponse status = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/status",
       RegistryWriterIdentity()));
 
@@ -1641,9 +1641,9 @@ TEST(PlatformRegistryControlPlaneTests, StatusUsesRedactedPathsAndFilesystemRead
 TEST(PlatformRegistryControlPlaneTests, PublishVerifyAndMirrorStatusUseLocalState)
 {
   const fs::path root = MakeTempDir("platform-registry-publish");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
   const json publish_request = PafioPublishRequest(
       "demo/app",
       "0.1.0",
@@ -1669,8 +1669,8 @@ TEST(PlatformRegistryControlPlaneTests, PublishVerifyAndMirrorStatusUseLocalStat
               {"registry", "https://packages.example.test"},
           },
       }));
-  const spio::platform::HttpResponse publish = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse publish = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/publish",
       RegistryWriterIdentity(),
       publish_request));
@@ -1717,8 +1717,8 @@ TEST(PlatformRegistryControlPlaneTests, PublishVerifyAndMirrorStatusUseLocalStat
   EXPECT_EQ(root_metadata.at("signed").at("type").get<std::string>(), "root");
   ASSERT_FALSE(root_metadata.at("signatures").empty());
 
-  const spio::platform::HttpResponse descriptor = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse descriptor = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/descriptor",
       RegistryWriterIdentity()));
   ASSERT_EQ(descriptor.status_code, 200);
@@ -1730,8 +1730,8 @@ TEST(PlatformRegistryControlPlaneTests, PublishVerifyAndMirrorStatusUseLocalStat
   EXPECT_EQ(descriptor_payload.at("control_plane_base_url").get<std::string>(), "/api/pafio-registry-control/v1");
   EXPECT_EQ(descriptor_payload.at("descriptor_signature").get<std::string>(), "platform-control-plane-mtls");
 
-  const spio::platform::HttpResponse verify = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse verify = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/verify",
       MirrorIdentity(),
       json::object()));
@@ -1742,8 +1742,8 @@ TEST(PlatformRegistryControlPlaneTests, PublishVerifyAndMirrorStatusUseLocalStat
   EXPECT_EQ(verify.body.at("payload").at("releases").get<int>(), 1);
   EXPECT_EQ(verify.body.at("payload").at("tree_size").get<int>(), 1);
 
-  const spio::platform::HttpResponse mirror = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse mirror = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/mirrors/mirror-local/status",
       MirrorIdentity()));
   ASSERT_EQ(mirror.status_code, 200);
@@ -1756,12 +1756,12 @@ TEST(PlatformRegistryControlPlaneTests, PublishVerifyAndMirrorStatusUseLocalStat
 TEST(PlatformRegistryControlPlaneTests, PackageRepositoryPublicationOwnerTokenAndYankApisWork)
 {
   const fs::path root = MakeTempDir("platform-registry-domain");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
   const json publish_request = PafioPublishRequest();
-  const spio::platform::HttpResponse publish = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse publish = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/publish",
       RegistryWriterIdentity(),
       publish_request));
@@ -1770,28 +1770,28 @@ TEST(PlatformRegistryControlPlaneTests, PackageRepositoryPublicationOwnerTokenAn
   EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / "_publications/pub-000001/publication.json"));
   EXPECT_TRUE(fs::exists(fs::path(config.registry.root) / "_distributions/default/current.json"));
 
-  const spio::platform::HttpResponse package = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse package = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/packages/demo/app",
       RegistryWriterIdentity()));
   ASSERT_EQ(package.status_code, 200);
   EXPECT_EQ(package.body.at("payload").at("latest_version").get<std::string>(), "0.1.0");
 
-  const spio::platform::HttpResponse release = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse release = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/packages/demo/app/releases/0.1.0",
       RegistryWriterIdentity()));
   ASSERT_EQ(release.status_code, 200);
   EXPECT_FALSE(release.body.at("payload").at("yanked").get<bool>());
 
-  const spio::platform::HttpResponse add_owner = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse add_owner = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/packages/demo/app/owners",
       RegistryWriterIdentity(),
       {{"owner_id", "user-bob"}, {"owner_kind", "user"}, {"role", "owner"}}));
   ASSERT_EQ(add_owner.status_code, 200);
-  const spio::platform::HttpResponse owners = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse owners = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/packages/demo/app/owners",
       RegistryWriterIdentity()));
   ASSERT_EQ(owners.status_code, 200);
@@ -1799,14 +1799,14 @@ TEST(PlatformRegistryControlPlaneTests, PackageRepositoryPublicationOwnerTokenAn
   EXPECT_EQ(
       owners.body.at("payload").at("owners").at(0).at("owner_id").get<std::string>(),
       "registry-writer-01");
-  const spio::platform::HttpResponse remove_owner = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Delete,
+  const pafio::platform::HttpResponse remove_owner = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Delete,
       "/api/pafio-registry-control/v1/packages/demo/app/owners/user-bob",
       RegistryWriterIdentity()));
   ASSERT_EQ(remove_owner.status_code, 200);
 
-  const spio::platform::HttpResponse token_created = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse token_created = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/tokens",
       RegistryWriterIdentity(),
       {
@@ -1817,16 +1817,16 @@ TEST(PlatformRegistryControlPlaneTests, PackageRepositoryPublicationOwnerTokenAn
   const std::string token = token_created.body.at("payload").at("token").get<std::string>();
   EXPECT_FALSE(token_created.body.at("payload").contains("token_hash"));
 
-  const spio::platform::HttpResponse denied_publish = router.Dispatch(RequestWithToken(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse denied_publish = router.Dispatch(RequestWithToken(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/publish",
       token,
       PafioPublishRequest("other/app", "1.0.0")));
   ASSERT_EQ(denied_publish.status_code, 403);
   EXPECT_FALSE(DirectoryHasEntries(fs::path(config.registry.root) / "_staging/uploads"));
 
-  const spio::platform::HttpResponse yank = router.Dispatch(RequestWithToken(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse yank = router.Dispatch(RequestWithToken(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/packages/demo/app/releases/0.1.0/yank",
       token,
       {{"reason", "bad metadata"}}));
@@ -1835,45 +1835,45 @@ TEST(PlatformRegistryControlPlaneTests, PackageRepositoryPublicationOwnerTokenAn
   EXPECT_TRUE(yank.body.at("payload").at("artifact_preserved").get<bool>());
   EXPECT_EQ(yank.body.at("payload").at("publication_id").get<std::string>(), "pub-000002");
 
-  const spio::platform::HttpResponse yanked_release = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse yanked_release = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/packages/demo/app/releases/0.1.0",
       RegistryWriterIdentity()));
   ASSERT_EQ(yanked_release.status_code, 200);
   EXPECT_TRUE(yanked_release.body.at("payload").at("yanked").get<bool>());
 
-  const spio::platform::HttpResponse versions = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse versions = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/repositories/default/versions",
       RegistryWriterIdentity()));
   ASSERT_EQ(versions.status_code, 200);
   EXPECT_EQ(versions.body.at("payload").at("versions").size(), 2U);
 
-  const spio::platform::HttpResponse publication = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse publication = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/publications/pub-000002",
       RegistryWriterIdentity()));
   ASSERT_EQ(publication.status_code, 200);
   EXPECT_TRUE(publication.body.at("payload").at("verified").get<bool>());
 
-  const spio::platform::HttpResponse rollback = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse rollback = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/distributions/default/rollback",
       OperatorIdentity(),
       json::object()));
   ASSERT_EQ(rollback.status_code, 200);
   EXPECT_EQ(rollback.body.at("payload").at("publication_id").get<std::string>(), "pub-000001");
 
-  const spio::platform::HttpResponse promote = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse promote = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/distributions/default/promote",
       OperatorIdentity(),
       {{"publication_id", "pub-000002"}}));
   ASSERT_EQ(promote.status_code, 200);
   EXPECT_EQ(promote.body.at("payload").at("publication_id").get<std::string>(), "pub-000002");
 
-  const spio::platform::HttpResponse unyank = router.Dispatch(RequestWithToken(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse unyank = router.Dispatch(RequestWithToken(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/packages/demo/app/releases/0.1.0/unyank",
       token,
       json::object()));
@@ -1882,30 +1882,30 @@ TEST(PlatformRegistryControlPlaneTests, PackageRepositoryPublicationOwnerTokenAn
   EXPECT_TRUE(unyank.body.at("payload").at("artifact_preserved").get<bool>());
   EXPECT_EQ(unyank.body.at("payload").at("publication_id").get<std::string>(), "pub-000003");
 
-  const spio::platform::HttpResponse final_release = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Get,
+  const pafio::platform::HttpResponse final_release = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Get,
       "/api/pafio-registry-control/v1/packages/demo/app/releases/0.1.0",
       RegistryWriterIdentity()));
   ASSERT_EQ(final_release.status_code, 200);
   EXPECT_FALSE(final_release.body.at("payload").at("yanked").get<bool>());
 
-  const spio::platform::HttpResponse revoked = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Delete,
+  const pafio::platform::HttpResponse revoked = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Delete,
       "/api/pafio-registry-control/v1/tokens/" + token_created.body.at("payload").at("token_id").get<std::string>(),
       RegistryWriterIdentity()));
   ASSERT_EQ(revoked.status_code, 200);
 
-  const spio::platform::HttpResponse revoked_token_denied = router.Dispatch(RequestWithToken(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse revoked_token_denied = router.Dispatch(RequestWithToken(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/packages/demo/app/releases/0.1.0/yank",
       token,
       json::object()));
   ASSERT_EQ(revoked_token_denied.status_code, 403);
 
-  spio::platform::PlatformConfig mirror_config = config;
+  pafio::platform::PlatformConfig mirror_config = config;
   mirror_config.registry.root = (root / "mirror-registry").string();
   mirror_config.registry.mirror_source_root = config.registry.root;
-  ASSERT_EQ(spio::platform::RunMirrorSyncOnce(mirror_config), 0);
+  ASSERT_EQ(pafio::platform::RunMirrorSyncOnce(mirror_config), 0);
   const json mirror_current = json::parse(ReadFile(fs::path(mirror_config.registry.root) / "_distributions/default/current.json"));
   EXPECT_EQ(mirror_current.at("publication_id").get<std::string>(), "pub-000003");
   EXPECT_TRUE(fs::exists(fs::path(mirror_config.registry.root) / "_publications/pub-000003/publication.json"));
@@ -1914,13 +1914,13 @@ TEST(PlatformRegistryControlPlaneTests, PackageRepositoryPublicationOwnerTokenAn
 TEST(PlatformRegistryControlPlaneTests, RejectsMalformedPafioArchiveUploadsWithoutStagingResidue)
 {
   const fs::path root = MakeTempDir("platform-registry-invalid-upload");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
-  spio::platform::PlatformRouter router(config);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
+  pafio::platform::PlatformRouter router(config);
 
   std::vector<json> malformed_requests;
-  json legacy_field = PafioPublishRequest();
-  legacy_field["manifest_path"] = "pafio.toml";
-  malformed_requests.push_back(std::move(legacy_field));
+  json unexpected_field = PafioPublishRequest();
+  unexpected_field["manifest_path"] = "pafio.toml";
+  malformed_requests.push_back(std::move(unexpected_field));
 
   json missing_field = PafioPublishRequest();
   missing_field.erase("dependencies");
@@ -2036,7 +2036,7 @@ TEST(PlatformRegistryControlPlaneTests, RejectsMalformedPafioArchiveUploadsWitho
 
   malformed_requests.push_back(PafioPublishRequestForArchive(
       BuildTestPafioArchiveWithManifest(
-          "[spio]\nmanifest-version = 1\n\n" +
+          "[pafio]\nmanifest-version = 1\n\n" +
           TestPafioManifest("demo/app", "0.1.0")),
       "demo/app",
       "0.1.0",
@@ -2054,8 +2054,8 @@ TEST(PlatformRegistryControlPlaneTests, RejectsMalformedPafioArchiveUploadsWitho
       json::array()));
 
   for (const json &request : malformed_requests) {
-    const spio::platform::HttpResponse response = router.Dispatch(RequestWithIdentity(
-        spio::platform::HttpMethod::Post,
+    const pafio::platform::HttpResponse response = router.Dispatch(RequestWithIdentity(
+        pafio::platform::HttpMethod::Post,
         "/api/pafio-registry-control/v1/publish",
         RegistryWriterIdentity(),
         request));
@@ -2074,35 +2074,35 @@ TEST(PlatformRegistryControlPlaneTests, RejectsMalformedPafioArchiveUploadsWitho
 TEST(PlatformRegistryControlPlaneTests, EnforcesRegistryRolesAndNonSuccessDomainErrors)
 {
   const fs::path root = MakeTempDir("platform-registry-errors");
-  const spio::platform::PlatformConfig config = TestPlatformConfig(root);
+  const pafio::platform::PlatformConfig config = TestPlatformConfig(root);
 
-  spio::platform::PlatformRouter router(config);
+  pafio::platform::PlatformRouter router(config);
   const json publish_request = PafioPublishRequest();
 
-  const spio::platform::HttpResponse denied = router.Dispatch(Request(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse denied = router.Dispatch(Request(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/publish",
       publish_request));
   ASSERT_EQ(denied.status_code, 403);
   EXPECT_EQ(denied.body.at("returncode").get<int>(), 2);
 
-  const spio::platform::HttpResponse verify_before_publish = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse verify_before_publish = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/verify",
       MirrorIdentity(),
       json::object()));
   ASSERT_EQ(verify_before_publish.status_code, 422);
   EXPECT_EQ(verify_before_publish.body.at("error_payload").at("category").get<std::string>(), "VerifyError");
 
-  const spio::platform::HttpResponse first_publish = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse first_publish = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/publish",
       RegistryWriterIdentity(),
       publish_request));
   ASSERT_EQ(first_publish.status_code, 200);
 
-  const spio::platform::HttpResponse duplicate = router.Dispatch(RequestWithIdentity(
-      spio::platform::HttpMethod::Post,
+  const pafio::platform::HttpResponse duplicate = router.Dispatch(RequestWithIdentity(
+      pafio::platform::HttpMethod::Post,
       "/api/pafio-registry-control/v1/publish",
       RegistryWriterIdentity(),
       publish_request));

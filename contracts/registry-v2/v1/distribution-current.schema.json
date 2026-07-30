@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "spio registry v2 distribution current pointer",
+  "title": "pafio registry v2 distribution current pointer",
   "type": "object",
   "required": [
     "distribution_id",

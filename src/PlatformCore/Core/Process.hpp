@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace spio
+namespace pafio
 {
 
 struct ProcessResult
@@ -66,4 +66,4 @@ ProcessResult RunProcess(const ProcessRequest &request)
   }
 }
 
-}  // namespace spio
+}  // namespace pafio

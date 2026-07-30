@@ -1,6 +1,6 @@
-# Spio Registry V2 Publish Control Plane
+# Pafio Registry V2 Publish Control Plane
 
-**Purpose:** Define the server-side responsibilities that produce the immutable `spio` registry `v2` static read plane without leaking dynamic publish behavior into the client-facing distribution protocol.
+**Purpose:** Define the server-side responsibilities that produce the immutable `pafio` registry `v2` static read plane without leaking dynamic publish behavior into the client-facing distribution protocol.
 
 **Last updated:** 2026-05-02
 
@@ -25,7 +25,7 @@ The current versioned HTTP service contract for this plane lives in:
 
 - [`../../contracts/registry-control-plane/v1/registry-control-plane.contract.json`](../../contracts/registry-control-plane/v1/registry-control-plane.contract.json)
 - [`../../contracts/registry-control-plane/v1/registry-control-plane.examples.json`](../../contracts/registry-control-plane/v1/registry-control-plane.examples.json)
-- [`./Spio-Registry-Control-Plane-Contract.md`](./Spio-Registry-Control-Plane-Contract.md)
+- [`./Pafio-Registry-Control-Plane-Contract.md`](./Pafio-Registry-Control-Plane-Contract.md)
 
 ## 2. Required Write-Side Guarantees
 

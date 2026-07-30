@@ -3,10 +3,10 @@
 #include <filesystem>
 #include <string>
 
-namespace spio
+namespace pafio
 {
 
 std::filesystem::path ProjectRoot();
 std::filesystem::path CanonicalAbsolutePath(const std::filesystem::path &path);
 
-}  // namespace spio
+}  // namespace pafio

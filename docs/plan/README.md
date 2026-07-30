@@ -1,9 +1,15 @@
 # Better Plan Workspace
 
-This workspace is the only current planning root for `Unka-Malloc/styio-cloud-nightly`.
+**Purpose:** Index the active Styio Platform owner-convergence plan.
+
+**Last updated:** 2026-07-30
+
+This workspace is the repository planning source of truth for Styio Platform.
 
 - Manifest: `Manifest.json`
-- Active plan: `repository-delivery-convergence/Checkpoints.json`
+- Active plan: Styio Platform owner convergence
 - Product branch represented: `nightly`
 
-Planning material outside `docs/plan` is intentionally consolidated here so future work has one state-machine validated source of truth.
+The active plan tracks Platform-owned registry and hosted-execution delivery.
+Historical migration prose is available from version control and is not a
+parallel planning authority.

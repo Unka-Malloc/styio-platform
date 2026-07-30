@@ -3,7 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 // Normalized actor shape shared by Microsoft, Google, Apple, and Telegram
@@ -25,4 +25,4 @@ ExternalIdentityRecord NormalizeExternalIdentity(const nlohmann::json &request);
 
 nlohmann::json SerializeExternalIdentityRecord(const ExternalIdentityRecord &record);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

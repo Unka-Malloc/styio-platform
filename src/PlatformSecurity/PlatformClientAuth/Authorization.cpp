@@ -2,7 +2,7 @@
 
 #include <initializer_list>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 namespace
@@ -113,4 +113,4 @@ bool IsAuthorizedForOperation(std::string_view operation_id, const MtlsIdentity 
   return true;
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <string>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 nlohmann::json BuildReleaseRolloutPlan(
@@ -17,5 +17,5 @@ nlohmann::json BuildReleaseRolloutPlan(
 void WriteReleaseChannel(const std::filesystem::path &registry_root, const nlohmann::json &plan);
 nlohmann::json ListReleaseChannels(const std::filesystem::path &registry_root);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform
 

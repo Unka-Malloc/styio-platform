@@ -41,7 +41,8 @@ and provide the configured system Styio path through `PAFIO_STYIO_BIN`.
 
 Keep `PlatformService/Router.cpp` limited to dispatch. Put capability handlers
 beside the state they mutate. Route environment, filesystem, child-process,
-socket, and sleep behavior through `PlatformCore/System`.
+socket, and sleep behavior through `PlatformCore/System`. Native Platform code
+uses the `pafio::platform` namespace after the one-time identity cutover.
 
 Job request changes must keep the native JSON contract, queue validation,
 worker argument construction, memory state, Postgres state, and focused native

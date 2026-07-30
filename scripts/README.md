@@ -15,9 +15,9 @@ validation, external audit validation, and repository governance gates.
 - `registry-v2-control-plane-server.py` runs the local registry control-plane server.
 - `registry-v2-static-read-server.py` runs a read-only static registry read plane.
 - `registry-v2-vm-smoke.py` validates a deployed VM registry node.
-- `publish-spio-tool-release.py` publishes a prebuilt tool executable such as
-  `spio` or `styio` into a static read-plane root. `spio` is published under
-  `tools/spio/`; `styio` client builds are published under release target
+- `publish-pafio-tool-release.py` publishes a prebuilt tool executable such as
+  `pafio` or `styio` into a static read-plane root. `pafio` is published under
+  `tools/pafio/`; `styio` client builds are published under release target
   namespaces such as `tools/styio-linux/`, `tools/styio-macos-cli/`,
   `tools/styio-macos-desktop-gui/`, `tools/styio-windows-cli/`,
   `tools/styio-windows-desktop-gui/`, `tools/styio-ios/`, or

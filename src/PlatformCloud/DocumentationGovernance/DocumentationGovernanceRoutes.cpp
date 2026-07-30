@@ -2,7 +2,7 @@
 #include "PlatformCloud/EcosystemManagement/EcosystemManager.hpp"
 #include "PlatformService/RouterSupport.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 HttpResponse
@@ -65,4 +65,4 @@ PlatformRouter::HandlePlanEcosystemRelease(const HttpRequest &request) const {
   }
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

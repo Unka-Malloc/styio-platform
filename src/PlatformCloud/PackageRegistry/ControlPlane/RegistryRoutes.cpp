@@ -1,6 +1,6 @@
 #include "PlatformCloud/PackageRegistry/ControlPlane/RegistryRoutes.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 std::vector<RouteSpec> BuildRegistryControlPlaneRoutes()
@@ -113,4 +113,4 @@ std::vector<RouteSpec> BuildRegistryControlPlaneRoutes()
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

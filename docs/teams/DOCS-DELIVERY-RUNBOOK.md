@@ -55,6 +55,8 @@ must describe workers invoking `pafio build` with a system-provided Styio and
 must not publish managed compiler install, select, pin, or cache behavior.
 Do not duplicate Pafio metadata/workflow/compile-plan contracts or Styio
 diagnostics, receipt, and runtime-event contracts in Platform documentation.
+Keep the active Better Plan limited to current owner delivery and fixed-revision
+acceptance; version control is the history source for retired migration prose.
 Agent guidance changes must keep `AGENTS.md` short and aligned with source
 ownership, manifests, contracts, tests, and required gates.
 

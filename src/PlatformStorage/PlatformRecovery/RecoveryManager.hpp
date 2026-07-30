@@ -4,7 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 // Filesystem snapshot request for registry and read-plane recovery. The caller
@@ -42,4 +42,4 @@ nlohmann::json BuildStorageStatus(
   const std::filesystem::path &snapshots_root
 );
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

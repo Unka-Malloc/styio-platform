@@ -5,7 +5,7 @@
 #include <map>
 #include <string>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 class PlatformRateLimiter
@@ -36,5 +36,5 @@ private:
   std::map<int, int64_t> by_status_;
 };
 
-}  // namespace spio::platform
+}  // namespace pafio::platform
 

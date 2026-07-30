@@ -2,12 +2,12 @@
 
 namespace fs = std::filesystem;
 
-namespace spio
+namespace pafio
 {
 
 fs::path ProjectRoot()
 {
-  return fs::path(SPIO_PROJECT_ROOT);
+  return fs::path(PAFIO_PROJECT_ROOT);
 }
 
 fs::path CanonicalAbsolutePath(const fs::path &path)
@@ -15,4 +15,4 @@ fs::path CanonicalAbsolutePath(const fs::path &path)
   return fs::absolute(path).lexically_normal();
 }
 
-}  // namespace spio
+}  // namespace pafio

@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 class MemoryStateStoreError : public std::runtime_error
@@ -143,4 +143,4 @@ private:
   size_t next_registry_audit_sequence_ = 1;
 };
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

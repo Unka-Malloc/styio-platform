@@ -1,6 +1,6 @@
-# Spio Registry Control-Plane Contract
+# Pafio Registry Control-Plane Contract
 
-**Purpose:** Freeze the HTTP control-plane contract used by backend services and automation to operate a `spio` registry `v2` root independently of the static read-plane contract.
+**Purpose:** Freeze the HTTP control-plane contract used by backend services and automation to operate a `pafio` registry `v2` root independently of the static read-plane contract.
 
 **Last updated:** 2026-05-02
 
@@ -37,17 +37,17 @@ This contract does not own:
 
 Those remain in:
 
-- [`Spio-Registry-V2-Protocol.md`](./Spio-Registry-V2-Protocol.md)
-- [`Spio-Registry-V2-Publish-Control-Plane.md`](./Spio-Registry-V2-Publish-Control-Plane.md)
+- [`Pafio-Registry-V2-Protocol.md`](./Pafio-Registry-V2-Protocol.md)
+- [`Pafio-Registry-V2-Publish-Control-Plane.md`](./Pafio-Registry-V2-Publish-Control-Plane.md)
 
 ## Repository Boundary
 
 `styio-platform` owns the hosted registry and mirror service side for this
-contract. `styio-spio` consumes the same native JSON package as a local
+contract. `pafio-nightly` consumes the same native JSON package as a local
 package-manager compatibility boundary. Service implementations must preserve
 the shared status, publish, and verify envelopes while keeping mirror
 freshness/replay in platform mirror docs and offline cache behavior in
-`styio-spio` client docs.
+`pafio-nightly` client docs.
 
 ## Executable Reference
 
@@ -59,9 +59,9 @@ That server binds:
 
 - one local registry root
 - one role-key directory
-- one `spio` binary for dry-run publish preparation
+- one `pafio` binary for dry-run publish preparation
 
-The descriptor response is the platform-owned trust handoff to `styio-spio`.
+The descriptor response is the platform-owned trust handoff to `pafio-nightly`.
 It names the registry read root, the control-plane base URL, and the SHA-256 of
 `trust/root.json`; public clients import that descriptor before remote fetches
 instead of trusting self-advertised registry metadata alone.

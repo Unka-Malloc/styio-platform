@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <array>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 bool IsRegistryOperation(std::string_view operation_id)
@@ -79,4 +79,4 @@ std::vector<RouteSpec> BuildPlatformControlPlaneRoutes()
   };
 }
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

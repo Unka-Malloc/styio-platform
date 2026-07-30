@@ -8,10 +8,10 @@
 #include <optional>
 #include <string>
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 std::optional<std::string> ValidateSubmitJobRequest(const nlohmann::json &request);
 PlatformJobRecord BuildQueuedJobRecord(const nlohmann::json &request, const PlatformConfig &config, std::string job_id);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

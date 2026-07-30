@@ -7,5 +7,5 @@
 ## Scope
 
 These files describe the common docs/process gates used by `styio-platform`.
-They intentionally mirror the `styio-spio` governance model where the same
-automation shape is still useful.
+They define the repository-local automation shape used to maintain Platform
+contracts and runbooks.

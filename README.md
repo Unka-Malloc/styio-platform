@@ -3,8 +3,7 @@
 `styio-platform` is the globally scalable cloud-computing service platform for
 the Styio ecosystem. It owns hosted compile services, multi-region deployment
 nodes, package repository distribution, mirror synchronization, registry
-control-plane server surfaces, and extensible cloud-service validation tooling
-that previously lived inside `styio-spio`.
+control-plane server surfaces, and extensible cloud-service validation tooling.
 
 **Project status:** developer preview. The repository is suitable for open
 development and early integration, but APIs and deployment defaults can still
@@ -42,7 +41,7 @@ package directly.
 - standard C++/LLVM development and compile environment for every workspace
 - native C++ invocation path for mixed Styio/C++ workloads
 - C++ fallback path when Styio cannot express or execute part of a workload
-- package repository distribution foundation for `styio-spio`
+- package repository distribution and control plane for Pafio clients
 - multi-region and cross-network deployment node control plane
 - mirror-site synchronization and registry replication
 - extensible cloud service APIs consumed by local and hosted clients

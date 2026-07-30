@@ -5,7 +5,7 @@
 
 #include "PlatformService/Http.hpp"
 
-namespace spio::platform
+namespace pafio::platform
 {
 
 // Returns the platform control-plane routes owned by PlatformService. Registry
@@ -21,4 +21,4 @@ bool IsRegistryOperation(std::string_view operation_id);
 // instead of only by an mTLS platform identity.
 bool IsRegistryTokenCapableOperation(std::string_view operation_id);
 
-}  // namespace spio::platform
+}  // namespace pafio::platform

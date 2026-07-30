@@ -10,7 +10,7 @@ import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "scripts" / "publish-spio-tool-release.py"
+SCRIPT = ROOT / "scripts" / "publish-pafio-tool-release.py"
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -18,14 +18,14 @@ def sha256_bytes(value: bytes) -> str:
 
 
 class ToolReleaseTests(unittest.TestCase):
-    def test_publish_spio_tool_release_channel(self) -> None:
+    def test_publish_pafio_tool_release_channel(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir)
             registry_root = root / "registry-v2"
             registry_root.mkdir()
-            binary = root / "spio"
-            binary.write_bytes(b"fake spio binary")
-            installer = root / "install-spio.sh"
+            binary = root / "pafio"
+            binary.write_bytes(b"fake pafio binary")
+            installer = root / "install-pafio.sh"
             installer.write_text("#!/usr/bin/env sh\n", encoding="utf-8")
 
             proc = subprocess.run(
@@ -50,20 +50,20 @@ class ToolReleaseTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, proc.stderr)
             result = json.loads(proc.stdout)
             self.assertTrue(result["ok"])
-            self.assertEqual(result["binary_path"], "tools/spio/releases/0.1.0-dev/linux-aarch64/spio")
+            self.assertEqual(result["binary_path"], "tools/pafio/releases/0.1.0-dev/linux-aarch64/pafio")
             self.assertEqual(
                 result["channel_version_path"],
-                "tools/spio/channel/latest/linux-aarch64/version",
+                "tools/pafio/channel/latest/linux-aarch64/version",
             )
 
-            latest = json.loads((registry_root / "tools" / "spio" / "latest.json").read_text(encoding="utf-8"))
+            latest = json.loads((registry_root / "tools" / "pafio" / "latest.json").read_text(encoding="utf-8"))
             entry = latest["platforms"]["linux-aarch64"]
-            self.assertEqual(entry["path"], "tools/spio/releases/0.1.0-dev/linux-aarch64/spio")
-            self.assertEqual(entry["sha256"], sha256_bytes(b"fake spio binary"))
-            self.assertEqual(entry["size_bytes"], len(b"fake spio binary"))
-            channel_version = registry_root / "tools" / "spio" / "channel" / "latest" / "linux-aarch64" / "version"
+            self.assertEqual(entry["path"], "tools/pafio/releases/0.1.0-dev/linux-aarch64/pafio")
+            self.assertEqual(entry["sha256"], sha256_bytes(b"fake pafio binary"))
+            self.assertEqual(entry["size_bytes"], len(b"fake pafio binary"))
+            channel_version = registry_root / "tools" / "pafio" / "channel" / "latest" / "linux-aarch64" / "version"
             self.assertEqual(channel_version.read_text(encoding="utf-8"), "0.1.0-dev\n")
-            self.assertTrue((registry_root / "tools" / "spio" / "install-spio.sh").exists())
+            self.assertTrue((registry_root / "tools" / "pafio" / "install-pafio.sh").exists())
 
             styio_binary = root / "styio"
             styio_binary.write_bytes(b"fake styio binary")
@@ -227,7 +227,7 @@ class ToolReleaseTests(unittest.TestCase):
             )
             self.assertEqual(second.returncode, 0, second.stderr)
 
-            binary.write_bytes(b"different fake spio binary")
+            binary.write_bytes(b"different fake pafio binary")
             conflict = subprocess.run(
                 [
                     sys.executable,
