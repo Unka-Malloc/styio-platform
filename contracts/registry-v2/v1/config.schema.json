@@ -20,7 +20,7 @@
     },
     "protocol": {
       "type": "string",
-      "const": "spio-static-registry"
+      "const": "pafio-static-registry"
     },
     "protocol_version": {
       "type": "integer",

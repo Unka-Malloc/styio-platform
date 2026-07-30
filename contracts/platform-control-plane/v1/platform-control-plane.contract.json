@@ -412,6 +412,87 @@
       },
       "optional": {}
     },
+    "JobSource": {
+      "kind": "object",
+      "required": {
+        "origin": {
+          "type": "string",
+          "min_length": 1
+        }
+      },
+      "optional": {
+        "requested_revision": {
+          "type": "string",
+          "min_length": 1
+        }
+      }
+    },
+    "JobWorkflow": {
+      "kind": "object",
+      "required": {},
+      "optional": {
+        "locked": {
+          "type": "boolean"
+        },
+        "offline": {
+          "type": "boolean"
+        },
+        "frozen": {
+          "type": "boolean"
+        },
+        "dry_run": {
+          "type": "boolean"
+        }
+      }
+    },
+    "JobTarget": {
+      "kind": "object",
+      "required": {},
+      "optional": {
+        "package": {
+          "type": "string",
+          "min_length": 1
+        },
+        "bin": {
+          "type": "string",
+          "min_length": 1
+        },
+        "test": {
+          "type": "string",
+          "min_length": 1
+        },
+        "lib": {
+          "type": "boolean"
+        }
+      }
+    },
+    "PlatformJobRequest": {
+      "kind": "object",
+      "required": {
+        "schema_version": {
+          "type": "integer"
+        },
+        "manifest_path": {
+          "type": "string",
+          "min_length": 1
+        },
+        "source": {
+          "ref": "JobSource"
+        }
+      },
+      "optional": {
+        "profile": {
+          "type": "string",
+          "min_length": 1
+        },
+        "workflow": {
+          "ref": "JobWorkflow"
+        },
+        "target": {
+          "ref": "JobTarget"
+        }
+      }
+    },
     "SubmitJobRequest": {
       "kind": "object",
       "required": {
@@ -436,7 +517,7 @@
           ]
         },
         "job_request": {
-          "type": "object"
+          "ref": "PlatformJobRequest"
         }
       },
       "optional": {
@@ -538,7 +619,7 @@
           "format": "date-time"
         },
         "job_request": {
-          "type": "object"
+          "ref": "PlatformJobRequest"
         },
         "artifacts": {
           "type": "array",

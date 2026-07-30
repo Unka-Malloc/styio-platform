@@ -2,10 +2,10 @@
 
 **Purpose:** Record platform boundary decisions inherited from `styio-spio` and new decisions made inside `styio-platform`.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-07-30
 
 ## Scope
 
-ADRs here are the durable history for compile-plan, hosted control-plane,
-registry server, and cloud-service ownership. Package-manager-only decisions
-stay in `styio-spio`.
+ADRs here record Platform-owned hosted workspace, registry server, job/worker,
+storage, security, and cloud-service decisions. Package-manager decisions live
+in Pafio; compiler decisions live in Styio.

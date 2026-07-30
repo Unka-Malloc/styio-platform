@@ -240,7 +240,7 @@ def load_role_keys(key_dir: pathlib.Path) -> dict[str, RoleKey]:
 
 def sign_payload(signed_payload: dict[str, Any], role_key: RoleKey) -> dict[str, Any]:
     message = canonical_json_bytes(signed_payload)
-    with tempfile.TemporaryDirectory(prefix="spio-registry-v2-sign-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="pafio-static-registry-sign-") as temp_dir:
         temp_root = pathlib.Path(temp_dir)
         message_path = temp_root / "message.json"
         signature_path = temp_root / "message.sig"
@@ -275,7 +275,7 @@ def verify_signature(signed_payload: dict[str, Any], signature_b64: str, public_
         signature = base64.b64decode(signature_b64, validate=True)
     except (ValueError, binascii.Error):
         raise RegistryV2Error("signature is not valid base64")
-    with tempfile.TemporaryDirectory(prefix="spio-registry-v2-verify-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="pafio-static-registry-verify-") as temp_dir:
         temp_root = pathlib.Path(temp_dir)
         message_path = temp_root / "message.json"
         signature_path = temp_root / "message.sig"

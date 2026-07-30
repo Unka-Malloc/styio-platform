@@ -17,10 +17,10 @@ Human-readable docs explain those files. They do not replace them.
 
 `v1` freezes these control-plane operations:
 
-1. `GET /api/spio-registry-control/v1/status`
-2. `GET /api/spio-registry-control/v1/descriptor`
-3. `POST /api/spio-registry-control/v1/publish`
-4. `POST /api/spio-registry-control/v1/verify`
+1. `GET /api/pafio-registry-control/v1/status`
+2. `GET /api/pafio-registry-control/v1/descriptor`
+3. `POST /api/pafio-registry-control/v1/publish`
+4. `POST /api/pafio-registry-control/v1/verify`
 
 This contract owns:
 

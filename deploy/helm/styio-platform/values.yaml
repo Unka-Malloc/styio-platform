@@ -49,11 +49,11 @@ primary:
 
 worker:
   replicas: 1
-  poolKey: linux/x86_64/build/nightly/minimal
+  poolKey: default
   workspaceRoot: /var/lib/styio-platform/workspaces
   artifactRoot: /var/lib/styio-platform/artifacts
   pollIntervalMs: 2000
-  spioBin: /usr/local/bin/spio
+  pafioBin: /usr/local/bin/pafio
   styioBin: /usr/local/bin/styio
 
 mirror:

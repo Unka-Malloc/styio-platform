@@ -110,7 +110,7 @@ RegistryControlPlaneBaseUrl(const PlatformConfig &config) {
   if (!config.registry.control_plane_base_url.empty()) {
     return config.registry.control_plane_base_url;
   }
-  return "/api/spio-registry-control/v1";
+  return "/api/pafio-registry-control/v1";
 }
 
 std::string

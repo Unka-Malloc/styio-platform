@@ -6,9 +6,9 @@
 
 ## Scope
 
-`styio-platform` documentation is downstream of the compiler contract in `styio`
-and the package-manager client contract in `styio-spio`. Platform docs own
-hosted workspaces, compile-plan service execution, registry control-plane
+`styio-platform` documentation is downstream of the compiler contract in Styio
+and the package-manager client contract in Pafio. Platform docs own
+hosted workspaces, Pafio workflow execution, registry control-plane
 servers, package distribution, multi-region deployment nodes, mirror
 synchronization, workspace compile semantics, native C++/LLVM fallback, and
 cloud-service extensibility.

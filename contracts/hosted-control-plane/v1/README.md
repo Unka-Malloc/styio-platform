@@ -1,8 +1,8 @@
 # hosted-control-plane v1
 
-**Purpose:** Define the first native JSON HTTP contract package for the repo-hosted and cloud-hosted workspace API consumed by `vityo-nightly` and any future `spio` control console frontend.
+**Purpose:** Define the native JSON HTTP contract for Platform-hosted workspaces consumed by `vityo-nightly`.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-07-30
 
 ## Source Of Truth
 
@@ -18,7 +18,13 @@
 
 ## Stability Rules
 
+- `v1` starts at the Pafio ownership cutover and contains no managed compiler
+  routes or compiler-selection state.
 - Additive optional fields are allowed within `v1`.
 - Removing an operation, renaming a field, changing a required field, or changing an enum meaning requires `v2`.
 - Frontend clients must treat undocumented fields as non-existent.
 - Backend services must preserve the published method, path, and envelope spelling exactly.
+
+Pafio owns dependency and project workflow behavior invoked behind hosted
+routes. Styio is system-provided and owns compiler machine contracts; Platform
+does not install, select, pin, cache, or describe compiler distributions.

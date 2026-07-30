@@ -2,7 +2,7 @@
 
 **Purpose:** Freeze the frontend/backend HTTP contract used by hosted workspaces so `vityo-nightly`, the platform control console, and backend services can develop independently against a versioned native JSON package.
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-07-30
 
 ## Source Of Truth
 
@@ -27,7 +27,6 @@ Human-readable docs must explain and reference those files, not replace them.
 This contract owns:
 
 - hosted workspace open and project-graph routes
-- toolchain-management routes
 - dependency materialization routes
 - execution routes
 - deployment routes
@@ -47,26 +46,26 @@ Those stay in their existing contracts.
 
 1. `POST /api/styio-hosted/v1/workspaces/open`
 2. `GET /api/styio-hosted/v1/workspaces/{workspace_id}/project-graph`
-3. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/tool/install`
-4. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/tool/use`
-5. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/tool/pin`
-6. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/tool/clear-pin`
-7. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/dependencies/fetch`
-8. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/dependencies/vendor`
-9. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/execution/run`
-10. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/execution/build`
-11. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/execution/test`
-12. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/deployment/pack`
-13. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/deployment/preflight`
-14. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/deployment/publish`
+3. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/dependencies/sync`
+4. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/dependencies/vendor`
+5. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/execution/run`
+6. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/execution/build`
+7. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/execution/test`
+8. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/deployment/pack`
+9. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/deployment/preflight`
+10. `POST /api/styio-hosted/v1/workspaces/{workspace_id}/deployment/publish`
 
 ## Envelope Rules
 
 - `open` and `project-graph` publish a hosted project envelope with `payload` and `workspace`.
-- toolchain, dependency, execution, and deployment routes publish command envelopes with `returncode`, `message`, `stdout`, `stderr`, and route-specific `payload` or `error_payload`.
+- dependency, execution, and deployment routes publish command envelopes with `returncode`, `message`, `stdout`, `stderr`, and route-specific `payload` or `error_payload`.
 - execution payloads must keep `diagnostics` and `runtime_events` structured.
 - deployment payloads must preserve `archive_path` so frontend flows can show durable artifacts.
 - domain-level failures are modeled inside the documented JSON envelope; clients must inspect `returncode` instead of relying on page-local heuristics.
+
+Styio is a system-provided dependency. This contract has no compiler install,
+use, pin, channel, or managed-cache operations. Hosted workers invoke Pafio
+with an explicitly configured Styio executable.
 
 ## Workflow Rule
 

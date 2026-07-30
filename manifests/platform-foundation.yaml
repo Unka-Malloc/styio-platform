@@ -1,16 +1,15 @@
 id: platform-foundation
 kind: platform-base
 owner: platform-core
-description: Non-removable foundation shared by every styio-platform business capability.
+description: Non-removable process, storage, security, and service foundation shared by every styio-platform business capability.
 split_policy:
   extractable: false
-  reason: Provides process, system, storage, security, protocol, and service primitives used by every business.
+  reason: Provides process, system, storage, security, and service primitives used by every business.
 cmake_targets:
   - styio_platform_system
   - styio_platform_core
   - styio_platform_security
   - styio_platform_storage
-  - styio_platform_protocols
   - styio_platform_service
   - styio_platform_kernel
 modules:
@@ -18,13 +17,8 @@ modules:
     - src/PlatformCore/Config.*
     - src/PlatformCore/Core
     - src/PlatformCore/System
-    - src/PlatformCore/Manifest
-    - src/PlatformCore/RegistryClient
-    - src/PlatformCore/Resolve
     - src/PlatformCore/SourceFetch
-    - src/PlatformCore/Toolchain
   storage:
-    - src/PlatformStorage/PlatformCache
     - src/PlatformStorage/PlatformPersistence
     - src/PlatformStorage/PlatformRecovery
   security:
@@ -32,8 +26,6 @@ modules:
     - src/PlatformSecurity/PlatformCA
     - src/PlatformSecurity/PlatformClientAuth
     - src/PlatformSecurity/SecurityHardening
-  protocols:
-    - src/SpioPlatformProtocols
   service_base:
     - src/PlatformService
     - src/PlatformService/RouteCatalog.*
@@ -50,8 +42,6 @@ storage:
     - memory_state_store
     - postgres_state_store
     - object_store
-  cache:
-    - local_cache_paths
   recovery:
     - filesystem_snapshot
     - snapshot_restore

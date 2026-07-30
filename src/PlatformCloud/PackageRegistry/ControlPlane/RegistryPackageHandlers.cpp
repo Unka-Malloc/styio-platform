@@ -15,17 +15,9 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
       2
     );
   }
-  if (const std::optional<std::string> error = ValidateOptionalStringFields(
-        request.body,
-        {"archive_path", "manifest_path", "package", "output_path", "publisher_id", "version"}
-      );
-      error.has_value()) {
-    return FailureResponse(400, "malformed registry publish request", *error, "UsageError", "publishRelease", 2);
-  }
-
   PublishDraft draft;
   try {
-    draft = BuildPublishDraft(request.body, config_, request.identity);
+    draft = BuildPublishDraft(request.body, RegistryActorId(request));
   }
   catch (const std::exception &error) {
     return FailureResponse(
@@ -37,6 +29,7 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
       2
     );
   }
+  PublishStagingCleanup staging_cleanup(draft);
   if (!RegistryWriteAuthorized(request, "package:publish", RegistryPackageId(draft.package))) {
     RecordRegistryAudit(
       request,
@@ -48,6 +41,13 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
   }
 
   try {
+    MaterializePublishArchive(request.body, config_, draft);
+    const std::string archive_sha256 = spio::Sha256File(draft.archive_path);
+    const uintmax_t archive_size = fs::file_size(draft.archive_path);
+    if (archive_sha256 != draft.archive_sha256 || archive_size != draft.archive_size_bytes) {
+      throw std::runtime_error("staged archive integrity verification failed");
+    }
+
     const fs::path registry_root(config_.registry.root);
     const std::string release_key = RegistryReleaseKey(draft.package, draft.version);
     if (UsesS3ObjectStore(config_)) {
@@ -83,10 +83,8 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
     EnsureRegistryRootInitialized(config_);
     const std::map<std::string, RegistryRoleKey> role_keys = LoadOrCreateRegistryRoleKeys(fs::path(config_.registry.key_dir));
 
-    const std::string archive_sha256 = spio::Sha256File(draft.archive_path);
-    const uintmax_t archive_size = fs::file_size(draft.archive_path);
     const std::string artifact_path =
-      "artifacts/source/sha256/" + archive_sha256.substr(0, 2) + "/" + archive_sha256.substr(2, 2) + "/" + archive_sha256 + ".spio.src.tar";
+      "artifacts/source/sha256/" + archive_sha256.substr(0, 2) + "/" + archive_sha256.substr(2, 2) + "/" + archive_sha256 + ".pafio.src.tar";
     const std::string published_at = UtcTimestampNow();
     const nlohmann::json release_record =
       BuildReleaseRecord(draft, published_at, archive_sha256, archive_size, artifact_path);
@@ -100,15 +98,13 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
     }
 
     nlohmann::json payload = {
-      {"registry_root", registry_root.string()},
-      {"registry_read_root", RegistryReadRootUrl(config_)},
       {"object_store_provider", config_.object_store.provider},
       {"created_root", created_root},
       {"package", draft.package},
       {"version", draft.version},
       {"publisher_id", draft.publisher_id},
       {"published_at", published_at},
-      {"archive_path", draft.archive_path.string()},
+      {"archive_name", draft.archive_name},
       {"archive_sha256", archive_sha256},
       {"archive_size_bytes", static_cast<int64_t>(archive_size)},
       {"artifact_path", artifact_path},
@@ -156,6 +152,9 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
       .added_by = RegistryActorId(request),
       .added_at = published_at,
     };
+    for (const nlohmann::json &dependency : release_record.at("dev_dependencies")) {
+      release_record_state.dependencies.push_back(dependency);
+    }
     if (postgres_ != nullptr) {
       postgres_->UpsertRegistryPackage(package_record);
       postgres_->UpsertRegistryPackageRelease(release_record_state);
@@ -171,6 +170,22 @@ PlatformRouter::HandlePublishRelease(const HttpRequest &request) {
       "success"
     );
     return JsonResponse(200, SuccessEnvelope("published registry v2 release", payload));
+  }
+  catch (const spio::ValidationError &error) {
+    RecordRegistryAudit(
+      request,
+      "publishRelease",
+      {{"package_id", draft.package}, {"version", draft.version}},
+      "invalid"
+    );
+    return FailureResponse(
+      400,
+      "malformed registry publish request",
+      error.what(),
+      "UsageError",
+      "publishRelease",
+      2
+    );
   }
   catch (const std::exception &error) {
     RecordRegistryAudit(

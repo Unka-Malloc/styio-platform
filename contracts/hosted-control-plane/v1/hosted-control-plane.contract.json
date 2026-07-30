@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_name": "spio hosted control plane",
+  "contract_name": "styio platform hosted control plane",
   "contract_version": "v1",
   "base_path": "/api/styio-hosted/v1",
   "workspace_path_parameter": "workspace_id",
@@ -22,42 +22,10 @@
       "failure_shape": "HostedCommandFailureEnvelope"
     },
     {
-      "id": "toolInstall",
+      "id": "syncDependencies",
       "method": "POST",
-      "path": "/workspaces/{workspace_id}/tool/install",
-      "request_shape": "ToolInstallRequest",
-      "success_shape": "ToolCommandEnvelope",
-      "failure_shape": "HostedCommandFailureEnvelope"
-    },
-    {
-      "id": "toolUse",
-      "method": "POST",
-      "path": "/workspaces/{workspace_id}/tool/use",
-      "request_shape": "ToolVersionRequest",
-      "success_shape": "ToolCommandEnvelope",
-      "failure_shape": "HostedCommandFailureEnvelope"
-    },
-    {
-      "id": "toolPin",
-      "method": "POST",
-      "path": "/workspaces/{workspace_id}/tool/pin",
-      "request_shape": "ToolVersionRequest",
-      "success_shape": "ToolCommandEnvelope",
-      "failure_shape": "HostedCommandFailureEnvelope"
-    },
-    {
-      "id": "toolClearPin",
-      "method": "POST",
-      "path": "/workspaces/{workspace_id}/tool/clear-pin",
-      "request_shape": "EmptyObject",
-      "success_shape": "ToolCommandEnvelope",
-      "failure_shape": "HostedCommandFailureEnvelope"
-    },
-    {
-      "id": "fetchDependencies",
-      "method": "POST",
-      "path": "/workspaces/{workspace_id}/dependencies/fetch",
-      "request_shape": "DependencyFetchRequest",
+      "path": "/workspaces/{workspace_id}/dependencies/sync",
+      "request_shape": "DependencySyncRequest",
       "success_shape": "DependencyCommandEnvelope",
       "failure_shape": "HostedCommandFailureEnvelope"
     },
@@ -122,11 +90,6 @@
     "NoRequestBody": {
       "kind": "none"
     },
-    "EmptyObject": {
-      "kind": "object",
-      "required": {},
-      "optional": {}
-    },
     "OpenWorkspaceRequest": {
       "kind": "object",
       "required": {
@@ -150,32 +113,7 @@
         }
       }
     },
-    "ToolInstallRequest": {
-      "kind": "object",
-      "required": {
-        "styio_binary_path": {
-          "type": "string",
-          "min_length": 1
-        }
-      },
-      "optional": {}
-    },
-    "ToolVersionRequest": {
-      "kind": "object",
-      "required": {
-        "compiler_version": {
-          "type": "string",
-          "min_length": 1
-        }
-      },
-      "optional": {
-        "channel": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "DependencyFetchRequest": {
+    "DependencySyncRequest": {
       "kind": "object",
       "required": {},
       "optional": {
@@ -315,32 +253,6 @@
       "optional": {
         "payload": {
           "type": "object"
-        }
-      }
-    },
-    "ToolCommandEnvelope": {
-      "kind": "object",
-      "required": {
-        "returncode": {
-          "type": "integer"
-        },
-        "message": {
-          "type": "string",
-          "min_length": 1
-        },
-        "stdout": {
-          "type": "string"
-        },
-        "stderr": {
-          "type": "string"
-        },
-        "payload": {
-          "ref": "ToolCommandPayload"
-        }
-      },
-      "optional": {
-        "error_payload": {
-          "ref": "ErrorPayload"
         }
       }
     },
@@ -570,9 +482,6 @@
             "type": "string"
           }
         },
-        "toolchain": {
-          "ref": "ToolchainStatus"
-        },
         "lock_state": {
           "type": "enum",
           "values": [
@@ -596,14 +505,6 @@
           "type": "string",
           "min_length": 1
         },
-        "toolchain_pin_path": {
-          "type": "string",
-          "min_length": 1
-        },
-        "styio_config_path": {
-          "type": "string",
-          "min_length": 1
-        },
         "vendor_root": {
           "type": "string",
           "min_length": 1
@@ -611,18 +512,6 @@
         "build_root": {
           "type": "string",
           "min_length": 1
-        },
-        "active_compiler": {
-          "ref": "CompilerHandshake"
-        },
-        "managed_toolchains": {
-          "ref": "ManagedToolchainState"
-        },
-        "package_distribution": {
-          "ref": "PackageDistributionSnapshot"
-        },
-        "source_state": {
-          "ref": "ProjectSourceState"
         },
         "notes": {
           "type": "array",
@@ -767,381 +656,6 @@
       },
       "optional": {}
     },
-    "ToolchainStatus": {
-      "kind": "object",
-      "required": {
-        "source": {
-          "type": "enum",
-          "values": [
-            "project-pin",
-            "managed-current",
-            "environment",
-            "unavailable",
-            "unknown"
-          ]
-        },
-        "detail": {
-          "type": "string",
-          "min_length": 1
-        }
-      },
-      "optional": {
-        "pin_path": {
-          "type": "string",
-          "min_length": 1
-        },
-        "channel": {
-          "type": "string",
-          "min_length": 1
-        },
-        "version": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "ManagedToolchainInstall": {
-      "kind": "object",
-      "required": {
-        "channel": {
-          "type": "string",
-          "min_length": 1
-        },
-        "compiler_version": {
-          "type": "string",
-          "min_length": 1
-        },
-        "install_root": {
-          "type": "string",
-          "min_length": 1
-        },
-        "install_binary_path": {
-          "type": "string",
-          "min_length": 1
-        }
-      },
-      "optional": {
-        "install_metadata_path": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "ManagedToolchainState": {
-      "kind": "object",
-      "required": {
-        "installed": {
-          "type": "array",
-          "items": {
-            "ref": "ManagedToolchainInstall"
-          }
-        }
-      },
-      "optional": {
-        "spio_home": {
-          "type": "string",
-          "min_length": 1
-        },
-        "current_binary": {
-          "type": "string",
-          "min_length": 1
-        },
-        "current_metadata_path": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "CompilerHandshake": {
-      "kind": "object",
-      "required": {
-        "binary_path": {
-          "type": "string",
-          "min_length": 1
-        },
-        "tool": {
-          "type": "string",
-          "min_length": 1
-        },
-        "compiler_version": {
-          "type": "string",
-          "min_length": 1
-        },
-        "channel": {
-          "type": "string",
-          "min_length": 1
-        },
-        "variant": {
-          "type": "string",
-          "min_length": 1
-        },
-        "capabilities": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "supported_contract_versions": {
-          "type": "map",
-          "values": {
-            "type": "array",
-            "items": {
-              "type": "integer"
-            }
-          }
-        },
-        "integration_phase": {
-          "type": "string",
-          "min_length": 1
-        },
-        "supported_adapter_modes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "feature_flags": {
-          "type": "map",
-          "values": {
-            "type": "boolean"
-          }
-        }
-      },
-      "optional": {}
-    },
-    "RegistrySource": {
-      "kind": "object",
-      "required": {
-        "registry_root": {
-          "type": "string",
-          "min_length": 1
-        },
-        "transport": {
-          "type": "string",
-          "min_length": 1
-        },
-        "dependency_refs": {
-          "type": "integer"
-        },
-        "packages": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "optional": {}
-    },
-    "PackageDistributionPackage": {
-      "kind": "object",
-      "required": {
-        "package_name": {
-          "type": "string",
-          "min_length": 1
-        },
-        "manifest_path": {
-          "type": "string",
-          "min_length": 1
-        },
-        "publish_enabled": {
-          "type": "boolean"
-        },
-        "publish_ready": {
-          "type": "boolean"
-        },
-        "blocking_reasons": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "runtime_registry_dependencies": {
-          "type": "integer"
-        },
-        "runtime_path_dependencies": {
-          "type": "integer"
-        },
-        "runtime_git_dependencies": {
-          "type": "integer"
-        },
-        "dev_registry_dependencies": {
-          "type": "integer"
-        },
-        "dev_path_dependencies": {
-          "type": "integer"
-        },
-        "dev_git_dependencies": {
-          "type": "integer"
-        }
-      },
-      "optional": {}
-    },
-    "PackageDistributionSnapshot": {
-      "kind": "object",
-      "required": {
-        "schema_version": {
-          "type": "integer"
-        },
-        "packages": {
-          "type": "array",
-          "items": {
-            "ref": "PackageDistributionPackage"
-          }
-        },
-        "registry_sources": {
-          "type": "array",
-          "items": {
-            "ref": "RegistrySource"
-          }
-        },
-        "publishable_packages": {
-          "type": "integer"
-        },
-        "blocked_packages": {
-          "type": "integer"
-        }
-      },
-      "optional": {}
-    },
-    "GitCacheState": {
-      "kind": "object",
-      "required": {
-        "repos_present": {
-          "type": "boolean"
-        },
-        "checkouts_present": {
-          "type": "boolean"
-        }
-      },
-      "optional": {
-        "repos_root": {
-          "type": "string",
-          "min_length": 1
-        },
-        "checkouts_root": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "RegistryCacheState": {
-      "kind": "object",
-      "required": {
-        "index_present": {
-          "type": "boolean"
-        },
-        "blobs_present": {
-          "type": "boolean"
-        },
-        "checkouts_present": {
-          "type": "boolean"
-        }
-      },
-      "optional": {
-        "cache_root": {
-          "type": "string",
-          "min_length": 1
-        },
-        "index_root": {
-          "type": "string",
-          "min_length": 1
-        },
-        "blob_root": {
-          "type": "string",
-          "min_length": 1
-        },
-        "checkout_root": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "VendorSourceState": {
-      "kind": "object",
-      "required": {
-        "vendor_present": {
-          "type": "boolean"
-        },
-        "metadata_present": {
-          "type": "boolean"
-        },
-        "git_snapshots": {
-          "type": "integer"
-        }
-      },
-      "optional": {
-        "vendor_root": {
-          "type": "string",
-          "min_length": 1
-        },
-        "metadata_path": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "ProjectSourceState": {
-      "kind": "object",
-      "required": {
-        "schema_version": {
-          "type": "integer"
-        },
-        "declared_git_dependencies": {
-          "type": "integer"
-        },
-        "declared_registry_dependencies": {
-          "type": "integer"
-        },
-        "git_cache": {
-          "ref": "GitCacheState"
-        },
-        "registry_cache": {
-          "ref": "RegistryCacheState"
-        },
-        "vendor": {
-          "ref": "VendorSourceState"
-        }
-      },
-      "optional": {
-        "spio_home": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
-    "ToolCommandPayload": {
-      "kind": "object",
-      "required": {
-        "installed": {
-          "type": "array",
-          "items": {
-            "ref": "ManagedToolchainInstall"
-          }
-        }
-      },
-      "optional": {
-        "compiler_version": {
-          "type": "string",
-          "min_length": 1
-        },
-        "channel": {
-          "type": "string",
-          "min_length": 1
-        },
-        "spio_home": {
-          "type": "string",
-          "min_length": 1
-        },
-        "current_binary": {
-          "type": "string",
-          "min_length": 1
-        },
-        "current_metadata_path": {
-          "type": "string",
-          "min_length": 1
-        }
-      }
-    },
     "DependencyCommandPayload": {
       "kind": "object",
       "required": {
@@ -1160,9 +674,6 @@
         "metadata_path": {
           "type": "string",
           "min_length": 1
-        },
-        "source_state": {
-          "ref": "ProjectSourceState"
         }
       }
     },

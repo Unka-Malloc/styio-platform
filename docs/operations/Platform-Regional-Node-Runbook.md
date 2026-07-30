@@ -40,7 +40,8 @@ Helm chart under `deploy/helm/styio-platform` starts:
 Primary pods must run `styio-platformd --migrate` before serving traffic.
 Workers claim jobs through the platform HTTP API, fetch `job_request.source.origin`
 through the shared `PlatformCore/SourceFetch` Git fetcher, run
-`spio build --manifest-path <relative path> --styio-bin <path>`, and write
+`pafio build --manifest-path <relative path>` with `PAFIO_STYIO_BIN` set to the
+system-provided Styio executable, and write
 stdout, stderr, and result metadata under the artifact PVC. Mirror sync copies
 `config.json`, `trust/`, `artifacts/`, `index/`, and `log/` from the primary
 registry PVC to the mirror registry PVC, then records the freshness cursor in

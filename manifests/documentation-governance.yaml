@@ -38,7 +38,7 @@ documentation_domains:
 ecosystem_repositories:
   managed:
     - styio
-    - styio-spio
+    - pafio-nightly
     - vityo-nightly
     - styio-platform
     - styio-community

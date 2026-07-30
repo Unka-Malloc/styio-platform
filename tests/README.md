@@ -2,7 +2,8 @@
 
 Tests cover the migrated platform kernel and service contract packages.
 
-- `native/` validates compile-plan and cloud job request behavior through CTest.
+- `native/` validates Platform service, job/worker, registry, storage, and
+  security behavior through CTest.
 - `interop/` validates machine-readable contract packages and the local HTTP
   smoke path for `styio-platformd --serve-once`.
 - `unit/` validates Python service tooling such as the cloud stress harness.

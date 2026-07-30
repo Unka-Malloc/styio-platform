@@ -46,8 +46,8 @@ spec:
               value: {{ .Values.worker.artifactRoot | quote }}
             - name: STYIO_PLATFORM_WORKER_POLL_INTERVAL_MS
               value: {{ .Values.worker.pollIntervalMs | quote }}
-            - name: STYIO_PLATFORM_WORKER_SPIO_BIN
-              value: {{ .Values.worker.spioBin | quote }}
+            - name: STYIO_PLATFORM_WORKER_PAFIO_BIN
+              value: {{ .Values.worker.pafioBin | quote }}
             - name: STYIO_PLATFORM_WORKER_STYIO_BIN
               value: {{ .Values.worker.styioBin | quote }}
             {{- include "styio-platform.clientMtlsEnv" . | nindent 12 }}

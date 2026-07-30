@@ -37,7 +37,7 @@ struct RegistryControlConfig
 {
   std::string root = ".styio-platform/registry-v2";
   std::string key_dir = ".styio-platform/registry-v2-keys";
-  std::string registry_name = "spio-registry-v2";
+  std::string registry_name = "pafio-static-registry";
   std::string read_root_url;
   std::string control_plane_base_url;
   std::string mirror_id = "mirror-local";

@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/package-registry-server.sh [options]
 
-Create a VM deployment bundle for the styio-platform spio registry server.
+Create a VM deployment bundle for the Styio Platform Pafio registry server.
 The bundle contains install.sh, registry control/read servers, the registry v2
 Python module, and smoke tooling. Copy the resulting tarball to a VM and run:
 
@@ -82,14 +82,14 @@ install -m 0755 scripts/registry-v2-control-plane-server.py "$bundle_dir/scripts
 install -m 0755 scripts/registry-v2-static-read-server.py "$bundle_dir/scripts/registry-v2-static-read-server.py"
 install -m 0755 scripts/registry-v2-vm-smoke.py "$bundle_dir/scripts/registry-v2-vm-smoke.py"
 cp -R src/PlatformCloud/PackageRegistry "$bundle_dir/src/PlatformCloud/PackageRegistry"
-cp docs/operations/Spio-Registry-Server-Runbook.md "$bundle_dir/docs/Spio-Registry-Server-Runbook.md"
+cp docs/operations/Spio-Registry-Server-Runbook.md "$bundle_dir/docs/Pafio-Registry-Server-Runbook.md"
 
 cat >"$bundle_dir/README.md" <<EOF
 # Styio Platform Registry Server VM Bundle
 
 Version: $VERSION
 
-This bundle installs a spio registry v2 server node on a Linux VM. It creates:
+This bundle installs a Pafio registry v2 server node on a Linux VM. It creates:
 
 - a registry control-plane service for publish, verify, and status
 - a read-only static HTTP service for package metadata and artifacts
@@ -108,12 +108,8 @@ Safer internal default:
 sudo ./install.sh --control-bind 127.0.0.1 --read-bind 0.0.0.0
 \`\`\`
 
-Manifest publish requests require a local spio binary. Pass it explicitly when
-the VM does not provide /usr/local/bin/spio:
-
-\`\`\`text
-sudo ./install.sh --spio-bin /opt/spio/bin/spio
-\`\`\`
+Publish requests carry a bounded source archive directly and do not require a
+compiler or package-manager executable on the registry VM.
 EOF
 
 cat >"$bundle_dir/MANIFEST.json" <<EOF
@@ -125,8 +121,8 @@ cat >"$bundle_dir/MANIFEST.json" <<EOF
     "styio-registry-control.service",
     "styio-registry-read.service"
   ],
-  "control_plane_base_path": "/api/spio-registry-control/v1",
-  "read_plane_protocol": "spio-static-registry",
+  "control_plane_base_path": "/api/pafio-registry-control/v1",
+  "read_plane_protocol": "pafio-static-registry",
   "read_plane_protocol_version": 2
 }
 EOF

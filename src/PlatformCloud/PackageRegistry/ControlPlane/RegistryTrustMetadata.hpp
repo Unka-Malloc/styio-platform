@@ -213,7 +213,7 @@ nlohmann::json
 RegistryConfigPayload(const PlatformConfig &config, const std::string &generated_at) {
   return {
     {"schema_version", 1},
-    {"protocol", "spio-static-registry"},
+    {"protocol", "pafio-static-registry"},
     {"protocol_version", 2},
     {"registry_name", config.registry.registry_name},
     {"generated_at", generated_at},

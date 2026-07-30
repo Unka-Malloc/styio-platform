@@ -1,8 +1,8 @@
 # Platform Global Service Model
 
-**Purpose:** Define `styio-platform` as the global cloud-computing and package-distribution foundation that serves `styio-spio` clients and hosted products.
+**Purpose:** Define `styio-platform` as the global cloud-computing and package-distribution foundation that serves Pafio clients and hosted products.
 
-**Last updated:** 2026-04-29
+**Last updated:** 2026-07-30
 
 ## Mission
 
@@ -30,7 +30,7 @@ The platform does not own:
 - local manifest editing or lockfile UX
 - offline package import/export commands
 - project-local compiler optimization policy
-- `styio-spio` package-manager CLI grammar
+- Pafio package-manager CLI grammar
 
 ## Availability Model
 
@@ -72,7 +72,7 @@ are not part of the platform governance source of truth.
 
 ## Client Relationship
 
-`styio-spio` is a local-first client. Platform access improves discovery,
+Pafio is a local-first client. Platform access improves discovery,
 remote package distribution, hosted compile, and synchronization, but a project
 with available offline packages must still work through local package-manager
 paths without connecting to `styio-platform`.

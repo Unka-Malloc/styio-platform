@@ -2,7 +2,7 @@
 
 **Purpose:** Define the first-priority workspace design goal: Styio-by-default compilation with native C++/LLVM fallback and smooth mixed compile execution.
 
-**Last updated:** 2026-05-09
+**Last updated:** 2026-07-30
 
 ## Mission
 
@@ -15,11 +15,11 @@ need C++ even when Styio is the primary language path.
 
 The default compile target is Styio:
 
-- Styio source and compile-plan semantics remain the primary product path.
+- Styio source compilation remains the primary product path.
 - Hosted workspace APIs should assume Styio first when no explicit target is
   selected.
-- Package and toolchain metadata should preserve Styio intent even when a
-  workload partially lowers into C++.
+- Pafio project metadata and Styio machine contracts preserve that intent
+  without Platform defining a second project or compiler schema.
 
 ## C++ / LLVM Environment
 
@@ -45,7 +45,7 @@ workspace run:
 - artifacts must remain addressable through one workspace result envelope
 - runtime handoff between Styio-generated and C++-native outputs must be
   explicit
-- package inputs must remain traceable back to the package-manager graph
+- package inputs must remain traceable to Pafio metadata
 
 The success condition is not merely that C++ can be compiled somewhere. The
 success condition is that mixed Styio/C++ compilation and execution remain
@@ -62,10 +62,11 @@ The control plane records the container's `current_workspace_id` and
 `workspace_generation`. Claiming a job with `compile_container_id` atomically
 filters queued work to the container's tenant/user binding and increments the
 workspace generation when a workspace switch is required. This preserves a warm
-compiler/toolchain process while keeping user isolation explicit.
+compiler process while keeping user isolation explicit.
 
 ## Ownership
 
-`styio-platform` owns the hosted workspace and cloud execution side of this
-model. `styio` owns language and compiler semantics. `styio-spio` owns local
-package-manager inputs and offline package availability that feed the workspace.
+`styio-platform` owns the hosted workspace and execution side of this model.
+Styio owns language and compiler semantics. Pafio owns local package-manager
+inputs, project metadata, and offline package availability that feed the
+workspace.

@@ -6,9 +6,9 @@ are visible in code, tests, contracts, or manifests.
 
 ## Source Map
 
-- `src/PlatformCore/`: config, manifests, resolver, source fetch, registry
-  client, toolchain state, and OS adapters.
-- `src/PlatformStorage/`: persistence, object storage, cache layout, recovery.
+- `src/PlatformCore/`: platform config, source fetch, common paths/process
+  helpers, and OS adapters.
+- `src/PlatformStorage/`: persistence, object storage, and recovery.
 - `src/PlatformSecurity/`: CA, mTLS identity, authorization, external identity,
   hardening.
 - `src/PlatformCloud/PackageRegistry/`: registry control plane, publication
@@ -23,11 +23,13 @@ are visible in code, tests, contracts, or manifests.
   release-plan model.
 - `src/PlatformService/`: HTTP adapter, route catalog, router, daemon, ops
   helpers.
-- `src/SpioPlatformProtocols/`: Spio-to-Platform payloads and serializers.
 
 ## Source Of Truth
 
 - Public API shape: `contracts/**`.
+- Pafio project metadata and workflow shape: upstream `pafio-nightly`.
+- Styio compile-plan, diagnostics, receipt, and runtime-event shape: upstream
+  `styio-nightly`.
 - Business ownership: `manifests/*.yaml`.
 - Behavior: `tests/`.
 - Build graph: `src/CMakeLists.txt`.

@@ -6,10 +6,10 @@
 
 ## Boundary
 
-`styio-platform` treats local `styio-spio` manifests and lockfiles as client
-inputs. It validates execution lanes, risk classes, source revisions, and
-registry write requests before dispatching work to hosted workers or server
-control planes.
+`styio-platform` treats Pafio project metadata and workflow requests as client
+inputs. It validates source revisions, job ownership, worker-pool selection,
+and registry write requests before dispatching hosted work or server
+control-plane mutations.
 
 Source ownership is split under `src/PlatformSecurity/`: `PlatformCA` owns
 certificate authority, trust-anchor lifecycle, and managed mTLS certificate
@@ -17,8 +17,8 @@ issuance, `PlatformClientAuth` owns mTLS identity and operation authorization
 policy, and `SecurityHardening` owns registry policy hooks and other hardening
 extension points.
 
-Compiler-private execution remains behind `styio`; package-manager credential
-storage remains in `styio-spio` until a platform credential service is designed.
+Compiler-private execution remains behind Styio; package-manager credential
+storage remains in Pafio until a platform credential service is designed.
 
 ## V1 Service Trust Rules
 
@@ -55,8 +55,8 @@ metadata. Registry v2 publication writes signed `config/`, `trust/`, `index/`,
 the local filesystem only as a staging cache.
 
 Registry descriptor publication is platform-owned. The control plane exposes
-`GET /api/spio-registry-control/v1/descriptor` to authenticated internal roles
+`GET /api/pafio-registry-control/v1/descriptor` to authenticated internal roles
 and returns the public read root plus the pinned `trust/root.json` SHA-256.
-`styio-spio` imports that descriptor into local client state before consuming
+Pafio imports that descriptor into local client state before consuming
 remote HTTP registries, so the public package manager does not establish trust
 from registry-hosted metadata alone.

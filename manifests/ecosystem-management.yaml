@@ -21,7 +21,7 @@ modules:
 repositories:
   managed:
     - styio
-    - styio-spio
+    - pafio-nightly
     - vityo-nightly
     - styio-platform
     - styio-community

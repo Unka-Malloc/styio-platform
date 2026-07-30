@@ -104,9 +104,9 @@ Container and job events add tenant, container, job, status, and latency fields 
 Run `spio_cloud_compile_stress_gate` when changing:
 
 - hosted control-plane execution routing
-- cloud execution policy fields
-- worker-pool key dimensions
-- source-build or compiler image lifecycle behavior
+- Platform worker-pool selection
+- Pafio worker argument construction
+- system Styio image lifecycle behavior
 - future tenant scheduling, quota, or isolation code
 - compile-worker rollout and replacement behavior
 

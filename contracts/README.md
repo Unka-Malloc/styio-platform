@@ -1,9 +1,7 @@
 # styio-platform Contracts
 
-This directory owns service-side and platform-side contract packages migrated
-from `styio-spio`.
+This directory owns Styio Platform service contracts.
 
-- `compile-plan/` is the compiler handoff format consumed by platform workers.
 - `hosted-control-plane/` is the native JSON hosted workspace contract package.
 - `platform-control-plane/` is the native JSON service-kernel contract package
   for the first runnable cloud control plane.
@@ -16,6 +14,6 @@ Contract packages are maintained as repo-native JSON contracts and examples.
 Markdown describes ownership and stability rules; executable gates validate the
 JSON packages directly.
 
-`styio-platform` owns the hosted registry and mirror service side. `styio-spio`
-owns the local package-manager client, offline cache behavior, and import/export
-semantics that consume these packages.
+`styio-platform` owns hosted workspace, registry, job, worker, and mirror
+contracts. Pafio owns project metadata and workflow contracts; Styio owns
+compiler-facing contracts.

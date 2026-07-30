@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage: install.sh [options]
 
-Install a styio-platform spio registry server node on a Linux VM. The default
+Install a Styio Platform Pafio registry server node on a Linux VM. The default
 mode installs a local registry v2 root, initializes signing keys, writes two
 systemd services, starts them, and runs a local smoke check.
 
@@ -16,13 +16,12 @@ Options:
   --systemd-dir <dir>     systemd unit directory (default: /etc/systemd/system)
   --user <name>           Service user (default: styio-platform)
   --group <name>          Service group (default: same as --user)
-  --registry-name <name>  Registry name (default: spio-registry-v2)
+  --registry-name <name>  Registry name (default: pafio-static-registry)
   --control-bind <addr>   Control-plane bind address (default: 127.0.0.1)
   --control-port <port>   Control-plane port (default: 8787)
   --read-bind <addr>      Static read-plane bind address (default: 0.0.0.0)
   --read-port <port>      Static read-plane port (default: 8788)
   --python <path>         Python 3 executable (default: first python3 in PATH)
-  --spio-bin <path>       spio binary for manifest publish requests (default: /usr/local/bin/spio)
   --no-systemd            Install files and initialize state, but do not write or start units.
   --no-start              Write units, but do not enable/start services or run smoke.
   --skip-smoke            Start services without running the local smoke check.
@@ -61,13 +60,12 @@ CONFIG_DIR="/etc/styio-platform"
 SYSTEMD_DIR="/etc/systemd/system"
 SERVICE_USER="styio-platform"
 SERVICE_GROUP=""
-REGISTRY_NAME="spio-registry-v2"
+REGISTRY_NAME="pafio-static-registry"
 CONTROL_BIND="127.0.0.1"
 CONTROL_PORT="8787"
 READ_BIND="0.0.0.0"
 READ_PORT="8788"
 PYTHON_BIN="$(command -v python3 || true)"
-SPIO_BIN="/usr/local/bin/spio"
 WRITE_SYSTEMD=1
 START_SERVICES=1
 RUN_SMOKE=1
@@ -121,10 +119,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --python)
       PYTHON_BIN="$2"
-      shift 2
-      ;;
-    --spio-bin)
-      SPIO_BIN="$2"
       shift 2
       ;;
     --no-systemd)
@@ -206,7 +200,6 @@ STYIO_REGISTRY_CONTROL_PORT=$(shell_quote "$CONTROL_PORT")
 STYIO_REGISTRY_READ_BIND=$(shell_quote "$READ_BIND")
 STYIO_REGISTRY_READ_PORT=$(shell_quote "$READ_PORT")
 STYIO_REGISTRY_PYTHON=$(shell_quote "$PYTHON_BIN")
-STYIO_REGISTRY_SPIO_BIN=$(shell_quote "$SPIO_BIN")
 EOF
 chmod 0640 "$ENV_FILE"
 chown root:"$SERVICE_GROUP" "$ENV_FILE"
@@ -232,7 +225,7 @@ if [[ "$WRITE_SYSTEMD" -eq 1 ]]; then
   read_unit="$SYSTEMD_DIR/styio-registry-read.service"
   cat >"$control_unit" <<EOF
 [Unit]
-Description=Styio spio registry v2 control plane
+Description=Styio Pafio registry v2 control plane
 After=network-online.target
 Wants=network-online.target
 
@@ -242,7 +235,7 @@ EnvironmentFile=$ENV_FILE
 WorkingDirectory=$INSTALL_DIR
 User=$SERVICE_USER
 Group=$SERVICE_GROUP
-ExecStart=$PYTHON_BIN $INSTALL_DIR/scripts/registry-v2-control-plane-server.py --root $REGISTRY_ROOT --key-dir $KEY_DIR --registry-name $REGISTRY_NAME --spio-bin $SPIO_BIN --bind $CONTROL_BIND --port $CONTROL_PORT
+ExecStart=$PYTHON_BIN $INSTALL_DIR/scripts/registry-v2-control-plane-server.py --root $REGISTRY_ROOT --key-dir $KEY_DIR --registry-name $REGISTRY_NAME --bind $CONTROL_BIND --port $CONTROL_PORT
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -256,7 +249,7 @@ WantedBy=multi-user.target
 EOF
   cat >"$read_unit" <<EOF
 [Unit]
-Description=Styio spio registry v2 static read plane
+Description=Styio Pafio registry v2 static read plane
 After=network-online.target
 Wants=network-online.target
 
@@ -300,5 +293,5 @@ if [[ "$RUN_SMOKE" -eq 1 ]]; then
 fi
 
 log "registry server deployment complete"
-log "control plane: http://$CONTROL_BIND:$CONTROL_PORT/api/spio-registry-control/v1/status"
+log "control plane: http://$CONTROL_BIND:$CONTROL_PORT/api/pafio-registry-control/v1/status"
 log "read plane: http://$READ_BIND:$READ_PORT/config.json"

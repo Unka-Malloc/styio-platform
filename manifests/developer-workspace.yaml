@@ -25,11 +25,11 @@ modules:
     - scripts/cloud-compile-stress.py
 protocols:
   owned:
+    - contracts/hosted-control-plane/v1
     - contracts/platform-control-plane/v1
-  spio_platform_protocols:
-    - compile_plan
-    - cloud_execution_policy
-    - cloud_build_job_request
+  platform_protocols:
+    - hosted_workspace
+    - platform_job_request
     - worker_job_claim
 apis:
   control_plane_base_path: /api/styio-platform/v1

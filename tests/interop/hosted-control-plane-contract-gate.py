@@ -19,11 +19,7 @@ EXAMPLES_PATH = ROOT / "contracts/hosted-control-plane/v1/hosted-control-plane.e
 EXPECTED_OPERATION_SNAPSHOT = [
     ("openWorkspace", "POST", "/workspaces/open"),
     ("projectGraph", "GET", "/workspaces/{workspace_id}/project-graph"),
-    ("toolInstall", "POST", "/workspaces/{workspace_id}/tool/install"),
-    ("toolUse", "POST", "/workspaces/{workspace_id}/tool/use"),
-    ("toolPin", "POST", "/workspaces/{workspace_id}/tool/pin"),
-    ("toolClearPin", "POST", "/workspaces/{workspace_id}/tool/clear-pin"),
-    ("fetchDependencies", "POST", "/workspaces/{workspace_id}/dependencies/fetch"),
+    ("syncDependencies", "POST", "/workspaces/{workspace_id}/dependencies/sync"),
     ("vendorDependencies", "POST", "/workspaces/{workspace_id}/dependencies/vendor"),
     ("runWorkflow", "POST", "/workspaces/{workspace_id}/execution/run"),
     ("buildWorkflow", "POST", "/workspaces/{workspace_id}/execution/build"),

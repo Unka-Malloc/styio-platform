@@ -1,7 +1,7 @@
 {
   "config": {
     "schema_version": 1,
-    "protocol": "spio-static-registry",
+    "protocol": "pafio-static-registry",
     "protocol_version": 2,
     "registry_name": "example-spio",
     "generated_at": "2026-04-21T00:00:00Z",

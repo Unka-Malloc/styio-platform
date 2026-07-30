@@ -277,9 +277,9 @@ PlatformRouter::HandleRegistryStatus() const {
         {"root_initialized", config_present && root_metadata_present},
         {"config_present", config_present},
         {"root_metadata_present", root_metadata_present},
-        {"publish_endpoint", "/api/spio-registry-control/v1/publish"},
-        {"verify_endpoint", "/api/spio-registry-control/v1/verify"},
-        {"descriptor_endpoint", "/api/spio-registry-control/v1/descriptor"},
+        {"publish_endpoint", "/api/pafio-registry-control/v1/publish"},
+        {"verify_endpoint", "/api/pafio-registry-control/v1/verify"},
+        {"descriptor_endpoint", "/api/pafio-registry-control/v1/descriptor"},
       };
       return JsonResponse(200, SuccessEnvelope("registry control plane is ready", payload));
     }
@@ -319,9 +319,9 @@ PlatformRouter::HandleRegistryStatus() const {
     {"root_initialized", config_present && root_metadata_present},
     {"config_present", config_present},
     {"root_metadata_present", root_metadata_present},
-    {"publish_endpoint", "/api/spio-registry-control/v1/publish"},
-    {"verify_endpoint", "/api/spio-registry-control/v1/verify"},
-    {"descriptor_endpoint", "/api/spio-registry-control/v1/descriptor"},
+    {"publish_endpoint", "/api/pafio-registry-control/v1/publish"},
+    {"verify_endpoint", "/api/pafio-registry-control/v1/verify"},
+    {"descriptor_endpoint", "/api/pafio-registry-control/v1/descriptor"},
   };
   return JsonResponse(200, SuccessEnvelope("registry control plane is ready", payload));
 }

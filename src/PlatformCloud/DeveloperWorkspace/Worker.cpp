@@ -36,55 +36,6 @@ struct ParsedUrl
   std::string origin;
 };
 
-std::string EnvString(const OperatingSystemAdapter &os, const char *name, std::string fallback)
-{
-  const std::optional<std::string> value = os.GetEnv(name);
-  if (!value.has_value() || value->empty())
-  {
-    return fallback;
-  }
-  return *value;
-}
-
-int EnvInt(const OperatingSystemAdapter &os, const char *name, int fallback)
-{
-  const std::optional<std::string> value = os.GetEnv(name);
-  if (!value.has_value() || value->empty())
-  {
-    return fallback;
-  }
-  try
-  {
-    return std::stoi(*value);
-  }
-  catch (...)
-  {
-    return fallback;
-  }
-}
-
-WorkerRuntimeConfig LoadWorkerRuntimeConfig(const OperatingSystemAdapter &os)
-{
-  WorkerRuntimeConfig config;
-  config.control_url = EnvString(os, "STYIO_PLATFORM_CONTROL_URL", config.control_url);
-  config.worker_id = EnvString(os, "STYIO_PLATFORM_WORKER_ID", config.worker_id);
-  config.worker_pool_key = EnvString(os, "STYIO_PLATFORM_WORKER_POOL_KEY", config.worker_pool_key);
-  config.workspace_root = EnvString(os, "STYIO_PLATFORM_WORKSPACE_ROOT", config.workspace_root.string());
-  config.artifact_root = EnvString(os, "STYIO_PLATFORM_ARTIFACT_ROOT", config.artifact_root.string());
-  config.spio_bin = EnvString(os, "STYIO_PLATFORM_WORKER_SPIO_BIN", config.spio_bin);
-  config.styio_bin = EnvString(os, "STYIO_PLATFORM_WORKER_STYIO_BIN", config.styio_bin);
-  config.compile_container_id = EnvString(os, "STYIO_PLATFORM_COMPILE_CONTAINER_ID", "");
-  config.compile_container_tenant_id = EnvString(os, "STYIO_PLATFORM_COMPILE_CONTAINER_TENANT_ID", "");
-  config.compile_container_user_id = EnvString(os, "STYIO_PLATFORM_COMPILE_CONTAINER_USER_ID", "");
-  config.compile_container_workspace_id = EnvString(os, "STYIO_PLATFORM_COMPILE_CONTAINER_WORKSPACE_ID", "");
-  config.compile_container_capacity = EnvInt(os, "STYIO_PLATFORM_COMPILE_CONTAINER_CAPACITY", config.compile_container_capacity);
-  config.mtls_ca_path = EnvString(os, "STYIO_PLATFORM_MTLS_CA", "");
-  config.mtls_cert_path = EnvString(os, "STYIO_PLATFORM_MTLS_CERT", "");
-  config.mtls_key_path = EnvString(os, "STYIO_PLATFORM_MTLS_KEY", "");
-  config.poll_interval_ms = EnvInt(os, "STYIO_PLATFORM_WORKER_POLL_INTERVAL_MS", config.poll_interval_ms);
-  return config;
-}
-
 ParsedUrl ParseHttpUrl(const std::string &url)
 {
   std::string scheme;
@@ -232,27 +183,6 @@ nlohmann::json HttpJson(
 void WriteText(const OperatingSystemAdapter &os, const fs::path &path, const std::string &text)
 {
   os.WriteTextFile(path, text);
-}
-
-std::vector<std::string> BuildSpioArgs(const nlohmann::json &job_request, const std::string &styio_bin)
-{
-  std::vector<std::string> args = {"build", "--manifest-path", job_request.at("manifest_path").get<std::string>()};
-  if (job_request.contains("workflow") && job_request["workflow"].is_object() &&
-      job_request["workflow"].value("dry_run", false))
-  {
-    args.push_back("--dry-run");
-  }
-  if (!styio_bin.empty())
-  {
-    args.push_back("--styio-bin");
-    args.push_back(styio_bin);
-  }
-  if (job_request.contains("profile") && job_request["profile"].is_string())
-  {
-    args.push_back("--profile");
-    args.push_back(job_request["profile"].get<std::string>());
-  }
-  return args;
 }
 
 nlohmann::json Artifact(
@@ -419,25 +349,18 @@ void ExecuteClaimedJob(
   spio::ProcessResult build;
   try
   {
-    build = os.RunProcess({
-        .program = worker.spio_bin,
-        .args = BuildSpioArgs(job_request, worker.styio_bin),
-        .working_directory = workspace.checkout_root,
-        .environment_overrides = {
-            {"SPIO_STYIO_BIN", worker.styio_bin},
-            {"STYIO_PLATFORM_REGION", platform.region},
-            {"STYIO_PLATFORM_COMPILE_CONTAINER_ID", worker.compile_container_id},
-        },
-        .timeout = spio::kExternalProcessBuildTimeout,
-        .error_context = "spio build for platform worker",
-    });
+    build = os.RunProcess(BuildWorkerPafioProcessRequest(
+        worker,
+        platform,
+        workspace,
+        job_request));
   }
   catch (const std::exception &error)
   {
     heartbeat_done = true;
     heartbeat_thread.join();
     WriteText(os, workspace.stderr_path, error.what());
-    Complete(os, control, worker, job_id, "failed", "spio build failed to launch", nlohmann::json::array(), {{"error", error.what()}});
+    Complete(os, control, worker, job_id, "failed", "pafio build failed to launch", nlohmann::json::array(), {{"error", error.what()}});
     return;
   }
   heartbeat_done = true;

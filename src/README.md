@@ -1,16 +1,13 @@
 # styio-platform Source
 
-This source tree contains the first migrated platform kernel. It keeps imported
-`spio::` namespaces stable while the repo split settles, but source ownership is
+This source tree contains the Platform service kernel. Source ownership is
 grouped by platform capability.
 
-- `PlatformCore/` owns core ability: manifest and lockfile support, dependency
-  resolution, source fetching, registry client access, and
-  toolchain/source-build behavior.
+- `PlatformCore/` owns platform config, shared paths/process helpers, source
+  fetching for hosted jobs, and operating-system adapters.
 - `PlatformCore/System/` owns the system layer: config loading,
   filesystem/process helpers, and centralized operating-system adapters.
 - `PlatformStorage/` owns the storage layer:
-  `PlatformCache/` contains cache and local state layout, and
   `PlatformPersistence/` contains persisted state records, the memory-backed
   development state store, Postgres migrations/state access, and object storage
   access for S3, filesystem, or memory-backed object stores.
@@ -36,9 +33,10 @@ grouped by platform capability.
   route catalogs, `PlatformOps/` rate-limit/metrics helpers, and the platform
   daemon. `Router.cpp` dispatches only; capability route handlers live beside
   the capability they mutate.
-- `SpioPlatformProtocols/` owns all Spio-to-Platform interaction payloads and
-  serializers, including compile-plan v1, project-graph payloads, cloud
-  execution policy, and cloud build job requests.
-
 `CMakeLists.txt` and this README stay at the `src/` root as source-tree
 metadata instead of runtime capability code.
+
+Pafio owns manifest, lock, resolution, metadata, and project workflow
+contracts. Styio owns compiler-facing plans, diagnostics, receipts, and runtime
+events. Platform consumes those contracts through worker processes instead of
+duplicating their implementations.

@@ -2,7 +2,7 @@
 
 **Purpose:** Own global hosted workspace, native JSON platform control-plane, regional node, registry distribution, mirror sync, server-script, and cloud stress surfaces.
 
-**Last updated:** 2026-05-09
+**Last updated:** 2026-07-30
 
 ## Mission
 
@@ -12,7 +12,6 @@ mirror synchronization.
 
 ## Owned Surface
 
-- `contracts/compile-plan/`
 - `contracts/hosted-control-plane/`
 - `contracts/platform-control-plane/`
 - `contracts/registry-control-plane/`
@@ -20,7 +19,6 @@ mirror synchronization.
 - `docs/governance/Platform-Documentation-Governance.md`
 - `docs/governance/Platform-Global-Service-Model.md`
 - `docs/governance/Platform-Workspace-Compile-Model.md`
-- `docs/governance/Platform-Cloud-Control-Plane-Contract.md`
 - `docs/operations/Platform-Regional-Node-Runbook.md`
 - `docs/registry/Platform-Mirror-Synchronization-Contract.md`
 - `scripts/cloud-compile-stress.py`
@@ -47,13 +45,10 @@ coverage visible in the affected docs or gates. VM deployment changes must keep
 the package bundle, installer, systemd services, static read plane, and smoke
 check aligned in the same change.
 Registry descriptor changes must keep
-`GET /api/spio-registry-control/v1/descriptor`, examples, smoke scripts, and
-client trust-import docs aligned. Hosted publish changes that move registry
+`GET /api/pafio-registry-control/v1/descriptor`, examples, smoke scripts, and
+Pafio trust-import docs aligned. Hosted publish changes that move registry
 objects to S3 must describe the write authority, static read root URL, and
 object immutability assumptions in the registry operations runbook.
-Tool-release publication changes must keep `scripts/publish-spio-tool-release.py`,
-the release target namespace map, and `tests/unit/test_tool_release.py`
-aligned with the client-side installer contract in `styio-spio`.
 User-bound compile container changes must keep
 `contracts/platform-control-plane/v1/`, `tests/interop/platform-control-plane-contract-gate.py`,
 the HTTP smoke job payload, and workspace compile governance aligned so
@@ -122,12 +117,12 @@ contract gate, docs gate, and native documentation governance tests.
 
 Coordinate with Platform Kernel when contracts depend on C++ payload shape.
 Coordinate with Docs Delivery whenever service ownership or runbooks change.
-Coordinate with upstream `styio-spio` when a platform distribution contract
-changes local package-manager behavior.
+Coordinate with Pafio when a platform distribution contract changes local
+package-manager behavior, with Styio for compiler contracts, and with Vityo for
+hosted frontend routes.
 
 ## Handoff / Recovery
 
-If a server contract cannot move yet, keep a temporary `styio-spio` reference
-and record the platform-side blocker in `docs/plan/repository-delivery-convergence/Evidence.md`.
-If a regional node or mirror sync contract is not executable yet, keep the
-documented contract here and record the missing gate before claiming cutover.
+If a regional node or mirror sync contract is not executable yet, record the
+missing gate before claiming cutover. Do not add package-manager or compiler
+compatibility copies to Platform.

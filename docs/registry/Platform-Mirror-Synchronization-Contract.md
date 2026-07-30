@@ -29,7 +29,7 @@ freshness through the platform control plane.
 
 ## Client Contract
 
-`styio-spio` clients may select a mirror for package reads, but local offline
+Pafio clients may select a mirror for package reads, but local offline
 packages and explicitly imported packages remain valid even when no platform or
 mirror endpoint is reachable.
 
@@ -40,6 +40,6 @@ Mirror changes are measurable only when the docs or gates identify:
 - authoritative write origin and accepted forwarding path
 - freshness cursor and replay behavior
 - immutable object and mutable index replication order
-- cache boundary between service replicas and client `SPIO_HOME`
+- cache boundary between service replicas and Pafio-owned client state
 - security boundary for mirror promotion, service credentials, and public reads
-- fallback behavior for offline-capable `styio-spio` clients
+- fallback behavior for offline-capable Pafio clients

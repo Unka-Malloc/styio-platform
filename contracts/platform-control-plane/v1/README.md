@@ -2,7 +2,7 @@
 
 **Purpose:** Define the native JSON contract package for the first runnable `styio-platform` cloud service kernel.
 
-**Last updated:** 2026-04-29
+**Last updated:** 2026-07-30
 
 ## Source Of Truth
 
@@ -21,6 +21,11 @@ worker-internal lifecycle, user-bound compile container registration and
 workspace switching, workgroup cluster registration, and mirror freshness/replay
 status. It is the route surface implemented by the C++ `styio-platformd`
 kernel.
+
+Submitted job requests contain only source checkout, Pafio workflow flags,
+target selection, and profile data. Worker-pool selection is a Platform field
+outside `job_request`; compiler selection and cloud-policy payloads are not part
+of this contract.
 
 ## Implementation Target
 

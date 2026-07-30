@@ -60,7 +60,7 @@ The Styio ecosystem keeps documentation ownership close to the product surface:
 | Repository | Documentation focus |
 |------------|---------------------|
 | `styio` | Language, compiler, and standard library |
-| `styio-spio` | CLI, package resolution, and registry client behavior |
+| `pafio-nightly` | CLI, project metadata, package resolution, and registry client behavior |
 | `vityo-nightly` | Hosted workspace UX and console flows |
 | `styio-platform` | Contracts, registry, cloud workspaces, operations |
 | `styio-community` | Tutorials, examples, and public guides |

@@ -2,12 +2,14 @@
 
 **Purpose:** Own platform documentation structure, generated indexes, and docs gate automation.
 
-**Last updated:** 2026-05-09
+**Last updated:** 2026-07-30
 
 ## Mission
 
-Keep documentation governance aligned with the Styio ecosystem while making
-`styio-platform` the global cloud-service and package-distribution foundation.
+Keep documentation governance aligned with the Styio ecosystem ownership
+boundary: Pafio owns package and project workflows, Styio owns compiler
+contracts, and `styio-platform` owns hosted execution, registry services, and
+their control planes.
 
 ## Owned Surface
 
@@ -48,7 +50,11 @@ collections anchored to their README `Last updated` value instead of allowing
 the generated date to drift without a source-document change.
 When platform README or governance docs describe compile container behavior,
 keep user binding, workspace hot-switch semantics, and worker environment
-variables consistent with the native JSON contract examples.
+variables consistent with the native JSON contract examples. Platform docs
+must describe workers invoking `pafio build` with a system-provided Styio and
+must not publish managed compiler install, select, pin, or cache behavior.
+Do not duplicate Pafio metadata/workflow/compile-plan contracts or Styio
+diagnostics, receipt, and runtime-event contracts in Platform documentation.
 Agent guidance changes must keep `AGENTS.md` short and aligned with source
 ownership, manifests, contracts, tests, and required gates.
 
@@ -68,6 +74,9 @@ indexes, source-fetch protocol guidance, or team runbook ownership.
 Documentation-governance changes are docs-delivery changes when they alter
 collections, owner mapping, ecosystem documentation boundaries, gate names, or
 runbook/DOC-STATS requirements.
+Deleting a contract or route that belongs to Pafio or Styio is a docs-delivery
+change because indexes, ownership maps, and external alignment documents must
+be updated atomically with the Platform surface.
 Agent guidance changes are docs-delivery changes when they alter source maps,
 source-of-truth rules, or required local gates.
 
@@ -80,6 +89,8 @@ For Helm-facing docs changes, also render `helm template` with default values
 and with TLS/mTLS values enabled.
 For control-plane documentation changes, also rerun the relevant native JSON
 contract gate when examples or route terminology changed.
+For hosted job or worker-boundary changes, run both hosted and Platform
+control-plane contract gates plus the focused HTTP smoke.
 For documentation-governance API changes, also run the platform control-plane
 contract gate and native documentation governance tests.
 
@@ -88,6 +99,8 @@ contract gate and native documentation governance tests.
 Coordinate with Platform Kernel and Control Plane when documentation changes
 represent code, global service, package distribution, or mirror ownership
 changes.
+Coordinate owner-contract changes with Pafio and Styio without copying their
+implementation schemas into this repository.
 For cloud-service governance changes, verify that docs describe the native JSON
 contract/examples/gates source of truth and the V1 C++ service target
 consistently.

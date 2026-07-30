@@ -55,7 +55,7 @@ The default install creates:
 - `/var/lib/styio-platform/registry/v2` initialized registry static root
 - `/var/lib/styio-platform/registry/v2-keys` server-side registry role keys
 - `/etc/styio-platform/styio-registry.env` deployment environment file
-- `styio-registry-control.service` for `/api/spio-registry-control/v1/status|publish|verify`
+- `styio-registry-control.service` for `/api/pafio-registry-control/v1/status|publish|verify`
 - `styio-registry-read.service` for read-only static package distribution
 
 Safe default binds:
@@ -85,7 +85,7 @@ Post-install operator checks:
 ```text
 systemctl status styio-registry-control.service
 systemctl status styio-registry-read.service
-curl -fsS http://127.0.0.1:8787/api/spio-registry-control/v1/status
+curl -fsS http://127.0.0.1:8787/api/pafio-registry-control/v1/status
 curl -fsS http://127.0.0.1:8788/config.json
 ```
 
@@ -118,12 +118,6 @@ If the deployment links a private security module and the write-origin rules sho
 
 ```text
 ./scripts/registry-server-gate.py --registry-root https://registry-upload.example.internal --publish-policy-file /etc/spio/publish-policy.toml --spio-bin ./build-codex/bin/spio --json
-```
-
-If the deployment links a private security module and already provisions a named profile under `SPIO_HOME/server/registry/publish-profiles/`, validate that path directly:
-
-```text
-spio publish --manifest-path path/to/spio.toml --registry https://registry-upload.example.internal --registry-profile write-dev
 ```
 
 ## 5. Split Publish and Fetch Origins

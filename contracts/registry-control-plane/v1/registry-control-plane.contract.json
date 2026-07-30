@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "contract_name": "spio registry control plane",
+  "contract_name": "Pafio registry control plane",
   "contract_version": "v1",
-  "base_path": "/api/spio-registry-control/v1",
+  "base_path": "/api/pafio-registry-control/v1",
   "operations": [
     {
       "id": "registryStatus",
@@ -390,39 +390,91 @@
       },
       "optional": {}
     },
-    "PublishRequest": {
+    "PublishDependency": {
       "kind": "object",
-      "required": {},
-      "optional": {
-        "archive_path": {
+      "required": {
+        "alias": {
           "type": "string",
-          "min_length": 1
-        },
-        "manifest_path": {
-          "type": "string",
-          "min_length": 1
+          "min_length": 1,
+          "max_length": 128
         },
         "package": {
           "type": "string",
-          "min_length": 1
+          "min_length": 1,
+          "max_length": 255
         },
-        "output_path": {
+        "version_req": {
           "type": "string",
-          "min_length": 1
+          "min_length": 1,
+          "max_length": 64
+        },
+        "registry": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 2048
+        }
+      },
+      "optional": {}
+    },
+    "PublishRequest": {
+      "kind": "object",
+      "required": {
+        "package": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 255
+        },
+        "version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "archive_name": {
+          "type": "string",
+          "min_length": 15,
+          "max_length": 255,
+          "suffix": ".pafio.src.tar"
+        },
+        "archive_base64": {
+          "type": "string",
+          "min_length": 4,
+          "max_length": 89478488
+        },
+        "archive_sha256": {
+          "type": "string",
+          "min_length": 64,
+          "max_length": 64
+        },
+        "archive_size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
         },
         "publisher_id": {
           "type": "string",
-          "min_length": 1
+          "min_length": 1,
+          "max_length": 255
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "ref": "PublishDependency"
+          },
+          "max_items": 256
+        },
+        "dev_dependencies": {
+          "type": "array",
+          "items": {
+            "ref": "PublishDependency"
+          },
+          "max_items": 256
         }
-      }
+      },
+      "optional": {}
     },
     "PublishPayload": {
       "kind": "object",
       "required": {
-        "registry_root": {
-          "type": "string",
-          "min_length": 1
-        },
         "created_root": {
           "type": "boolean"
         },
@@ -442,20 +494,24 @@
           "type": "string",
           "format": "date-time"
         },
-        "archive_path": {
+        "archive_name": {
           "type": "string",
-          "min_length": 1
+          "min_length": 15,
+          "max_length": 255,
+          "suffix": ".pafio.src.tar"
         },
         "archive_sha256": {
           "type": "string",
-          "min_length": 64
+          "min_length": 64,
+          "max_length": 64
         },
         "archive_size_bytes": {
           "type": "integer"
         },
         "artifact_path": {
           "type": "string",
-          "min_length": 1
+          "min_length": 1,
+          "suffix": ".pafio.src.tar"
         },
         "index_path": {
           "type": "string",
@@ -469,17 +525,21 @@
           "type": "integer"
         },
         "dependencies": {
-          "type": "integer"
+          "type": "array",
+          "items": {
+            "ref": "PublishDependency"
+          },
+          "max_items": 256
         },
         "dev_dependencies": {
-          "type": "integer"
+          "type": "array",
+          "items": {
+            "ref": "PublishDependency"
+          },
+          "max_items": 256
         }
       },
       "optional": {
-        "registry_read_root": {
-          "type": "string",
-          "min_length": 1
-        },
         "object_store_provider": {
           "type": "string",
           "min_length": 1

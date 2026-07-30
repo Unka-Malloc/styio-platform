@@ -2,6 +2,8 @@
 
 #include "PlatformCore/SourceFetch/SourceFetch.hpp"
 
+#include <algorithm>
+#include <array>
 #include <string_view>
 #include <utility>
 
@@ -22,26 +24,35 @@ std::string WorkerPoolFromRequest(const nlohmann::json &request)
   {
     return request["preferred_worker_pool"].get<std::string>();
   }
-  if (request.contains("job_request") && request["job_request"].is_object())
-  {
-    const nlohmann::json &job_request = request["job_request"];
-    if (job_request.contains("cloud") && job_request["cloud"].is_object())
-    {
-      const nlohmann::json &cloud = job_request["cloud"];
-      if (cloud.contains("worker_pool_key") && cloud["worker_pool_key"].is_string())
-      {
-        return cloud["worker_pool_key"].get<std::string>();
-      }
-    }
-  }
-  return "linux/x86_64/binary/stable/minimal";
+  return "default";
 }
 
-std::optional<std::string> ValidateCloudBuildRequest(const nlohmann::json &job_request)
+template <size_t N>
+std::optional<std::string> ValidateKnownFields(
+    const nlohmann::json &object,
+    const std::array<std::string_view, N> &allowed,
+    std::string_view path)
+{
+  for (const auto &[field, value] : object.items())
+  {
+    (void) value;
+    if (std::find(allowed.begin(), allowed.end(), field) == allowed.end())
+    {
+      return std::string(path) + "." + field + " is not part of the v1 contract";
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> ValidatePlatformJobRequest(const nlohmann::json &job_request)
 {
   if (!job_request.contains("schema_version") || !job_request["schema_version"].is_number_integer())
   {
     return "job_request.schema_version is required";
+  }
+  if (job_request["schema_version"].get<int>() != 1)
+  {
+    return "job_request.schema_version must equal 1";
   }
   if (!job_request.contains("manifest_path") || !job_request["manifest_path"].is_string() ||
       job_request["manifest_path"].get<std::string>().empty())
@@ -68,11 +79,74 @@ std::optional<std::string> ValidateCloudBuildRequest(const nlohmann::json &job_r
   {
     return "job_request.source.requested_revision must be a non-empty string when present";
   }
-  for (const std::string field : {"toolchain", "workflow", "target", "cloud"})
+  if (const std::optional<std::string> error = ValidateKnownFields(
+          job_request,
+          std::array<std::string_view, 6>{"schema_version", "manifest_path", "source", "profile", "workflow", "target"},
+          "job_request");
+      error.has_value())
+  {
+    return *error;
+  }
+  if (const std::optional<std::string> error = ValidateKnownFields(
+          source,
+          std::array<std::string_view, 2>{"origin", "requested_revision"},
+          "job_request.source");
+      error.has_value())
+  {
+    return *error;
+  }
+  if (job_request.contains("profile") &&
+      (!job_request["profile"].is_string() || job_request["profile"].get<std::string>().empty()))
+  {
+    return "job_request.profile must be a non-empty string when present";
+  }
+  for (const std::string field : {"workflow", "target"})
   {
     if (job_request.contains(field) && !job_request[field].is_object())
     {
       return "job_request." + field + " must be an object when present";
+    }
+  }
+  if (job_request.contains("workflow"))
+  {
+    const nlohmann::json &workflow = job_request["workflow"];
+    if (const std::optional<std::string> error = ValidateKnownFields(
+            workflow,
+            std::array<std::string_view, 4>{"locked", "offline", "frozen", "dry_run"},
+            "job_request.workflow");
+        error.has_value())
+    {
+      return *error;
+    }
+    for (const std::string field : {"locked", "offline", "frozen", "dry_run"})
+    {
+      if (workflow.contains(field) && !workflow[field].is_boolean())
+      {
+        return "job_request.workflow." + field + " must be a boolean when present";
+      }
+    }
+  }
+  if (job_request.contains("target"))
+  {
+    const nlohmann::json &target = job_request["target"];
+    if (const std::optional<std::string> error = ValidateKnownFields(
+            target,
+            std::array<std::string_view, 4>{"package", "bin", "test", "lib"},
+            "job_request.target");
+        error.has_value())
+    {
+      return *error;
+    }
+    for (const std::string field : {"package", "bin", "test"})
+    {
+      if (target.contains(field) && (!target[field].is_string() || target[field].get<std::string>().empty()))
+      {
+        return "job_request.target." + field + " must be a non-empty string when present";
+      }
+    }
+    if (target.contains("lib") && !target["lib"].is_boolean())
+    {
+      return "job_request.target.lib must be a boolean when present";
     }
   }
   return std::nullopt;
@@ -101,7 +175,7 @@ std::optional<std::string> ValidateSubmitJobRequest(const nlohmann::json &reques
   {
     return "job_request is required";
   }
-  if (const std::optional<std::string> error = ValidateCloudBuildRequest(request["job_request"]); error.has_value())
+  if (const std::optional<std::string> error = ValidatePlatformJobRequest(request["job_request"]); error.has_value())
   {
     return *error;
   }

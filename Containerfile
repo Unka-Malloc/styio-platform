@@ -37,16 +37,16 @@ RUN cmake -S styio -B /tmp/styio-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   && test -n "$found" \
   && cp "$found" /opt/styio/bin/styio
 
-FROM build-base AS spio-build
-ARG SPIO_REPO=https://github.com/eBioRing/styio-spio.git
-ARG SPIO_REF=nightly
-RUN git clone --depth 1 --branch "$SPIO_REF" "$SPIO_REPO" styio-spio
-RUN cmake -S styio-spio -B /tmp/spio-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  && cmake --build /tmp/spio-build --parallel "$CMAKE_BUILD_PARALLEL_LEVEL" \
-  && mkdir -p /opt/spio/bin \
-  && found="$(find /tmp/spio-build -type f -name spio -perm /111 | head -n 1)" \
+FROM build-base AS pafio-build
+ARG PAFIO_REPO=https://github.com/SymPolicy/Pafio.git
+ARG PAFIO_REF=nightly
+RUN git clone --depth 1 --branch "$PAFIO_REF" "$PAFIO_REPO" pafio
+RUN cmake -S pafio -B /tmp/pafio-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  && cmake --build /tmp/pafio-build --parallel "$CMAKE_BUILD_PARALLEL_LEVEL" \
+  && mkdir -p /opt/pafio/bin \
+  && found="$(find /tmp/pafio-build -type f -name pafio -perm /111 | head -n 1)" \
   && test -n "$found" \
-  && cp "$found" /opt/spio/bin/spio
+  && cp "$found" /opt/pafio/bin/pafio
 
 FROM build-base AS platform-build
 COPY . /src/styio-platform
@@ -72,7 +72,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=platform-build /opt/styio-platform/bin/styio-platformd /usr/local/bin/styio-platformd
-COPY --from=spio-build /opt/spio/bin/spio /usr/local/bin/spio
+COPY --from=pafio-build /opt/pafio/bin/pafio /usr/local/bin/pafio
 COPY --from=styio-build /opt/styio/bin/styio /usr/local/bin/styio
 COPY scripts /opt/styio-platform/scripts
 COPY src/PlatformCloud/PackageRegistry /opt/styio-platform/src/PlatformCloud/PackageRegistry
@@ -80,7 +80,7 @@ COPY src/PlatformCloud/DeveloperWorkspace/workspace_compile_stress /opt/styio-pl
 
 ENV PATH="/usr/local/bin:${PATH}"
 ENV PYTHONPATH="/opt/styio-platform/src/PlatformCloud/PackageRegistry:/opt/styio-platform/src/PlatformCloud/DeveloperWorkspace"
-ENV STYIO_PLATFORM_WORKER_SPIO_BIN=/usr/local/bin/spio
+ENV STYIO_PLATFORM_WORKER_PAFIO_BIN=/usr/local/bin/pafio
 ENV STYIO_PLATFORM_WORKER_STYIO_BIN=/usr/local/bin/styio
 
 EXPOSE 8787 8080

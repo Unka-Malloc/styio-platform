@@ -50,7 +50,7 @@ protocols:
     - publish_release
     - verify_registry
 apis:
-  control_plane_base_path: /api/spio-registry-control/v1
+  control_plane_base_path: /api/pafio-registry-control/v1
   operations:
     - registryStatus
     - registryDescriptor

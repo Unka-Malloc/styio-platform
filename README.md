@@ -10,10 +10,10 @@ that previously lived inside `styio-spio`.
 development and early integration, but APIs and deployment defaults can still
 change before a stable production release.
 
-This repository is downstream of `styio` and `styio-spio`:
+This repository is downstream of Styio and Pafio:
 
 - `styio` remains the compiler and language implementation source of truth.
-- `styio-spio` remains the package manager, resolver, pack, publish, and client
+- Pafio remains the package manager, resolver, pack, publish, and client
   workflow surface.
 - `styio-platform` consumes those contracts to run hosted workspaces, compile
   jobs, registry server control planes, cross-network deployment nodes, mirror
@@ -26,11 +26,9 @@ environments into `developer-workspace`.
 Agent-facing maintenance rules live in `AGENTS.md`; keep design details in
 code, contracts, tests, and manifests before adding prose.
 
-The platform kernel keeps imported C++ namespace and contract names stable
-across repository boundaries. New platform services live here first.
-`styio-spio` retains local package-manager client code, offline package
-workflows, local import/export paths, and compatibility shims that users need
-without connecting to the platform.
+New platform services live here first. Pafio retains local package-manager
+client code, offline package workflows, and local import/export paths without
+requiring Platform connectivity.
 
 The V1 cloud service plan is a native platform kernel, not a generated API
 toolchain. Its executable contract source is the repo-native JSON package under
@@ -83,7 +81,7 @@ mirror caches. Production S3 publication remains opt-in through Helm
 `objectStore` values.
 `styio-platformd --migrate` applies the control-plane schema,
 `styio-platformd --worker` claims Git-backed build jobs and invokes
-`spio build`, and `styio-platformd --sync-mirror-once` copies the registry v2
+`pafio build`, and `styio-platformd --sync-mirror-once` copies the registry v2
 filesystem layout from the primary PVC into the mirror PVC and records
 freshness in Postgres.
 

@@ -13,9 +13,9 @@
         "root_initialized": true,
         "config_present": true,
         "root_metadata_present": true,
-        "publish_endpoint": "/api/spio-registry-control/v1/publish",
-        "verify_endpoint": "/api/spio-registry-control/v1/verify",
-        "descriptor_endpoint": "/api/spio-registry-control/v1/descriptor"
+        "publish_endpoint": "/api/pafio-registry-control/v1/publish",
+        "verify_endpoint": "/api/pafio-registry-control/v1/verify",
+        "descriptor_endpoint": "/api/pafio-registry-control/v1/descriptor"
       }
     },
     "failure": {
@@ -39,8 +39,8 @@
       "payload": {
         "schema_version": 1,
         "registry_name": "production-registry",
-        "registry_root": "https://registry.example.invalid/spio/v2",
-        "control_plane_base_url": "https://platform.example.invalid/api/spio-registry-control/v1",
+        "registry_root": "https://registry.example.invalid/pafio/v2",
+        "control_plane_base_url": "https://platform.example.invalid/api/pafio-registry-control/v1",
         "root_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         "issued_at": "2026-05-02T00:00:00Z",
         "expires": "2026-06-02T00:00:00Z",
@@ -60,8 +60,22 @@
   },
   "publishRelease": {
     "request": {
-      "manifest_path": "/workspace/demo/spio.toml",
-      "publisher_id": "console-user"
+      "package": "demo/app",
+      "version": "0.1.0",
+      "archive_name": "demo-app-0.1.0.pafio.src.tar",
+      "archive_base64": "YXJjaGl2ZQ==",
+      "archive_sha256": "0eb3e36bfb24dcd9bb1d1bece1531216b59539a8fde17ee80224af0653c92aa3",
+      "archive_size_bytes": 7,
+      "publisher_id": "pafio-cli",
+      "dependencies": [
+        {
+          "alias": "base",
+          "package": "demo/base",
+          "version_req": "^1.0.0",
+          "registry": "https://packages.example.invalid"
+        }
+      ],
+      "dev_dependencies": []
     },
     "success": {
       "returncode": 0,
@@ -69,21 +83,27 @@
       "stdout": "",
       "stderr": "",
       "payload": {
-        "registry_root": "/srv/spio-registry-v2",
         "created_root": true,
         "package": "demo/app",
         "version": "0.1.0",
-        "publisher_id": "console-user",
+        "publisher_id": "control-plane",
         "published_at": "2026-04-21T00:00:00Z",
-        "archive_path": "/tmp/demo/app-0.1.0.tar",
-        "archive_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        "archive_size_bytes": 4096,
-        "artifact_path": "artifacts/source/sha256/01/23/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.spio.src.tar",
+        "archive_name": "demo-app-0.1.0.pafio.src.tar",
+        "archive_sha256": "0eb3e36bfb24dcd9bb1d1bece1531216b59539a8fde17ee80224af0653c92aa3",
+        "archive_size_bytes": 7,
+        "artifact_path": "artifacts/source/sha256/0e/b3/0eb3e36bfb24dcd9bb1d1bece1531216b59539a8fde17ee80224af0653c92aa3.pafio.src.tar",
         "index_path": "index/demo/app.jsonl",
         "log_leaf_path": "log/leaves/000000000001.json",
         "sequence": 1,
-        "dependencies": 0,
-        "dev_dependencies": 0
+        "dependencies": [
+          {
+            "alias": "base",
+            "package": "demo/base",
+            "version_req": "^1.0.0",
+            "registry": "https://packages.example.invalid"
+          }
+        ],
+        "dev_dependencies": []
       }
     },
     "failure": {
@@ -106,7 +126,7 @@
       "stderr": "",
       "payload": {
         "ok": true,
-        "root": "/srv/spio-registry-v2",
+        "root": "/srv/pafio-static-registry",
         "namespaces": 1,
         "index_files": 1,
         "releases": 2,

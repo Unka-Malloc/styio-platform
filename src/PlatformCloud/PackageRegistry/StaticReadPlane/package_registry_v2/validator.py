@@ -178,7 +178,7 @@ def _verify_role_envelope(
 def verify_registry_root(root_path_value: str) -> dict[str, Any]:
     root_reader = RootReader(root_path_value)
     config = root_reader.load_json("config.json", "registry v2 config")
-    if config.get("protocol") != "spio-static-registry" or config.get("protocol_version") != 2:
+    if config.get("protocol") != "pafio-static-registry" or config.get("protocol_version") != 2:
         raise RegistryV2Error("registry v2 config does not declare the expected protocol/version")
     capabilities = require_object(config.get("capabilities"), "registry v2 config capabilities")
     require_bool(capabilities.get("append_only_index"), "registry v2 config capabilities.append_only_index")

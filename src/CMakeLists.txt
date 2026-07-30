@@ -25,13 +25,7 @@ set(STYIO_PLATFORM_SYSTEM_SOURCES
 )
 
 set(STYIO_PLATFORM_CORE_SOURCES
-    PlatformCore/Manifest/Lockfile.cpp
-    PlatformCore/Manifest/Manifest.cpp
-    PlatformCore/RegistryClient/Client.cpp
-    PlatformCore/Resolve/Resolver.cpp
     PlatformCore/SourceFetch/SourceFetch.cpp
-    PlatformCore/Toolchain/SourceBuild.cpp
-    PlatformCore/Toolchain/State.cpp
 )
 
 set(STYIO_PLATFORM_SECURITY_SOURCES
@@ -42,15 +36,7 @@ set(STYIO_PLATFORM_SECURITY_SOURCES
     PlatformSecurity/SecurityHardening/RegistrySecurity.cpp
 )
 
-set(STYIO_PLATFORM_PROTOCOL_SOURCES
-    SpioPlatformProtocols/CompilePlan.cpp
-    SpioPlatformProtocols/Contract.cpp
-    SpioPlatformProtocols/Execution.cpp
-    SpioPlatformProtocols/Job.cpp
-)
-
 set(STYIO_PLATFORM_STORAGE_SOURCES
-    PlatformStorage/PlatformCache/CachePaths.cpp
     PlatformStorage/PlatformPersistence/StateRecords.cpp
     PlatformStorage/PlatformPersistence/MemoryStateStore.cpp
     PlatformStorage/PlatformPersistence/ObjectStore.cpp
@@ -112,14 +98,11 @@ endif()
 styio_platform_add_static_library(styio_platform_core ${STYIO_PLATFORM_CORE_SOURCES})
 target_link_libraries(styio_platform_core PUBLIC styio_platform_storage styio_platform_security styio_platform_system)
 
-styio_platform_add_static_library(styio_platform_protocols ${STYIO_PLATFORM_PROTOCOL_SOURCES})
-target_link_libraries(styio_platform_protocols PUBLIC styio_platform_core)
-
 styio_platform_add_static_library(styio_platform_package_registry ${STYIO_PLATFORM_PACKAGE_REGISTRY_SOURCES})
 target_link_libraries(styio_platform_package_registry PUBLIC styio_platform_core styio_platform_storage Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
 
 styio_platform_add_static_library(styio_platform_developer_workspace ${STYIO_PLATFORM_DEVELOPER_WORKSPACE_SOURCES})
-target_link_libraries(styio_platform_developer_workspace PUBLIC styio_platform_core styio_platform_protocols styio_platform_storage Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(styio_platform_developer_workspace PUBLIC styio_platform_core styio_platform_storage Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
 
 styio_platform_add_static_library(styio_platform_documentation_governance ${STYIO_PLATFORM_DOCUMENTATION_GOVERNANCE_SOURCES})
 target_link_libraries(styio_platform_documentation_governance PUBLIC styio_platform_core)
@@ -136,14 +119,13 @@ target_link_libraries(styio_platform_cloud INTERFACE
 )
 
 styio_platform_add_static_library(styio_platform_service ${STYIO_PLATFORM_SERVICE_SOURCES})
-target_link_libraries(styio_platform_service PUBLIC styio_platform_cloud styio_platform_storage styio_platform_protocols styio_platform_security Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(styio_platform_service PUBLIC styio_platform_cloud styio_platform_storage styio_platform_security Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
 
 add_library(styio_platform_kernel INTERFACE)
 target_link_libraries(styio_platform_kernel INTERFACE
   styio_platform_system
   styio_platform_core
   styio_platform_security
-  styio_platform_protocols
   styio_platform_storage
   styio_platform_cloud
   styio_platform_service

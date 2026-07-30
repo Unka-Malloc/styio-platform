@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import io
 import json
 import os
 import secrets
@@ -9,6 +12,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import textwrap
 import time
@@ -241,8 +245,8 @@ spec:
           git init
           git config user.email smoke@example.invalid
           git config user.name smoke
-          cat > spio.toml <<'EOF'
-          [spio]
+          cat > pafio.toml <<'EOF'
+          [pafio]
           manifest-version = 1
 
           [package]
@@ -251,8 +255,7 @@ spec:
           edition = "2026"
           publish = false
 
-          [toolchain]
-          channel = "nightly"
+          [build]
           implicit-std = true
 
           [lib]
@@ -293,11 +296,7 @@ spec:
 
 
 def publish_registry_fixture(namespace: str, release: str) -> None:
-    script = r"""
-set -eu
-mkdir -p /tmp/styio-platform-publish/src
-cat > /tmp/styio-platform-publish/spio.toml <<'EOF'
-[spio]
+    manifest = b"""[pafio]
 manifest-version = 1
 
 [package]
@@ -306,20 +305,52 @@ version = "0.1.0"
 edition = "2026"
 publish = true
 
-[toolchain]
-channel = "nightly"
+[build]
 implicit-std = true
 
 [lib]
 path = "src/lib.styio"
-EOF
-printf '# publish := 1\n' > /tmp/styio-platform-publish/src/lib.styio
+"""
+    archive_buffer = io.BytesIO()
+    with tarfile.open(fileobj=archive_buffer, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+        for name, content in (
+            ("app-0.1.0/pafio.toml", manifest),
+            ("app-0.1.0/src/lib.styio", b"# publish := 1\n"),
+        ):
+            member = tarfile.TarInfo(name=name)
+            member.size = len(content)
+            member.mode = 0o644
+            member.mtime = 0
+            archive.addfile(member, io.BytesIO(content))
+    archive_bytes = archive_buffer.getvalue()
+    request_body = json.dumps(
+        {
+            "package": "demo/app",
+            "version": "0.1.0",
+            "archive_name": "demo-app-0.1.0.pafio.src.tar",
+            "archive_base64": base64.b64encode(archive_bytes).decode("ascii"),
+            "archive_sha256": hashlib.sha256(archive_bytes).hexdigest(),
+            "archive_size_bytes": len(archive_bytes),
+            "publisher_id": "k8s-smoke-client-claim",
+            "dependencies": [],
+            "dev_dependencies": [],
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    script = f"""
+set -eu
 response="$(mktemp)"
-status="$(curl -sS -o "$response" -w '%{http_code}' \
+request="$(mktemp)"
+trap 'rm -f "$request" "$response"' EXIT
+cat > "$request" <<'JSON'
+{request_body}
+JSON
+status="$(curl -sS -o "$response" -w '%{{http_code}}' \
   -H 'Content-Type: application/json' \
   -H 'X-Styio-Mtls-Uri-San: spiffe://styio-platform/tenant/platform/role/registry-writer/node/k8s-smoke' \
-  -d '{"manifest_path":"/tmp/styio-platform-publish/spio.toml","publisher_id":"k8s-smoke"}' \
-  http://127.0.0.1:8787/api/spio-registry-control/v1/publish)"
+  --data-binary "@$request" \
+  http://127.0.0.1:8787/api/pafio-registry-control/v1/publish)"
 cat "$response"
 if [ "$status" != "200" ] && [ "$status" != "409" ]; then
   exit 1
@@ -442,17 +473,13 @@ def main() -> int:
                 "workspace_id": "workspace-smoke",
                 "action": "build",
                 "region": "local-dev",
-                "preferred_worker_pool": "linux/x86_64/build/nightly/minimal",
+                "preferred_worker_pool": "default",
                 "job_request": {
                     "schema_version": 1,
-                    "api_path": "/api/styio-platform/v1/jobs",
-                    "action": "build",
-                    "manifest_path": "spio.toml",
+                    "manifest_path": "pafio.toml",
                     "source": {"origin": "http://styio-platform-fixture-git:8000/fixture.git"},
-                    "toolchain": {"mode": "build", "channel": "nightly", "build_mode": "minimal"},
                     "workflow": {"locked": False, "offline": False, "dry_run": True},
                     "target": {"lib": True},
-                    "cloud": {},
                 },
             },
         )

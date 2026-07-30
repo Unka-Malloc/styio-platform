@@ -15,10 +15,10 @@ struct WorkerRuntimeConfig
 {
   std::string control_url = "http://127.0.0.1:8787/api/styio-platform/v1";
   std::string worker_id = "worker-local";
-  std::string worker_pool_key = "linux/x86_64/build/nightly/minimal";
+  std::string worker_pool_key = "default";
   std::filesystem::path workspace_root = ".styio-platform/workspaces";
   std::filesystem::path artifact_root = ".styio-platform/artifacts";
-  std::string spio_bin = "spio";
+  std::string pafio_bin = "pafio";
   std::string styio_bin = "styio";
   std::string compile_container_id;
   std::string compile_container_tenant_id;
@@ -30,6 +30,8 @@ struct WorkerRuntimeConfig
   std::string mtls_key_path;
   int poll_interval_ms = 2000;
 };
+
+WorkerRuntimeConfig LoadWorkerRuntimeConfig(const OperatingSystemAdapter &os);
 
 struct WorkerCompileContainerSpec
 {
@@ -61,6 +63,12 @@ struct WorkerWorkspace
   std::filesystem::path stderr_path;
   std::filesystem::path result_path;
 };
+
+spio::ProcessRequest BuildWorkerPafioProcessRequest(
+    const WorkerRuntimeConfig &worker,
+    const PlatformConfig &platform,
+    const WorkerWorkspace &workspace,
+    const nlohmann::json &job_request);
 
 class WorkerWorkspaceFactory
 {

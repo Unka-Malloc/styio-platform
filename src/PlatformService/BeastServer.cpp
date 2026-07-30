@@ -11,8 +11,10 @@
 #include "PlatformSecurity/PlatformCA/CertificateAuthority.hpp"
 #include "PlatformService/Router.hpp"
 
+#include <algorithm>
 #include <array>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
@@ -52,11 +54,43 @@
 namespace spio::platform
 {
 
+size_t HttpRequestBodyLimitForTarget(std::string_view target)
+{
+  const size_t query = target.find('?');
+  if (query != std::string_view::npos)
+  {
+    target = target.substr(0, query);
+  }
+  return target == "/api/pafio-registry-control/v1/publish"
+             ? kPublishHttpRequestBodyLimitBytes
+             : kDefaultHttpRequestBodyLimitBytes;
+}
+
+bool HttpRequestBodySizeAllowed(std::string_view target, const uint64_t content_length)
+{
+  return content_length <= static_cast<uint64_t>(HttpRequestBodyLimitForTarget(target));
+}
+
+std::optional<size_t> CheckedHttpRequestSize(const size_t header_bytes, const uint64_t content_length)
+{
+  if (content_length > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+  {
+    return std::nullopt;
+  }
+  const size_t body_bytes = static_cast<size_t>(content_length);
+  if (header_bytes > std::numeric_limits<size_t>::max() - body_bytes)
+  {
+    return std::nullopt;
+  }
+  return header_bytes + body_bytes;
+}
+
 namespace
 {
 
 constexpr std::string_view kPlatformApiBase = "/api/styio-platform/v1";
 constexpr std::string_view kIdentityHeader = "x-styio-mtls-uri-san";
+constexpr size_t kMaxHttpHeaderBytes = 64U * 1024U;
 
 std::string StripQuery(std::string target)
 {
@@ -173,6 +207,21 @@ struct RawHttpRequest
   std::string body;
 };
 
+struct RawHttpRequestHead
+{
+  std::string method;
+  std::string target;
+  std::map<std::string, std::string> headers;
+};
+
+struct RawHttpReadPlan
+{
+  RawHttpRequestHead head;
+  size_t body_start = 0;
+  size_t content_length = 0;
+  size_t total_request_bytes = 0;
+};
+
 std::string TrimAscii(std::string value)
 {
   while (!value.empty() && (value.front() == ' ' || value.front() == '\t' || value.front() == '\r'))
@@ -215,24 +264,35 @@ std::string HttpReason(int status_code)
   }
 }
 
-std::optional<size_t> ContentLength(const std::map<std::string, std::string> &headers)
+std::optional<uint64_t> ContentLength(const std::map<std::string, std::string> &headers)
 {
   const auto found = headers.find("content-length");
   if (found == headers.end())
   {
     return 0;
   }
-  try
-  {
-    return static_cast<size_t>(std::stoull(found->second));
-  }
-  catch (...)
+  if (found->second.empty())
   {
     return std::nullopt;
   }
+  uint64_t parsed = 0;
+  for (const unsigned char ch : found->second)
+  {
+    if (ch < '0' || ch > '9')
+    {
+      return std::nullopt;
+    }
+    const uint64_t digit = static_cast<uint64_t>(ch - '0');
+    if (parsed > (std::numeric_limits<uint64_t>::max() - digit) / 10U)
+    {
+      return std::nullopt;
+    }
+    parsed = parsed * 10U + digit;
+  }
+  return parsed;
 }
 
-std::optional<RawHttpRequest> ParseRawHttpRequest(const std::string &raw, std::string &error)
+std::optional<RawHttpRequestHead> ParseRawHttpRequestHead(const std::string &raw, std::string &error)
 {
   const size_t header_end = raw.find("\r\n\r\n");
   if (header_end == std::string::npos)
@@ -240,8 +300,13 @@ std::optional<RawHttpRequest> ParseRawHttpRequest(const std::string &raw, std::s
     error = "HTTP request headers are incomplete";
     return std::nullopt;
   }
+  if (header_end > std::numeric_limits<size_t>::max() - 4U || header_end + 4U > kMaxHttpHeaderBytes)
+  {
+    error = "HTTP request headers exceed maximum size";
+    return std::nullopt;
+  }
 
-  RawHttpRequest parsed;
+  RawHttpRequestHead parsed;
   std::istringstream stream(raw.substr(0, header_end));
   std::string line;
   if (!std::getline(stream, line))
@@ -271,23 +336,124 @@ std::optional<RawHttpRequest> ParseRawHttpRequest(const std::string &raw, std::s
       error = "HTTP header line is missing ':'";
       return std::nullopt;
     }
-    parsed.headers[LowerAscii(line.substr(0, colon))] = TrimAscii(line.substr(colon + 1));
+    const std::string name = LowerAscii(line.substr(0, colon));
+    if (name == "content-length" && parsed.headers.contains(name))
+    {
+      error = "duplicate Content-Length headers are not accepted";
+      return std::nullopt;
+    }
+    parsed.headers[name] = TrimAscii(line.substr(colon + 1));
   }
+  if (parsed.headers.contains("transfer-encoding"))
+  {
+    error = "Transfer-Encoding is not supported";
+    return std::nullopt;
+  }
+  return parsed;
+}
 
-  const std::optional<size_t> content_length = ContentLength(parsed.headers);
+std::optional<RawHttpReadPlan> BuildRawHttpReadPlan(const std::string &raw, std::string &error)
+{
+  std::optional<RawHttpRequestHead> head = ParseRawHttpRequestHead(raw, error);
+  if (!head.has_value())
+  {
+    return std::nullopt;
+  }
+  const std::optional<uint64_t> content_length = ContentLength(head->headers);
   if (!content_length.has_value())
   {
     error = "Content-Length must be an integer";
     return std::nullopt;
   }
-  const size_t body_start = header_end + 4;
-  if (raw.size() < body_start + *content_length)
+  if (!HttpRequestBodySizeAllowed(head->target, *content_length))
+  {
+    error = "HTTP request body exceeds maximum size";
+    return std::nullopt;
+  }
+  const size_t header_end = raw.find("\r\n\r\n");
+  const size_t body_start = header_end + 4U;
+  const std::optional<size_t> total_request_bytes = CheckedHttpRequestSize(body_start, *content_length);
+  if (!total_request_bytes.has_value())
+  {
+    error = "HTTP request size overflows the platform size limit";
+    return std::nullopt;
+  }
+  return RawHttpReadPlan{
+      .head = std::move(*head),
+      .body_start = body_start,
+      .content_length = static_cast<size_t>(*content_length),
+      .total_request_bytes = *total_request_bytes,
+  };
+}
+
+std::optional<RawHttpRequest> ParseRawHttpRequest(const std::string &raw, std::string &error)
+{
+  std::optional<RawHttpReadPlan> plan = BuildRawHttpReadPlan(raw, error);
+  if (!plan.has_value())
+  {
+    return std::nullopt;
+  }
+  if (raw.size() < plan->total_request_bytes)
   {
     error = "HTTP request body is incomplete";
     return std::nullopt;
   }
-  parsed.body = raw.substr(body_start, *content_length);
-  return parsed;
+  return RawHttpRequest{
+      .method = std::move(plan->head.method),
+      .target = std::move(plan->head.target),
+      .headers = std::move(plan->head.headers),
+      .body = raw.substr(plan->body_start, plan->content_length),
+  };
+}
+
+template <typename ReadSome>
+bool ReadBoundedRawHttpRequest(ReadSome read_some, std::string &raw, std::string &error)
+{
+  std::array<char, 4096> buffer{};
+  while (raw.find("\r\n\r\n") == std::string::npos)
+  {
+    const std::ptrdiff_t rc = read_some(buffer.data(), buffer.size());
+    if (rc <= 0)
+    {
+      error = "failed to read HTTP request headers";
+      return false;
+    }
+    raw.append(buffer.data(), static_cast<size_t>(rc));
+    if (raw.find("\r\n\r\n") == std::string::npos && raw.size() > kMaxHttpHeaderBytes)
+    {
+      error = "HTTP request headers exceed maximum size";
+      return false;
+    }
+  }
+
+  std::optional<RawHttpReadPlan> plan = BuildRawHttpReadPlan(raw, error);
+  if (!plan.has_value())
+  {
+    return false;
+  }
+  if (raw.size() > plan->total_request_bytes)
+  {
+    error = "HTTP request contains bytes beyond Content-Length";
+    return false;
+  }
+  while (raw.size() < plan->total_request_bytes)
+  {
+    const size_t remaining = plan->total_request_bytes - raw.size();
+    const size_t requested = std::min(buffer.size(), remaining);
+    const std::ptrdiff_t rc = read_some(buffer.data(), requested);
+    if (rc <= 0)
+    {
+      error = "failed to read HTTP request body";
+      return false;
+    }
+    if (static_cast<size_t>(rc) > remaining)
+    {
+      error = "HTTP request contains bytes beyond Content-Length";
+      return false;
+    }
+    raw.append(buffer.data(), static_cast<size_t>(rc));
+  }
+  return true;
 }
 
 std::string BuildRawHttpResponse(int status_code, const nlohmann::json &body)
@@ -476,73 +642,14 @@ int CreateTcpListener(const PlatformConfig &config)
 
 bool ReadSslHttpRequest(SSL *ssl, std::string &raw, std::string &error)
 {
-  constexpr size_t kMaxRequestBytes = 1024 * 1024;
-  char buffer[4096];
-  while (raw.find("\r\n\r\n") == std::string::npos)
-  {
-    const int rc = SSL_read(ssl, buffer, sizeof(buffer));
-    if (rc <= 0)
-    {
-      error = "failed to read TLS HTTP request headers";
-      return false;
-    }
-    raw.append(buffer, static_cast<size_t>(rc));
-    if (raw.size() > kMaxRequestBytes)
-    {
-      error = "HTTP request exceeds maximum size";
-      return false;
-    }
-  }
-
-  std::string parse_error;
-  const std::optional<RawHttpRequest> header_only = ParseRawHttpRequest(raw, parse_error);
-  size_t content_length = 0;
-  if (!header_only.has_value())
-  {
-    const size_t header_end = raw.find("\r\n\r\n");
-    std::map<std::string, std::string> headers;
-    std::istringstream stream(raw.substr(0, header_end));
-    std::string line;
-    std::getline(stream, line);
-    while (std::getline(stream, line))
-    {
-      line = TrimAscii(std::move(line));
-      const size_t colon = line.find(':');
-      if (colon != std::string::npos)
+  return ReadBoundedRawHttpRequest(
+      [ssl](char *buffer, const size_t size) -> std::ptrdiff_t
       {
-        headers[LowerAscii(line.substr(0, colon))] = TrimAscii(line.substr(colon + 1));
-      }
-    }
-    const std::optional<size_t> parsed_length = ContentLength(headers);
-    if (!parsed_length.has_value())
-    {
-      error = parse_error;
-      return false;
-    }
-    content_length = *parsed_length;
-  }
-  else
-  {
-    content_length = header_only->body.size();
-  }
-
-  const size_t body_start = raw.find("\r\n\r\n") + 4;
-  while (raw.size() < body_start + content_length)
-  {
-    const int rc = SSL_read(ssl, buffer, sizeof(buffer));
-    if (rc <= 0)
-    {
-      error = "failed to read TLS HTTP request body";
-      return false;
-    }
-    raw.append(buffer, static_cast<size_t>(rc));
-    if (raw.size() > kMaxRequestBytes)
-    {
-      error = "HTTP request exceeds maximum size";
-      return false;
-    }
-  }
-  return true;
+        const size_t bounded = std::min(size, static_cast<size_t>(std::numeric_limits<int>::max()));
+        return static_cast<std::ptrdiff_t>(SSL_read(ssl, buffer, static_cast<int>(bounded)));
+      },
+      raw,
+      error);
 }
 
 void SslWriteAll(SSL *ssl, const std::string &payload)
@@ -699,20 +806,65 @@ http::response<http::string_body> DispatchHttpRequest(
 
 void HandleConnection(tcp::socket socket, PlatformRouter &router)
 {
-  beast::flat_buffer buffer;
-  http::request<http::string_body> request;
+  std::string prefix;
+  std::array<char, 4096> prefix_buffer{};
   beast::error_code error;
-  http::read(socket, buffer, request, error);
-  if (error == http::error::end_of_stream)
+  while (prefix.find("\r\n\r\n") == std::string::npos)
   {
+    const size_t read = socket.read_some(net::buffer(prefix_buffer), error);
+    if (error || read == 0U)
+    {
+      socket.shutdown(tcp::socket::shutdown_send, error);
+      return;
+    }
+    prefix.append(prefix_buffer.data(), read);
+    if (prefix.find("\r\n\r\n") == std::string::npos && prefix.size() > kMaxHttpHeaderBytes)
+    {
+      const std::string response = BuildRawHttpResponse(
+          400,
+          BadRequestBody("HTTP request headers exceed maximum size"));
+      net::write(socket, net::buffer(response), error);
+      socket.shutdown(tcp::socket::shutdown_send, error);
+      return;
+    }
+  }
+
+  std::string plan_error;
+  const std::optional<RawHttpReadPlan> plan = BuildRawHttpReadPlan(prefix, plan_error);
+  if (!plan.has_value() || prefix.size() > plan->total_request_bytes)
+  {
+    if (plan.has_value())
+    {
+      plan_error = "HTTP request contains bytes beyond Content-Length";
+    }
+    const std::string response = BuildRawHttpResponse(400, BadRequestBody(plan_error));
+    net::write(socket, net::buffer(response), error);
     socket.shutdown(tcp::socket::shutdown_send, error);
     return;
   }
+
+  beast::flat_buffer buffer;
+  const auto destination = buffer.prepare(prefix.size());
+  net::buffer_copy(destination, net::buffer(prefix));
+  buffer.commit(prefix.size());
+  http::request_parser<http::string_body> parser;
+  parser.header_limit(kMaxHttpHeaderBytes);
+  parser.body_limit(HttpRequestBodyLimitForTarget(plan->head.target));
+  http::read(socket, buffer, parser, error);
   if (error)
   {
-    throw beast::system_error{error};
+    const std::string response = BuildRawHttpResponse(
+        400,
+        BadRequestBody(
+            error == http::error::body_limit
+                ? "HTTP request body exceeds maximum size"
+                : "failed to read HTTP request"));
+    net::write(socket, net::buffer(response), error);
+    socket.shutdown(tcp::socket::shutdown_send, error);
+    return;
   }
 
+  http::request<http::string_body> request = parser.release();
   http::response<http::string_body> response = DispatchHttpRequest(router, request);
   http::write(socket, response, error);
   if (error)
@@ -775,73 +927,13 @@ bool SendAll(int fd, const std::string &payload)
 
 bool ReadHttpRequest(int fd, std::string &raw, std::string &error)
 {
-  constexpr size_t kMaxRequestBytes = 1024 * 1024;
-  char buffer[4096];
-  while (raw.find("\r\n\r\n") == std::string::npos)
-  {
-    const ssize_t rc = ::recv(fd, buffer, sizeof(buffer), 0);
-    if (rc <= 0)
-    {
-      error = "failed to read HTTP request headers";
-      return false;
-    }
-    raw.append(buffer, static_cast<size_t>(rc));
-    if (raw.size() > kMaxRequestBytes)
-    {
-      error = "HTTP request exceeds maximum size";
-      return false;
-    }
-  }
-
-  std::string parse_error;
-  const std::optional<RawHttpRequest> header_only = ParseRawHttpRequest(raw, parse_error);
-  size_t content_length = 0;
-  if (!header_only.has_value())
-  {
-    const size_t header_end = raw.find("\r\n\r\n");
-    std::map<std::string, std::string> headers;
-    std::istringstream stream(raw.substr(0, header_end));
-    std::string line;
-    std::getline(stream, line);
-    while (std::getline(stream, line))
-    {
-      line = TrimAscii(std::move(line));
-      const size_t colon = line.find(':');
-      if (colon != std::string::npos)
+  return ReadBoundedRawHttpRequest(
+      [fd](char *buffer, const size_t size) -> std::ptrdiff_t
       {
-        headers[LowerAscii(line.substr(0, colon))] = TrimAscii(line.substr(colon + 1));
-      }
-    }
-    const std::optional<size_t> parsed_length = ContentLength(headers);
-    if (!parsed_length.has_value())
-    {
-      error = parse_error;
-      return false;
-    }
-    content_length = *parsed_length;
-  }
-  else
-  {
-    content_length = header_only->body.size();
-  }
-
-  const size_t body_start = raw.find("\r\n\r\n") + 4;
-  while (raw.size() < body_start + content_length)
-  {
-    const ssize_t rc = ::recv(fd, buffer, sizeof(buffer), 0);
-    if (rc <= 0)
-    {
-      error = "failed to read HTTP request body";
-      return false;
-    }
-    raw.append(buffer, static_cast<size_t>(rc));
-    if (raw.size() > kMaxRequestBytes)
-    {
-      error = "HTTP request exceeds maximum size";
-      return false;
-    }
-  }
-  return true;
+        return static_cast<std::ptrdiff_t>(::recv(fd, buffer, size, 0));
+      },
+      raw,
+      error);
 }
 
 int CreateListener(const PlatformConfig &config)

@@ -4,18 +4,15 @@ import hashlib
 import json
 import pathlib
 import shutil
-import subprocess
-import tarfile
 import tomllib
 from collections import defaultdict
 from typing import Any
 
 from package_registry_v2.common import (
-    REGISTRY_SUBPROCESS_TIMEOUT_SECONDS,
     RegistryV2Error,
     artifact_bucket_path,
+    atomic_write_bytes,
     canonical_json_bytes,
-    copy_if_missing_or_same,
     ensure_parent,
     expires_in,
     index_path_for_package,
@@ -36,36 +33,140 @@ from package_registry_v2.common import (
 
 
 MAX_ARCHIVE_MANIFEST_BYTES = 1024 * 1024
+MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
+MAX_DEPENDENCIES_PER_TABLE = 256
+MAX_PACKAGE_BYTES = 255
+MAX_VERSION_BYTES = 64
+MAX_ALIAS_BYTES = 128
+MAX_REGISTRY_BYTES = 2048
+MAX_ARCHIVE_NAME_BYTES = 255
+USTAR_BLOCK_BYTES = 512
 
 
-def _find_manifest_bytes(archive_path: pathlib.Path) -> bytes:
-    with tarfile.open(archive_path, mode="r:*") as archive:
-        candidates: list[tuple[str, bytes]] = []
-        for member in archive.getmembers():
-            if not member.isfile():
-                continue
-            normalized = member.name.replace("\\", "/")
-            if normalized.startswith("/"):
-                raise RegistryV2Error(f"source artifact archive member path must be relative: {member.name!r}")
-            parts = normalized.split("/")
-            if any(part in ("", ".", "..") for part in parts):
+def _bytes_are_zero(value: bytes) -> bool:
+    return not any(value)
+
+
+def _parse_canonical_ustar_octal(field: bytes, name: str) -> int:
+    if len(field) < 2 or field[-1] != 0 or any(byte < ord("0") or byte > ord("7") for byte in field[:-1]):
+        raise RegistryV2Error(f"source archive {name} must be canonical NUL-terminated octal")
+    return int(field[:-1], 8)
+
+
+def _parse_canonical_ustar_checksum(field: bytes) -> int:
+    if len(field) != 8 or field[6] != 0 or field[7] != ord(" "):
+        raise RegistryV2Error("source archive checksum field is not canonical ustar octal")
+    return _parse_canonical_ustar_octal(field[:7], "checksum")
+
+
+def _parse_canonical_ustar_text(field: bytes, name: str) -> bytes:
+    terminator = field.find(b"\0")
+    if terminator < 0:
+        return field
+    if not _bytes_are_zero(field[terminator:]):
+        raise RegistryV2Error(f"source archive {name} has nonzero bytes after its terminator")
+    return field[:terminator]
+
+
+def _validate_canonical_ustar_path(path: bytes) -> list[bytes]:
+    if not path or path.startswith(b"/") or b"\\" in path:
+        raise RegistryV2Error("source archive member path must be canonical POSIX-relative")
+    parts = path.split(b"/")
+    if any(part in (b"", b".", b"..") for part in parts):
+        raise RegistryV2Error("source archive member path must not contain empty, dot, or parent segments")
+    if len(parts) < 2:
+        raise RegistryV2Error("source archive members must belong to one top-level package prefix")
+    return parts
+
+
+def _validate_deterministic_pafio_ustar(archive_bytes: bytes) -> bytes:
+    archive_size = len(archive_bytes)
+    if archive_size < 3 * USTAR_BLOCK_BYTES or archive_size % USTAR_BLOCK_BYTES != 0:
+        raise RegistryV2Error("source archive must be 512-byte aligned canonical ustar")
+
+    paths: set[bytes] = set()
+    top_level_prefix: bytes | None = None
+    previous_path: bytes | None = None
+    manifest_bytes = b""
+    manifest_count = 0
+    offset = 0
+    trailer_seen = False
+    while offset < archive_size:
+        header = archive_bytes[offset : offset + USTAR_BLOCK_BYTES]
+        if _bytes_are_zero(header):
+            if (
+                offset + 2 * USTAR_BLOCK_BYTES != archive_size
+                or not _bytes_are_zero(archive_bytes[offset + USTAR_BLOCK_BYTES : offset + 2 * USTAR_BLOCK_BYTES])
+            ):
+                raise RegistryV2Error("source archive must end with exactly two zero blocks and no trailing bytes")
+            trailer_seen = True
+            offset += 2 * USTAR_BLOCK_BYTES
+            break
+
+        computed_checksum = sum(
+            ord(" ") if 148 <= index < 156 else byte
+            for index, byte in enumerate(header)
+        )
+        if _parse_canonical_ustar_checksum(header[148:156]) != computed_checksum:
+            raise RegistryV2Error("source archive header checksum mismatch")
+        if (
+            _parse_canonical_ustar_octal(header[100:108], "mode") != 0o644
+            or _parse_canonical_ustar_octal(header[108:116], "uid") != 0
+            or _parse_canonical_ustar_octal(header[116:124], "gid") != 0
+            or _parse_canonical_ustar_octal(header[136:148], "mtime") != 0
+        ):
+            raise RegistryV2Error("source archive members must use mode 0644 and zero uid, gid, and mtime")
+        if header[156:157] != b"0":
+            raise RegistryV2Error("source archive may contain regular files only")
+        if header[257:263] != b"ustar\0" or header[263:265] != b"00":
+            raise RegistryV2Error("source archive must use POSIX ustar magic and version")
+        if (
+            not _bytes_are_zero(header[157:257])
+            or not _bytes_are_zero(header[265:345])
+            or not _bytes_are_zero(header[500:512])
+        ):
+            raise RegistryV2Error("source archive link, owner, device, and extension fields must be empty")
+
+        name = _parse_canonical_ustar_text(header[0:100], "name")
+        prefix = _parse_canonical_ustar_text(header[345:500], "prefix")
+        path = name if not prefix else prefix + b"/" + name
+        path_parts = _validate_canonical_ustar_path(path)
+        if path in paths:
+            raise RegistryV2Error("source archive contains a duplicate member path")
+        paths.add(path)
+        if previous_path is not None and previous_path >= path:
+            raise RegistryV2Error("source archive member paths must be strictly increasing")
+        previous_path = path
+        if top_level_prefix is None:
+            top_level_prefix = path_parts[0]
+        elif top_level_prefix != path_parts[0]:
+            raise RegistryV2Error("source archive members must share one top-level package prefix")
+
+        file_size = _parse_canonical_ustar_octal(header[124:136], "size")
+        data_offset = offset + USTAR_BLOCK_BYTES
+        if file_size > archive_size - data_offset:
+            raise RegistryV2Error("source archive member size exceeds archive bounds")
+        padded_size = ((file_size + USTAR_BLOCK_BYTES - 1) // USTAR_BLOCK_BYTES) * USTAR_BLOCK_BYTES
+        if padded_size > archive_size - data_offset:
+            raise RegistryV2Error("source archive member padding exceeds archive bounds")
+        if not _bytes_are_zero(archive_bytes[data_offset + file_size : data_offset + padded_size]):
+            raise RegistryV2Error("source archive member data padding must be zero")
+
+        if path_parts[-1] == b"pafio.toml":
+            manifest_count += 1
+            if len(path_parts) != 2 or file_size > MAX_ARCHIVE_MANIFEST_BYTES:
                 raise RegistryV2Error(
-                    f"source artifact archive member path is not canonical POSIX-relative path: {member.name!r}"
+                    "source archive manifest must be exactly <prefix>/pafio.toml "
+                    f"and no larger than {MAX_ARCHIVE_MANIFEST_BYTES} bytes"
                 )
-            if normalized == "spio.toml" or normalized.endswith("/spio.toml"):
-                if member.size > MAX_ARCHIVE_MANIFEST_BYTES:
-                    raise RegistryV2Error(
-                        f"source artifact manifest candidate exceeds {MAX_ARCHIVE_MANIFEST_BYTES} bytes: {member.name!r}"
-                    )
-                handle = archive.extractfile(member)
-                if handle is None:
-                    continue
-                candidates.append((normalized, handle.read()))
-        if not candidates:
-            raise RegistryV2Error(f"source artifact does not contain spio.toml: {archive_path}")
-        if len(candidates) != 1:
-            raise RegistryV2Error(f"source artifact contains multiple spio.toml manifests: {archive_path}")
-    return candidates[0][1]
+            manifest_bytes = archive_bytes[data_offset : data_offset + file_size]
+        offset = data_offset + padded_size
+
+    if not trailer_seen or offset != archive_size:
+        raise RegistryV2Error("source archive must end with exactly two zero blocks")
+    if manifest_count != 1:
+        raise RegistryV2Error("source archive must contain exactly one <prefix>/pafio.toml")
+    return manifest_bytes
 
 
 def _log_root_hash(leaf_hashes: list[str]) -> str:
@@ -107,7 +208,7 @@ def _registry_config(
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "schema_version": 1,
-        "protocol": "spio-static-registry",
+        "protocol": "pafio-static-registry",
         "protocol_version": 2,
         "registry_name": registry_name,
         "generated_at": generated_at,
@@ -149,69 +250,312 @@ def _canonical_archive_path(value: str) -> pathlib.Path:
     return path.resolve()
 
 
-def _prepare_publish_candidate(
-    spio_bin: pathlib.Path,
-    manifest_path: pathlib.Path,
-    package_name: str | None,
-    output_path: pathlib.Path | None,
-) -> dict[str, Any]:
-    command = [
-        str(spio_bin),
-        "--json",
-        "publish",
-        "--dry-run",
-        "--manifest-path",
-        str(manifest_path),
-    ]
-    if package_name is not None:
-        command.extend(["--package", package_name])
-    if output_path is not None:
-        command.extend(["--output", str(output_path)])
-    try:
-        proc = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=REGISTRY_SUBPROCESS_TIMEOUT_SECONDS,
+def _bounded_string(value: Any, context: str, max_bytes: int) -> str:
+    text = require_string(value, context)
+    if len(text.encode("utf-8")) > max_bytes:
+        raise RegistryV2Error(f"{context} exceeds the {max_bytes}-byte limit")
+    return text
+
+
+def _is_safe_package_name(package_name: str) -> bool:
+    parts = package_name.split("/")
+    if len(parts) != 2:
+        return False
+    for part in parts:
+        if not part or not (("a" <= part[0] <= "z") or ("0" <= part[0] <= "9")):
+            return False
+        if any(not (("a" <= char <= "z") or ("0" <= char <= "9") or char in "-_") for char in part):
+            return False
+    return True
+
+
+def _is_safe_archive_name(archive_name: str) -> bool:
+    if archive_name.startswith(".") or not archive_name.endswith(".pafio.src.tar"):
+        return False
+    return all(
+        ("A" <= char <= "Z")
+        or ("a" <= char <= "z")
+        or ("0" <= char <= "9")
+        or char in "-_."
+        for char in archive_name
+    )
+
+
+def _is_strict_pafio_version(value: str) -> bool:
+    parts = value.split(".")
+    return (
+        len(parts) == 3
+        and all(part and all("0" <= char <= "9" for char in part) for part in parts)
+    )
+
+
+def _normalize_publish_dependencies(entries: Any, field_name: str) -> list[dict[str, str]]:
+    if not isinstance(entries, list):
+        raise RegistryV2Error(f"{field_name} must be an array")
+    if len(entries) > MAX_DEPENDENCIES_PER_TABLE:
+        raise RegistryV2Error(f"{field_name} exceeds the {MAX_DEPENDENCIES_PER_TABLE}-entry limit")
+    normalized: list[dict[str, str]] = []
+    aliases: set[str] = set()
+    expected_fields = {"alias", "package", "version_req", "registry"}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != expected_fields:
+            raise RegistryV2Error(f"{field_name} entries must contain exactly alias, package, version_req, and registry")
+        alias = _bounded_string(entry["alias"], f"{field_name}.alias", MAX_ALIAS_BYTES)
+        package = _bounded_string(entry["package"], f"{field_name}.package", MAX_PACKAGE_BYTES)
+        version_req = _bounded_string(entry["version_req"], f"{field_name}.version_req", MAX_VERSION_BYTES)
+        registry = _bounded_string(entry["registry"], f"{field_name}.registry", MAX_REGISTRY_BYTES)
+        if not _is_safe_package_name(package):
+            raise RegistryV2Error(f"{field_name}.package must use lowercase namespace/name form")
+        if not _is_strict_pafio_version(version_req):
+            raise RegistryV2Error(f"{field_name}.version_req must be strict x.y.z")
+        if alias in aliases:
+            raise RegistryV2Error(f"{field_name} contains duplicate alias: {alias}")
+        aliases.add(alias)
+        normalized.append(
+            {
+                "alias": alias,
+                "package": package,
+                "version_req": version_req,
+                "registry": registry,
+            }
         )
-    except subprocess.TimeoutExpired as err:
-        raise RegistryV2Error(
-            f"spio publish --dry-run timed out after {REGISTRY_SUBPROCESS_TIMEOUT_SECONDS:g}s"
-        ) from err
-    if proc.returncode != 0:
-        stderr = proc.stderr.strip() or proc.stdout.strip()
-        raise RegistryV2Error(f"spio publish --dry-run failed: {stderr}")
+    return sorted(normalized, key=lambda dependency: dependency["alias"])
+
+
+def _release_dependencies(dependencies: list[dict[str, str]], kind: str) -> list[dict[str, Any]]:
+    return [
+        {
+            **dependency,
+            "kind": kind,
+            "optional": False,
+            "target_condition": "",
+            "features": [],
+        }
+        for dependency in dependencies
+    ]
+
+
+def _toml_statements(source: str) -> list[str]:
+    statements: list[str] = []
+    current: list[str] = []
+    brackets: list[str] = []
+    state = "normal"
+    index = 0
+    while index < len(source):
+        char = source[index]
+        if state == "normal":
+            if char == "#":
+                newline = source.find("\n", index)
+                if newline < 0:
+                    break
+                if brackets:
+                    current.append("\n")
+                elif "".join(current).strip():
+                    statements.append("".join(current).strip())
+                    current = []
+                index = newline + 1
+                continue
+            if source.startswith('"""', index):
+                current.append('"""')
+                state = "multiline-basic"
+                index += 3
+                continue
+            if source.startswith("'''", index):
+                current.append("'''")
+                state = "multiline-literal"
+                index += 3
+                continue
+            if char == '"':
+                current.append(char)
+                state = "basic"
+                index += 1
+                continue
+            if char == "'":
+                current.append(char)
+                state = "literal"
+                index += 1
+                continue
+            if char in "[{":
+                brackets.append(char)
+            elif char == "]" and brackets and brackets[-1] == "[":
+                brackets.pop()
+            elif char == "}" and brackets and brackets[-1] == "{":
+                brackets.pop()
+            if char == "\n" and not brackets:
+                if "".join(current).strip():
+                    statements.append("".join(current).strip())
+                current = []
+            else:
+                current.append(char)
+            index += 1
+            continue
+        if state in ("basic", "multiline-basic") and char == "\\":
+            current.append(char)
+            if index + 1 < len(source):
+                current.append(source[index + 1])
+                index += 2
+            else:
+                index += 1
+            continue
+        if state == "basic" and char == '"':
+            current.append(char)
+            state = "normal"
+            index += 1
+            continue
+        if state == "literal" and char == "'":
+            current.append(char)
+            state = "normal"
+            index += 1
+            continue
+        if state == "multiline-basic" and source.startswith('"""', index):
+            current.append('"""')
+            state = "normal"
+            index += 3
+            continue
+        if state == "multiline-literal" and source.startswith("'''", index):
+            current.append("'''")
+            state = "normal"
+            index += 3
+            continue
+        current.append(char)
+        index += 1
+    if "".join(current).strip():
+        statements.append("".join(current).strip())
+    return statements
+
+
+_TOML_SHAPE_PROBE = "__pafio_dependency_shape_probe_82da61e4__"
+
+
+def _find_toml_probe_path(value: Any, path: tuple[str, ...] = ()) -> tuple[str, ...] | None:
+    if value == _TOML_SHAPE_PROBE:
+        return path
+    if isinstance(value, dict):
+        for key, child in value.items():
+            result = _find_toml_probe_path(child, path + (key,))
+            if result is not None:
+                return result
+    elif isinstance(value, list):
+        for child in value:
+            result = _find_toml_probe_path(child, path)
+            if result is not None:
+                return result
+    return None
+
+
+def _toml_header_path(statement: str) -> tuple[str, ...]:
     try:
-        payload = json.loads(proc.stdout)
-    except json.JSONDecodeError as err:
-        raise RegistryV2Error("spio publish --dry-run did not emit valid JSON") from err
-    if not isinstance(payload, dict):
-        raise RegistryV2Error("spio publish --dry-run must emit a top-level JSON object")
-    if payload.get("command") != "publish" or payload.get("mode") != "dry-run":
-        raise RegistryV2Error("spio publish --dry-run emitted an unexpected payload shape")
-    return payload
+        probe_document = tomllib.loads(f'{statement}\n{_TOML_SHAPE_PROBE} = "{_TOML_SHAPE_PROBE}"')
+    except tomllib.TOMLDecodeError as err:
+        raise RegistryV2Error("source package dependency table declaration is not valid TOML") from err
+    probe_path = _find_toml_probe_path(probe_document)
+    if probe_path is None or probe_path[-1:] != (_TOML_SHAPE_PROBE,):
+        raise RegistryV2Error("source package dependency table declaration could not be validated")
+    return probe_path[:-1]
 
 
-def _normalize_dependency(alias: str, spec: Any, section_name: str) -> dict[str, Any]:
+def _split_toml_assignment(statement: str) -> tuple[str, str]:
+    state = "normal"
+    index = 0
+    while index < len(statement):
+        char = statement[index]
+        if state == "normal":
+            if char == '"':
+                state = "basic"
+            elif char == "'":
+                state = "literal"
+            elif char == "=":
+                return statement[:index].strip(), statement[index + 1 :].strip()
+        elif state == "basic" and char == "\\":
+            index += 1
+        elif state == "basic" and char == '"':
+            state = "normal"
+        elif state == "literal" and char == "'":
+            state = "normal"
+        index += 1
+    raise RegistryV2Error("source package manifest statement must contain a key/value assignment")
+
+
+def _toml_assignment_path(key_source: str) -> tuple[str, ...]:
+    try:
+        probe_document = tomllib.loads(f'{key_source} = "{_TOML_SHAPE_PROBE}"')
+    except tomllib.TOMLDecodeError as err:
+        raise RegistryV2Error("source package dependency key is not valid TOML") from err
+    probe_path = _find_toml_probe_path(probe_document)
+    if probe_path is None:
+        raise RegistryV2Error("source package dependency key could not be validated")
+    return probe_path
+
+
+def _validate_inline_dependency_shape(source: str, manifest_doc: dict[str, Any]) -> None:
+    dependency_sections = {"dependencies", "dev-dependencies"}
+    inline_aliases = {section: set() for section in dependency_sections}
+    active_header: tuple[str, ...] = ()
+    for statement in _toml_statements(source):
+        stripped = statement.lstrip()
+        if stripped.startswith("["):
+            active_header = _toml_header_path(statement)
+            if active_header and active_header[0] in dependency_sections:
+                if stripped.startswith("[[") or len(active_header) != 1:
+                    raise RegistryV2Error(
+                        f"[{active_header[0]}] entries must be inline tables"
+                    )
+            continue
+        key_source, value_source = _split_toml_assignment(statement)
+        absolute_path = active_header + _toml_assignment_path(key_source)
+        if not absolute_path or absolute_path[0] not in dependency_sections:
+            continue
+        if len(absolute_path) != 2 or not value_source.startswith("{"):
+            raise RegistryV2Error(f"[{absolute_path[0]}] entries must be inline tables")
+        inline_aliases[absolute_path[0]].add(absolute_path[1])
+
+    for section_name in dependency_sections:
+        section = manifest_doc.get(section_name, {})
+        if isinstance(section, dict) and set(section) != inline_aliases[section_name]:
+            raise RegistryV2Error(f"[{section_name}] entries must be inline tables")
+
+
+def _normalize_dependency(alias: str, spec: Any, section_name: str) -> dict[str, str]:
+    alias = _bounded_string(alias, f"dependency alias in [{section_name}]", MAX_ALIAS_BYTES)
     if not isinstance(spec, dict):
         raise RegistryV2Error(f"dependency '{alias}' in [{section_name}] must be an inline table")
-    package = require_string(spec.get("package"), f"dependency '{alias}' package in [{section_name}]")
-    version = require_string(spec.get("version"), f"dependency '{alias}' version in [{section_name}]")
-    registry = require_string(spec.get("registry"), f"dependency '{alias}' registry in [{section_name}]")
+    expected_fields = {"package", "version", "registry"}
+    if set(spec) != expected_fields:
+        raise RegistryV2Error(
+            f"dependency '{alias}' in [{section_name}] must contain exactly package, version, and registry"
+        )
+    package = _bounded_string(
+        spec["package"],
+        f"dependency '{alias}' package in [{section_name}]",
+        MAX_PACKAGE_BYTES,
+    )
+    version = _bounded_string(
+        spec["version"],
+        f"dependency '{alias}' version in [{section_name}]",
+        MAX_VERSION_BYTES,
+    )
+    registry = _bounded_string(
+        spec["registry"],
+        f"dependency '{alias}' registry in [{section_name}]",
+        MAX_REGISTRY_BYTES,
+    )
+    if not _is_safe_package_name(package):
+        raise RegistryV2Error(
+            f"dependency '{alias}' package in [{section_name}] must use lowercase namespace/name form"
+        )
+    if not _is_strict_pafio_version(version):
+        raise RegistryV2Error(
+            f"dependency '{alias}' version in [{section_name}] must be strict x.y.z"
+        )
     return {
         "alias": alias,
         "package": package,
         "version_req": version,
         "registry": registry,
-        "kind": "runtime" if section_name == "dependencies" else "development",
-        "optional": False,
-        "target_condition": "",
-        "features": [],
     }
 
 
-def _record_dependencies(manifest_doc: dict[str, Any], section_name: str) -> list[dict[str, Any]]:
+def _record_dependencies(manifest_doc: dict[str, Any], section_name: str) -> list[dict[str, str]]:
     section = manifest_doc.get(section_name, {})
     if section is None:
         return []
@@ -220,29 +564,103 @@ def _record_dependencies(manifest_doc: dict[str, Any], section_name: str) -> lis
     return [_normalize_dependency(alias, spec, section_name) for alias, spec in sorted(section.items())]
 
 
-def _extract_record_from_archive(
-    archive_path: pathlib.Path,
+def _validate_pafio_manifest(
+    manifest_bytes: bytes,
     *,
-    publisher_id: str,
-    published_at: str,
-) -> tuple[dict[str, Any], bytes]:
-    manifest_bytes = _find_manifest_bytes(archive_path)
+    expected_package: str,
+    expected_version: str,
+    expected_dependencies: list[dict[str, str]],
+    expected_dev_dependencies: list[dict[str, str]],
+) -> None:
     try:
-        manifest_doc = tomllib.loads(manifest_bytes.decode("utf-8"))
+        manifest_source = manifest_bytes.decode("utf-8")
     except UnicodeDecodeError as err:
-        raise RegistryV2Error(f"source package manifest is not UTF-8: {archive_path}") from err
+        raise RegistryV2Error("source package pafio.toml is not UTF-8") from err
+    try:
+        manifest_doc = tomllib.loads(manifest_source)
     except tomllib.TOMLDecodeError as err:
-        raise RegistryV2Error(f"source package manifest is not valid TOML: {archive_path}") from err
+        raise RegistryV2Error("source package pafio.toml is not valid TOML") from err
 
+    if "spio" in manifest_doc:
+        raise RegistryV2Error("source package pafio.toml must not contain [spio]")
+    pafio_table = require_object(manifest_doc.get("pafio"), "source package manifest [pafio]")
+    manifest_version = pafio_table.get("manifest-version")
+    if not isinstance(manifest_version, int) or isinstance(manifest_version, bool) or manifest_version != 1:
+        raise RegistryV2Error("source package manifest [pafio].manifest-version must be 1")
     package_table = require_object(manifest_doc.get("package"), "source package manifest [package]")
     package_name = require_string(package_table.get("name"), "source package manifest package.name")
     package_version = require_string(package_table.get("version"), "source package manifest package.version")
+    if not _is_strict_pafio_version(package_version):
+        raise RegistryV2Error("source package manifest package.version must be strict x.y.z")
+    if package_table.get("publish") is not True:
+        raise RegistryV2Error("source package manifest package.publish must be true")
+    _validate_inline_dependency_shape(manifest_source, manifest_doc)
     dependencies = _record_dependencies(manifest_doc, "dependencies")
     dev_dependencies = _record_dependencies(manifest_doc, "dev-dependencies")
-    artifact_sha256 = sha256_file(archive_path)
+    if package_name != expected_package:
+        raise RegistryV2Error("request package does not match archived pafio.toml")
+    if package_version != expected_version:
+        raise RegistryV2Error("request version does not match archived pafio.toml")
+    if dependencies != expected_dependencies:
+        raise RegistryV2Error("request dependencies do not match archived pafio.toml")
+    if dev_dependencies != expected_dev_dependencies:
+        raise RegistryV2Error("request dev_dependencies do not match archived pafio.toml")
+
+
+def validate_publish_archive_bytes(
+    archive_bytes: bytes,
+    *,
+    package_name: str,
+    package_version: str,
+    dependencies: list[dict[str, str]],
+    dev_dependencies: list[dict[str, str]],
+) -> bytes:
+    if not isinstance(archive_bytes, bytes):
+        raise RegistryV2Error("source archive must be provided as bytes")
+    if not archive_bytes or len(archive_bytes) > MAX_ARCHIVE_BYTES:
+        raise RegistryV2Error(f"source archive must be between 1 and {MAX_ARCHIVE_BYTES} bytes")
+    package_name = _bounded_string(package_name, "package", MAX_PACKAGE_BYTES)
+    package_version = _bounded_string(package_version, "version", MAX_VERSION_BYTES)
+    if not _is_safe_package_name(package_name):
+        raise RegistryV2Error("package must use lowercase namespace/name form")
+    if not _is_strict_pafio_version(package_version):
+        raise RegistryV2Error("version must be strict x.y.z")
+    normalized_dependencies = _normalize_publish_dependencies(dependencies, "dependencies")
+    normalized_dev_dependencies = _normalize_publish_dependencies(dev_dependencies, "dev_dependencies")
+    manifest_bytes = _validate_deterministic_pafio_ustar(archive_bytes)
+    _validate_pafio_manifest(
+        manifest_bytes,
+        expected_package=package_name,
+        expected_version=package_version,
+        expected_dependencies=normalized_dependencies,
+        expected_dev_dependencies=normalized_dev_dependencies,
+    )
+    return manifest_bytes
+
+
+def _extract_record_from_archive_bytes(
+    archive_bytes: bytes,
+    *,
+    expected_package: str,
+    expected_version: str,
+    expected_dependencies: list[dict[str, str]],
+    expected_dev_dependencies: list[dict[str, str]],
+    publisher_id: str,
+    published_at: str,
+) -> dict[str, Any]:
+    manifest_bytes = validate_publish_archive_bytes(
+        archive_bytes,
+        package_name=expected_package,
+        package_version=expected_version,
+        dependencies=expected_dependencies,
+        dev_dependencies=expected_dev_dependencies,
+    )
+    dependencies = _release_dependencies(expected_dependencies, "runtime")
+    dev_dependencies = _release_dependencies(expected_dev_dependencies, "development")
+    artifact_sha256 = sha256_bytes(archive_bytes)
     metadata_source = {
-        "package": package_name,
-        "version": package_version,
+        "package": expected_package,
+        "version": expected_version,
         "publisher_id": publisher_id,
         "published_at": published_at,
         "archive_sha256": artifact_sha256,
@@ -251,8 +669,8 @@ def _extract_record_from_archive(
     }
     record = {
         "schema_version": 1,
-        "package": package_name,
-        "version": package_version,
+        "package": expected_package,
+        "version": expected_version,
         "release_revision": 1,
         "published_at": published_at,
         "publisher_id": publisher_id,
@@ -260,8 +678,8 @@ def _extract_record_from_archive(
         "deprecated_message": "",
         "source_artifact": {
             "sha256": artifact_sha256,
-            "size_bytes": archive_path.stat().st_size,
-            "path": artifact_bucket_path("artifacts/source/sha256", artifact_sha256, ".spio.src.tar").as_posix(),
+            "size_bytes": len(archive_bytes),
+            "path": artifact_bucket_path("artifacts/source/sha256", artifact_sha256, ".pafio.src.tar").as_posix(),
             "archive_format": "tar",
             "compression": "none",
         },
@@ -275,7 +693,7 @@ def _extract_record_from_archive(
         "manifest_digest": sha256_bytes(manifest_bytes),
         "metadata_digest": sha256_bytes(canonical_json_bytes(metadata_source)),
     }
-    return record, manifest_bytes
+    return record
 
 
 def _read_signed_version(path: pathlib.Path) -> int:
@@ -333,7 +751,7 @@ def _initialize_registry_root(
     if config_path.exists() or root_path.exists():
         _ensure_root_matches_keys(dest_root, role_keys)
         config = load_json_file(config_path, "registry v2 config")
-        if config.get("protocol") != "spio-static-registry" or config.get("protocol_version") != 2:
+        if config.get("protocol") != "pafio-static-registry" or config.get("protocol_version") != 2:
             raise RegistryV2Error("existing registry root does not match the registry v2 protocol")
         existing_name = require_string(config.get("registry_name"), "registry v2 config registry_name")
         if existing_name != registry_name:
@@ -611,13 +1029,22 @@ def _create_publication(dest_root: pathlib.Path, registry_name: str, registry_ti
     return publication
 
 
-def _append_release_record(dest_root: pathlib.Path, record: dict[str, Any], archive_path: pathlib.Path) -> dict[str, Any]:
+def _append_release_record(dest_root: pathlib.Path, record: dict[str, Any], archive_bytes: bytes) -> dict[str, Any]:
     package_name = require_string(record.get("package"), "registry v2 publish record package")
     package_version = require_string(record.get("version"), "registry v2 publish record version")
     artifact = require_object(record.get("source_artifact"), "registry v2 publish source artifact")
     artifact_relative_path = require_string(artifact.get("path"), "registry v2 publish source artifact path")
     artifact_dest_path = dest_root / pathlib.PurePosixPath(artifact_relative_path)
-    copy_if_missing_or_same(archive_path, artifact_dest_path)
+    artifact_sha256 = require_string(artifact.get("sha256"), "registry v2 publish source artifact sha256")
+    if artifact_dest_path.exists():
+        if (
+            not artifact_dest_path.is_file()
+            or artifact_dest_path.stat().st_size != len(archive_bytes)
+            or sha256_file(artifact_dest_path) != artifact_sha256
+        ):
+            raise RegistryV2Error("destination source artifact already exists with different content")
+    else:
+        atomic_write_bytes(artifact_dest_path, archive_bytes)
 
     index_path = dest_root / index_path_for_package(package_name)
     existing_records: list[dict[str, Any]] = []
@@ -661,64 +1088,70 @@ def publish_to_registry_v2(
     dest_root_value: str,
     key_dir_value: str,
     *,
-    archive_path_value: str | None = None,
-    manifest_path_value: str | None = None,
-    spio_bin_value: str | None = None,
-    package_name: str | None = None,
-    output_path_value: str | None = None,
-    registry_name: str = "spio-registry-v2",
-    publisher_id: str = "local-publisher",
+    archive_path_value: str,
+    archive_name: str,
+    package_name: str,
+    package_version: str,
+    dependencies: list[dict[str, str]],
+    dev_dependencies: list[dict[str, str]],
+    registry_name: str = "pafio-static-registry",
+    publisher_id: str = "control-plane",
 ) -> dict[str, Any]:
-    if archive_path_value is None and manifest_path_value is None:
-        raise RegistryV2Error("registry v2 publish requires --archive-path or --manifest-path")
-    if archive_path_value is not None and manifest_path_value is not None:
-        raise RegistryV2Error("registry v2 publish accepts either --archive-path or --manifest-path, not both")
+    package_name = _bounded_string(package_name, "package", MAX_PACKAGE_BYTES)
+    package_version = _bounded_string(package_version, "version", MAX_VERSION_BYTES)
+    archive_name = _bounded_string(archive_name, "archive_name", MAX_ARCHIVE_NAME_BYTES)
+    publisher_id = _bounded_string(publisher_id, "publisher_id", MAX_PACKAGE_BYTES)
+    if not _is_safe_package_name(package_name):
+        raise RegistryV2Error("package must use lowercase namespace/name form")
+    if not _is_strict_pafio_version(package_version):
+        raise RegistryV2Error("version must be strict x.y.z")
+    if not _is_safe_archive_name(archive_name):
+        raise RegistryV2Error("archive_name must be a safe basename ending in .pafio.src.tar")
+    normalized_dependencies = _normalize_publish_dependencies(dependencies, "dependencies")
+    normalized_dev_dependencies = _normalize_publish_dependencies(dev_dependencies, "dev_dependencies")
+    archive_path = _canonical_archive_path(archive_path_value)
+    if not archive_path.is_file():
+        raise RegistryV2Error("registry v2 publish archive was not found")
+    try:
+        archive_bytes = archive_path.read_bytes()
+    except OSError as err:
+        raise RegistryV2Error("registry v2 publish archive could not be read") from err
+    if not archive_bytes or len(archive_bytes) > MAX_ARCHIVE_BYTES:
+        raise RegistryV2Error(f"registry v2 publish archive must be between 1 and {MAX_ARCHIVE_BYTES} bytes")
 
-    dest_root = normalize_local_root(dest_root_value)
-    key_dir = normalize_local_root(key_dir_value)
-    role_keys = load_role_keys(key_dir)
     registry_time = utc_now().strftime("%Y-%m-%dT%H:%M:%SZ")
-    created_root = _initialize_registry_root(dest_root, role_keys, registry_name=registry_name, registry_time=registry_time)
-
-    candidate_payload: dict[str, Any] | None = None
-    if archive_path_value is not None:
-        archive_path = _canonical_archive_path(archive_path_value)
-    else:
-        manifest_path = _canonical_archive_path(manifest_path_value or "spio.toml")
-        spio_bin = _canonical_archive_path(spio_bin_value or str(pathlib.Path(__file__).resolve().parents[2] / "scripts" / "spio"))
-        output_path = _canonical_archive_path(output_path_value) if output_path_value is not None else None
-        candidate_payload = _prepare_publish_candidate(spio_bin, manifest_path, package_name, output_path)
-        archive_path = _canonical_archive_path(require_string(candidate_payload.get("archive_path"), "spio publish dry-run archive_path"))
-
-    if not archive_path.exists():
-        raise RegistryV2Error(f"registry v2 publish archive was not found: {archive_path}")
-
-    record, _ = _extract_record_from_archive(
-        archive_path,
+    record = _extract_record_from_archive_bytes(
+        archive_bytes,
+        expected_package=package_name,
+        expected_version=package_version,
+        expected_dependencies=normalized_dependencies,
+        expected_dev_dependencies=normalized_dev_dependencies,
         publisher_id=publisher_id,
         published_at=registry_time,
     )
-    append_result = _append_release_record(dest_root, record, archive_path)
+    dest_root = normalize_local_root(dest_root_value)
+    key_dir = normalize_local_root(key_dir_value)
+    role_keys = load_role_keys(key_dir)
+    created_root = _initialize_registry_root(dest_root, role_keys, registry_name=registry_name, registry_time=registry_time)
+    append_result = _append_release_record(dest_root, record, archive_bytes)
     metadata_versions = _refresh_signed_metadata(dest_root, role_keys, registry_time)
     publication = _create_publication(dest_root, registry_name, registry_time)
 
     return {
-        "ok": True,
-        "registry_root": str(dest_root),
         "created_root": created_root,
         "package": record["package"],
         "version": record["version"],
         "publisher_id": publisher_id,
         "published_at": registry_time,
-        "archive_path": str(archive_path),
+        "archive_name": archive_name,
         "archive_sha256": record["source_artifact"]["sha256"],
         "archive_size_bytes": record["source_artifact"]["size_bytes"],
         "artifact_path": record["source_artifact"]["path"],
         "index_path": append_result["index_path"].relative_to(dest_root).as_posix(),
         "log_leaf_path": append_result["leaf_path"].relative_to(dest_root).as_posix(),
         "sequence": append_result["sequence"],
-        "dependencies": len(record["dependencies"]),
-        "dev_dependencies": len(record["dev_dependencies"]),
+        "dependencies": normalized_dependencies,
+        "dev_dependencies": normalized_dev_dependencies,
         "checkpoint_version": metadata_versions["checkpoint_version"],
         "snapshot_version": metadata_versions["snapshot_version"],
         "timestamp_version": metadata_versions["timestamp_version"],
@@ -727,7 +1160,6 @@ def publish_to_registry_v2(
         "repository_version_id": publication["repository_version_id"],
         "publication_id": publication["publication_id"],
         "distribution_id": "default",
-        "candidate": candidate_payload,
     }
 
 
@@ -735,7 +1167,7 @@ def initialize_registry_v2_root(
     dest_root_value: str,
     key_dir_value: str,
     *,
-    registry_name: str = "spio-registry-v2",
+    registry_name: str = "pafio-static-registry",
 ) -> dict[str, Any]:
     from .keygen import generate_key_directory
 
